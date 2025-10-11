@@ -47,3 +47,4 @@ app.*.map.json
 .env
 .env.*
 node_modules/
+/Backend/.env

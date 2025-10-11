@@ -1,19 +1,14 @@
-// news_feed_screen.dart
+// lib/screens/news_feed_screen.dart
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:html/parser.dart' show parse;
 
-class Article {
-  final String title;
-  final String excerpt;
-  final List<String> tags;
-  final String sentiment;
 
-  Article({
-    required this.title,
-    required this.excerpt,
-    required this.tags,
-    required this.sentiment,
-  });
-}
+import '../models/article.dart';
 
 class NewsFeedScreen extends StatefulWidget {
   const NewsFeedScreen({super.key});
@@ -23,20 +18,214 @@ class NewsFeedScreen extends StatefulWidget {
 }
 
 class _NewsFeedScreenState extends State<NewsFeedScreen> {
-  final List<Article> _articles = List.generate(
-    6,
-    (i) => Article(
-      title: "RBI Raises Repo Rate by 25 bps to 6.75%",
-      excerpt:
-          "The Reserve Bank of India (RBI) has increased the repo rate by 25 basis points to 6.75% in today's policy meeting. The move aims to curb inflationary pressures, but could impact borrowing costs for corporates and retail loans.",
-      tags: ["#RBI", "#InterestRates", "#BankingStocks"],
-      sentiment: "Slightly Negative for markets",
-    ),
-  );
+  // read key from .env (set in main.dart with dotenv.load(...))
+  final String? _apiKey =
+      dotenv.env['MARKETAUX_API_KEY'] ?? dotenv.env['API_KEY'];
 
+  final TextEditingController _searchController = TextEditingController();
+
+  List<Article> _articles = [];
+  List<Article> _filtered = [];
+  bool _isLoading = false;
+  String _error = '';
   int _bottomIndex = 0;
   int _tabIndex = 0;
-  final _searchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(_applySearch);
+    _fetchNews();
+  }
+
+  @override
+  void dispose() {
+    _searchController.removeListener(_applySearch);
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _applySearch() {
+    final q = _searchController.text.trim().toLowerCase();
+    if (q.isEmpty) {
+      setState(() => _filtered = List.from(_articles));
+      return;
+    }
+    setState(() {
+      _filtered = _articles.where((a) {
+        final hay = '${a.title} ${a.excerpt} ${a.tags.join(' ')}'.toLowerCase();
+        return hay.contains(q);
+      }).toList();
+    });
+  }
+  Future<String> fetchFullArticleText(String url) async {
+  try {
+    final resp = await http.get(Uri.parse(url));
+    if (resp.statusCode == 200) {
+      final document = parse(resp.body);
+      // Get all text inside <p> tags (basic extraction)
+      final paragraphs = document.getElementsByTagName('p');
+      final text = paragraphs.map((e) => e.text.trim()).where((t) => t.isNotEmpty).join('\n\n');
+      return text.isNotEmpty ? text : '';
+    }
+  } catch (e) {
+    debugPrint('Error fetching full article from $url: $e');
+  }
+  return '';
+}
+
+  Future<void> _fetchNews() async {
+    if (_apiKey == null || _apiKey!.isEmpty) {
+      setState(() {
+        _error = 'API key not found. Add API_KEY (or MARKETAUX_API_KEY) to .env';
+        _isLoading = false;
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _error = '';
+    });
+
+    try {
+      final uri = Uri.https('api.marketaux.com', '/v1/news/all', {
+        'api_token': _apiKey!,
+        'countries': 'in',
+        'language': 'en',
+        'filter_entities': 'true',
+        'industries': 'Financial Services',
+        'limit': '30',
+      });
+
+      final resp = await http.get(uri).timeout(const Duration(seconds: 15));
+
+      if (resp.statusCode == 200) {
+        final Map<String, dynamic> jsonBody = jsonDecode(resp.body);
+        final List<dynamic> data = jsonBody['data'] ?? [];
+
+        final List<Article> parsed = data.map<Article>((item) {
+          // Marketaux fields: title, description, source, published_at, url, entities
+          final title = item['title'] ?? 'No title';
+          final excerpt = item['description'] ?? '';
+          final url = item['url'] ?? '';
+          DateTime date;
+          try {
+            date = DateTime.parse(item['published_at']);
+          } catch (_) {
+            date = DateTime.now();
+          }
+          final List<String> tags = [];
+          try {
+            if (item['entities'] is List) {
+              for (final ent in item['entities']) {
+                if (ent is Map && ent['name'] != null) tags.add('#${ent['name']}');
+              }
+            }
+          } catch (_) {}
+          // sentiment left empty for now
+          return Article(
+            title: title,
+            excerpt: excerpt,
+            tags: tags,
+            sentiment: '',
+            url: url,
+            date: date,
+          );
+        }).toList();
+
+        parsed.sort((a, b) => b.date.compareTo(a.date));
+
+        if (!mounted) return;
+        setState(() {
+          _articles = parsed;
+          _filtered = List.from(parsed);
+          _isLoading = false;
+        });
+      } else {
+        if (!mounted) return;
+        setState(() {
+          _error = 'Failed to fetch news (code ${resp.statusCode})';
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'Error fetching news: $e';
+        _isLoading = false;
+      });
+    }
+  }
+  Future<String?> fetchSummary(String text) async {
+  try {
+    final uri = Uri.parse('http://10.170.141.198:8000/summarize');
+    final resp = await http.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'text': text}),
+    );
+
+    if (resp.statusCode == 200) {
+      final data = jsonDecode(resp.body);
+      return data['summary'] as String?;
+    }
+  } catch (e) {
+    debugPrint("Error fetching summary: $e");
+  }
+  return null;
+}
+
+
+ Future<void> _showSummary(Article article) async {
+  if (article.summary != null) {
+    _showDialog(article.summary!);
+    return;
+  }
+
+  // Show loading
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (_) => const Center(child: CircularProgressIndicator()),
+  );
+
+  String content = article.excerpt; // fallback
+  if (article.url.isNotEmpty) {
+    final fullText = await fetchFullArticleText(article.url);
+    if (fullText.isNotEmpty) content = fullText;
+  }
+
+  final summary = await fetchSummary(content);
+  Navigator.pop(context); // remove loading
+
+  if (summary != null) {
+    setState(() => article.summary = summary); // cache locally
+    _showDialog(summary);
+  } else {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Failed to fetch summary')),
+    );
+  }
+}
+
+
+void _showDialog(String summary) {
+  showDialog(
+    context: context,
+    builder: (_) => AlertDialog(
+      title: const Text('News Summary'),
+      content: Text(summary),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Close'),
+        ),
+      ],
+    ),
+  );
+}
+
 
   Widget _buildTopSearchRow() {
     return Padding(
@@ -48,7 +237,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
             child: Container(
               height: 48,
               decoration: BoxDecoration(
-                color: const Color(0xFFF6B3B3), // coral/pink look
+                color: const Color(0xFFF6B3B3),
                 borderRadius: BorderRadius.circular(28),
               ),
               padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -82,9 +271,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
             ),
             child: const CircleAvatar(
               radius: 20,
-              backgroundImage: NetworkImage(
-                'https://i.pravatar.cc/300', // placeholder avatar
-              ),
+              backgroundImage: NetworkImage('https://i.pravatar.cc/300'),
             ),
           ),
         ],
@@ -130,6 +317,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
   }
 
   Widget _buildArticleCard(Article a) {
+    final dateFormatted = DateFormat.yMMMd().add_jm().format(a.date);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 10),
       child: Container(
@@ -150,33 +338,47 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
             ),
             const SizedBox(height: 8),
 
-            // Excerpt
+            // Date
             Text(
-              a.excerpt,
-              style: TextStyle(fontSize: 14, color: Colors.grey.shade800, height: 1.35),
+              dateFormatted,
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
             ),
+            const SizedBox(height: 8),
+
+            // Excerpt
+            if (a.excerpt.isNotEmpty)
+              Text(
+                a.excerpt,
+                style: TextStyle(fontSize: 14, color: Colors.grey.shade800, height: 1.35),
+                maxLines: 4,
+                overflow: TextOverflow.ellipsis,
+              ),
             const SizedBox(height: 10),
 
             // Read more button + tags row
             Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF05151).withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Text(
-                    "READ MORE",
-                    style: TextStyle(color: Color(0xFFF05151), fontWeight: FontWeight.w700, fontSize: 12),
-                  ),
-                ),
+                InkWell(
+                      onTap: () => _showSummary(a), // use _showSummary instead of _openUrl
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF05151).withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Text(
+                          "READ MORE",
+                          style: TextStyle(color: Color(0xFFF05151), fontWeight: FontWeight.w700, fontSize: 12),
+                        ),
+                      ),
+                    ),
+
                 const SizedBox(width: 12),
                 Expanded(
                   child: Wrap(
                     spacing: 6,
                     runSpacing: 6,
-                    children: a.tags
+                    children: (a.tags.isEmpty ? <String>['#news'] : a.tags)
                         .map((t) => Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                               decoration: BoxDecoration(
@@ -192,19 +394,20 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
             ),
             const SizedBox(height: 8),
 
-            // Sentiment line
-            RichText(
-              text: TextSpan(
-                text: "Sentiment: ",
-                style: TextStyle(fontWeight: FontWeight.w700, color: Colors.grey.shade700, fontSize: 13),
-                children: [
-                  TextSpan(
-                    text: a.sentiment,
-                    style: const TextStyle(fontWeight: FontWeight.w500, color: Colors.black87),
-                  ),
-                ],
+            // Sentiment line (if available)
+            if (a.sentiment.isNotEmpty)
+              RichText(
+                text: TextSpan(
+                  text: "Sentiment: ",
+                  style: TextStyle(fontWeight: FontWeight.w700, color: Colors.grey.shade700, fontSize: 13),
+                  children: [
+                    TextSpan(
+                      text: a.sentiment,
+                      style: const TextStyle(fontWeight: FontWeight.w500, color: Colors.black87),
+                    ),
+                  ],
+                ),
               ),
-            ),
           ],
         ),
       ),
@@ -212,11 +415,43 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
   }
 
   Widget _buildFeed() {
+    if (_isLoading) {
+      return const Expanded(child: Center(child: CircularProgressIndicator()));
+    }
+
+    if (_error.isNotEmpty) {
+      return Expanded(
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(_error, textAlign: TextAlign.center),
+              const SizedBox(height: 12),
+              ElevatedButton.icon(
+                onPressed: _fetchNews,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_filtered.isEmpty) {
+      return const Expanded(
+        child: Center(child: Text('No articles found')),
+      );
+    }
+
     return Expanded(
-      child: ListView.builder(
-        padding: const EdgeInsets.only(top: 10, bottom: 90),
-        itemCount: _articles.length,
-        itemBuilder: (context, index) => _buildArticleCard(_articles[index]),
+      child: RefreshIndicator(
+        onRefresh: _fetchNews,
+        child: ListView.builder(
+          padding: const EdgeInsets.only(top: 10, bottom: 90),
+          itemCount: _filtered.length,
+          itemBuilder: (context, index) => _buildArticleCard(_filtered[index]),
+        ),
       ),
     );
   }
@@ -227,9 +462,8 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // scaffold with safe area and bottom nav
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F7FA), // light background like screenshot
+      backgroundColor: const Color(0xFFF6F7FA),
       body: SafeArea(
         child: Column(
           children: [
