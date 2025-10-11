@@ -1,0 +1,76 @@
+{
+  "project_info": {
+    "project_number": "256768829103",
+    "project_id": "news-project-a59cd",
+    "storage_bucket": "news-project-a59cd.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:256768829103:android:4aa52b72a3fac8c99d565a",
+        "android_client_info": {
+          "package_name": "News.App"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "256768829103-9140jnijkuirc4s73id8cd301dkvr8at.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "News.App",
+            "certificate_hash": "cb4717ccb82d168f5a00422aa5703a17d1a4c949"
+          }
+        },
+        {
+          "client_id": "256768829103-jfq1vbnks1dlbhq0scc93brolstq078r.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB_avnE65of6DjXh-f6H7rcedpiXdKYjRQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "256768829103-jfq1vbnks1dlbhq0scc93brolstq078r.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:256768829103:android:e044b3bb45a64a049d565a",
+        "android_client_info": {
+          "package_name": "com.example.news_application"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "256768829103-jfq1vbnks1dlbhq0scc93brolstq078r.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB_avnE65of6DjXh-f6H7rcedpiXdKYjRQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "256768829103-jfq1vbnks1dlbhq0scc93brolstq078r.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
