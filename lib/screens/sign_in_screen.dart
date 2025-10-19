@@ -15,12 +15,13 @@ class SignInScreen extends StatefulWidget {
 }
 
 class _SignInScreenState extends State<SignInScreen> {
-  // kept exactly as you provided
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final GoogleSignIn _googleSignIn = GoogleSignIn();
 
-  // Email/Password Sign-In (unchanged behavior)
+  // ===========================
+  // EMAIL SIGN-IN (Backend commented)
+  // ===========================
   Future<void> _handleEmailSignIn() async {
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
@@ -32,6 +33,8 @@ class _SignInScreenState extends State<SignInScreen> {
       return;
     }
 
+    // 🔒 Commented backend logic (local IP will fail on other phones)
+    /*
     try {
       final response = await http.post(
         Uri.parse("http://10.170.141.198:5000/api/auth/signin"),
@@ -45,9 +48,10 @@ class _SignInScreenState extends State<SignInScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Signed in successfully")),
         );
-
-        // Navigate to home screen if needed (left commented as in your original)
-         Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const NewsFeedScreen()));
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const NewsFeedScreen()),
+        );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(data['message'] ?? "Sign in failed")),
@@ -58,10 +62,24 @@ class _SignInScreenState extends State<SignInScreen> {
         SnackBar(content: Text("Sign in failed: $e")),
       );
     }
+    */
+
+    // ✅ Temporary direct navigation for demo APK
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Signed in successfully (demo mode)")),
+    );
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const NewsFeedScreen()),
+    );
   }
 
-  // Google Sign-In (unchanged behavior)
+  // ===========================
+  // GOOGLE SIGN-IN (Backend commented)
+  // ===========================
   Future<void> _handleGoogleSignIn() async {
+    // 🔒 Commented all backend + Firebase logic for demo build
+    /*
     try {
       final googleUser = await _googleSignIn.signIn();
       if (googleUser == null) return;
@@ -80,7 +98,6 @@ class _SignInScreenState extends State<SignInScreen> {
         'loginType': 'google',
       };
 
-      // Send to backend MongoDB
       final response = await http.post(
         Uri.parse("http://10.170.141.198:5000/api/auth/google-login"),
         headers: {"Content-Type": "application/json"},
@@ -93,7 +110,6 @@ class _SignInScreenState extends State<SignInScreen> {
         print("MongoDB save failed: ${response.body}");
       }
 
-      // Optional Firestore
       await FirebaseFirestore.instance
           .collection('users')
           .doc(userCredential.user!.uid)
@@ -103,36 +119,45 @@ class _SignInScreenState extends State<SignInScreen> {
         const SnackBar(content: Text("Signed in with Google successfully!")),
       );
 
-      // Navigate to home screen (left commented)
-      // Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()));
-
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
+      );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Google Sign-In failed: $e")),
       );
     }
+    */
+
+    // ✅ Temporary demo navigation
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Signed in with Google (demo mode)")),
+    );
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const NewsFeedScreen()),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    // screen width for responsive sizing
     final w = MediaQuery.of(context).size.width;
 
     return Scaffold(
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        // Keeping a clean white-ish background to better match the screenshot
         color: Colors.white,
         child: SafeArea(
           child: SingleChildScrollView(
             child: Column(
               children: [
                 const SizedBox(height: 30),
-                // Top logo similar to the image: stylized rupee + app name
+
+                // Logo + header
                 Column(
                   children: [
-                    // stylized logo text
                     RichText(
                       text: TextSpan(
                         children: [
@@ -174,7 +199,7 @@ class _SignInScreenState extends State<SignInScreen> {
 
                 const SizedBox(height: 30),
 
-                // The white card containing inputs and primary sign in button
+                // Input Card
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20.0),
                   child: Container(
@@ -195,11 +220,10 @@ class _SignInScreenState extends State<SignInScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'Enter Phone Number', // keeping same label text as the image, but input will accept email per your request
+                          'Enter Phone Number',
                           style: TextStyle(fontSize: 14, color: Colors.black54, fontWeight: FontWeight.w500),
                         ),
                         const SizedBox(height: 8),
-                        // Email field (in place of phone number)
                         TextField(
                           controller: _emailController,
                           keyboardType: TextInputType.emailAddress,
@@ -239,8 +263,6 @@ class _SignInScreenState extends State<SignInScreen> {
                         ),
 
                         const SizedBox(height: 18),
-
-                        // Primary SIGN IN button (white background with black text in your original — but visually similar)
                         SizedBox(
                           width: double.infinity,
                           height: 48,
@@ -265,7 +287,7 @@ class _SignInScreenState extends State<SignInScreen> {
 
                 const SizedBox(height: 20),
 
-                // OR divider
+                // Divider
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24.0),
                   child: Row(
@@ -282,26 +304,24 @@ class _SignInScreenState extends State<SignInScreen> {
 
                 const SizedBox(height: 16),
 
-                // Social buttons column
+                // Google / Apple / Facebook buttons
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24.0),
                   child: Column(
                     children: [
-                      // Google button (pink-ish background in image)
                       SizedBox(
                         width: double.infinity,
                         height: 48,
                         child: ElevatedButton(
                           onPressed: _handleGoogleSignIn,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFF8C5C5), // pinkish
+                            backgroundColor: const Color(0xFFF8C5C5),
                             elevation: 0,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                           ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.start,
                             children: [
-                              // left 'G' circle
                               Container(
                                 width: 34,
                                 height: 34,
@@ -314,7 +334,7 @@ class _SignInScreenState extends State<SignInScreen> {
                                 ),
                               ),
                               const SizedBox(width: 12),
-                              Expanded(
+                              const Expanded(
                                 child: Text(
                                   'Continue with Google',
                                   style: TextStyle(color: Colors.black87, fontSize: 16, fontWeight: FontWeight.w600),
@@ -324,16 +344,12 @@ class _SignInScreenState extends State<SignInScreen> {
                           ),
                         ),
                       ),
-
                       const SizedBox(height: 12),
-
-                      // Apple button (light grey)
                       SizedBox(
                         width: double.infinity,
                         height: 48,
                         child: ElevatedButton(
                           onPressed: () {
-                            // If you plan to add Apple sign-in later, put handler here.
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(content: Text('Apple Sign-In tapped — not implemented')),
                             );
@@ -356,7 +372,7 @@ class _SignInScreenState extends State<SignInScreen> {
                                 child: const Center(child: Icon(Icons.apple, size: 18, color: Colors.black87)),
                               ),
                               const SizedBox(width: 12),
-                              Expanded(
+                              const Expanded(
                                 child: Text(
                                   'Continue with Apple',
                                   style: TextStyle(color: Colors.black87, fontSize: 16, fontWeight: FontWeight.w600),
@@ -366,16 +382,12 @@ class _SignInScreenState extends State<SignInScreen> {
                           ),
                         ),
                       ),
-
                       const SizedBox(height: 12),
-
-                      // Facebook button (light blue)
                       SizedBox(
                         width: double.infinity,
                         height: 48,
                         child: ElevatedButton(
                           onPressed: () {
-                            // Add Facebook login handler when available
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(content: Text('Facebook Sign-In tapped — not implemented')),
                             );
@@ -398,7 +410,7 @@ class _SignInScreenState extends State<SignInScreen> {
                                 child: const Center(child: Icon(Icons.facebook, size: 18, color: Colors.blue)),
                               ),
                               const SizedBox(width: 12),
-                              Expanded(
+                              const Expanded(
                                 child: Text(
                                   'Continue with Facebook',
                                   style: TextStyle(color: Colors.black87, fontSize: 16, fontWeight: FontWeight.w600),
@@ -414,7 +426,6 @@ class _SignInScreenState extends State<SignInScreen> {
 
                 const SizedBox(height: 26),
 
-                // Sign up link (as you already had)
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [

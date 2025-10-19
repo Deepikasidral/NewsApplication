@@ -1,5 +1,9 @@
 fastapi
-uvicorn
-openai
+uvicorn[standard]
+httpx
 python-dotenv
-pydantic
+motor
+beautifulsoup4
+langchain
+openai
+anyio

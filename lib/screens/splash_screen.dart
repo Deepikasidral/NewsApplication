@@ -22,27 +22,47 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFF283593), Color(0xFFE91E63)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: const Center(
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.newspaper, color: Colors.white, size: 90),
-            SizedBox(height: 20),
-            Text(
-              "DAILY NEWS",
+            // "₹upee Letter" logo text
+            RichText(
+              text: TextSpan(
+                children: [
+                  const TextSpan(
+                    text: '₹',
+                    style: TextStyle(
+                      color: Colors.red,
+                      fontSize: 45,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Times New Roman',
+                    ),
+                  ),
+                  const TextSpan(
+                    text: 'upee Letter',
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontSize: 38,
+                      fontWeight: FontWeight.w500,
+                      fontFamily: 'Times New Roman',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 15),
+            const Text(
+              'Your one-stop solution for fast\nand clear '
+              'financial news!',
+              textAlign: TextAlign.center,
               style: TextStyle(
-                color: Colors.white,
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1.5,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
+                height: 1.4,
               ),
             ),
           ],

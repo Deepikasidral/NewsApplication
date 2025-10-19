@@ -3,10 +3,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:html/parser.dart' show parse;
-
 
 import '../models/article.dart';
 
@@ -18,10 +16,6 @@ class NewsFeedScreen extends StatefulWidget {
 }
 
 class _NewsFeedScreenState extends State<NewsFeedScreen> {
-  // read key from .env (set in main.dart with dotenv.load(...))
-  final String? _apiKey =
-      dotenv.env['MARKETAUX_API_KEY'] ?? dotenv.env['API_KEY'];
-
   final TextEditingController _searchController = TextEditingController();
 
   List<Article> _articles = [];
@@ -30,6 +24,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
   String _error = '';
   int _bottomIndex = 0;
   int _tabIndex = 0;
+  bool _isSummarizing = false;
 
   @override
   void initState() {
@@ -58,181 +53,182 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
       }).toList();
     });
   }
-  Future<String> fetchFullArticleText(String url) async {
-  try {
-    final resp = await http.get(Uri.parse(url));
-    if (resp.statusCode == 200) {
-      final document = parse(resp.body);
-      // Get all text inside <p> tags (basic extraction)
-      final paragraphs = document.getElementsByTagName('p');
-      final text = paragraphs.map((e) => e.text.trim()).where((t) => t.isNotEmpty).join('\n\n');
-      return text.isNotEmpty ? text : '';
-    }
-  } catch (e) {
-    debugPrint('Error fetching full article from $url: $e');
+
+  String parseHtmlString(String htmlString) {
+    final document = parse(htmlString);
+    return document.body?.text ?? '';
   }
-  return '';
-}
 
-  Future<void> _fetchNews() async {
-    if (_apiKey == null || _apiKey!.isEmpty) {
-      setState(() {
-        _error = 'API key not found. Add API_KEY (or MARKETAUX_API_KEY) to .env';
-        _isLoading = false;
-      });
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-      _error = '';
-    });
-
+  Future<String> fetchFullArticleText(String url) async {
     try {
-      final uri = Uri.https('api.marketaux.com', '/v1/news/all', {
-        'api_token': _apiKey!,
-        'countries': 'in',
-        'language': 'en',
-        'filter_entities': 'true',
-        'industries': 'Financial Services',
-        'limit': '30',
-      });
-
-      final resp = await http.get(uri).timeout(const Duration(seconds: 15));
-
+      final resp = await http.get(Uri.parse(url));
       if (resp.statusCode == 200) {
-        final Map<String, dynamic> jsonBody = jsonDecode(resp.body);
-        final List<dynamic> data = jsonBody['data'] ?? [];
-
-        final List<Article> parsed = data.map<Article>((item) {
-          // Marketaux fields: title, description, source, published_at, url, entities
-          final title = item['title'] ?? 'No title';
-          final excerpt = item['description'] ?? '';
-          final url = item['url'] ?? '';
-          DateTime date;
-          try {
-            date = DateTime.parse(item['published_at']);
-          } catch (_) {
-            date = DateTime.now();
-          }
-          final List<String> tags = [];
-          try {
-            if (item['entities'] is List) {
-              for (final ent in item['entities']) {
-                if (ent is Map && ent['name'] != null) tags.add('#${ent['name']}');
-              }
-            }
-          } catch (_) {}
-          // sentiment left empty for now
-          return Article(
-            title: title,
-            excerpt: excerpt,
-            tags: tags,
-            sentiment: '',
-            url: url,
-            date: date,
-          );
-        }).toList();
-
-        parsed.sort((a, b) => b.date.compareTo(a.date));
-
-        if (!mounted) return;
-        setState(() {
-          _articles = parsed;
-          _filtered = List.from(parsed);
-          _isLoading = false;
-        });
-      } else {
-        if (!mounted) return;
-        setState(() {
-          _error = 'Failed to fetch news (code ${resp.statusCode})';
-          _isLoading = false;
-        });
+        final document = parse(resp.body);
+        final paragraphs = document.getElementsByTagName('p');
+        final text = paragraphs
+            .map((e) => e.text.trim())
+            .where((t) => t.isNotEmpty)
+            .join('\n\n');
+        return text.isNotEmpty ? text : '';
       }
     } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error = 'Error fetching news: $e';
-        _isLoading = false;
-      });
+      debugPrint('Error fetching full article from $url: $e');
     }
+    return '';
   }
-  Future<String?> fetchSummary(String text) async {
-  try {
-    final uri = Uri.parse('http://10.170.141.198:8000/summarize');
-    final resp = await http.post(
-      uri,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'text': text}),
-    );
 
-    if (resp.statusCode == 200) {
-      final data = jsonDecode(resp.body);
-      return data['summary'] as String?;
-    }
-  } catch (e) {
-    debugPrint("Error fetching summary: $e");
-  }
-  return null;
-}
+ Future<void> _fetchNews() async {
+  setState(() {
+    _isLoading = true;
+    _error = '';
+  });
 
-
- Future<void> _showSummary(Article article) async {
-  if (article.summary != null) {
-    _showDialog(article.summary!);
+  final centerCode = dotenv.env['CENTER_CODE'];
+  if (centerCode == null || centerCode.isEmpty) {
+    setState(() {
+      _error = "❌ CENTER_CODE not found in .env file.";
+      _isLoading = false;
+    });
     return;
   }
 
-  // Show loading
+  final now = DateTime.now();
+  final yesterday = now.subtract(const Duration(hours: 24));
+  final fromTime = Uri.encodeComponent(
+      DateFormat('yyyy/MM/dd HH:mm:ss').format(yesterday));
+  final endTime =
+      Uri.encodeComponent(DateFormat('yyyy/MM/dd HH:mm:ss').format(now));
+
+  final url = Uri.parse(
+      'http://editorial.pti.in/ptiapi/webservice1.asmx/JsonFile1?centercode=$centerCode&FromTime=$fromTime&EndTime=$endTime');
+
+  try {
+    final resp = await http.get(url);
+    if (resp.statusCode == 200) {
+      final bodyString = utf8.decode(resp.bodyBytes);
+      final cleaned =
+          bodyString.replaceAll('<string>', '').replaceAll('</string>', '').trim();
+      final data = json.decode(cleaned);
+
+      _articles = (data as List)
+          .map((e) => Article(
+                title: e['Headline'] ?? 'Untitled',
+                excerpt: e['story'] != null
+                    ? parseHtmlString(e['story'])
+                    : '',
+                story: e['story'] ?? '',
+                date: (() {
+                  try {
+                    return DateFormat('EEEE, MMM dd, yyyy HH:mm:ss')
+                        .parse(e['PublishedAt']);
+                  } catch (_) {
+                    return DateTime.now();
+                  }
+                })(),
+                url: e['link'] ?? '',
+                tags: [
+                  if (e['category'] != null) '#${e['category']}',
+                  if (e['subcategory'] != null) '#${e['subcategory'].trim()}'
+                ],
+                sentiment: '',
+              ))
+          .toList();
+
+      _articles.sort((a, b) => b.date.compareTo(a.date));
+      _filtered = List.from(_articles);
+    } else {
+      _error = 'Failed to fetch news';
+    }
+  } catch (e) {
+    _error = 'Error fetching news: $e';
+  } finally {
+    setState(() => _isLoading = false);
+  }
+}
+
+
+// _showFullStory in news_feed_screen.dart
+Future<void> _showFullStory(Article article) async {
+  String textContent = article.story.isNotEmpty ? article.story : article.excerpt;
+  String summary = '';
+  bool isError = false;
+
   showDialog(
     context: context,
     barrierDismissible: false,
-    builder: (_) => const Center(child: CircularProgressIndicator()),
-  );
+    builder: (ctx) => StatefulBuilder(
+      builder: (ctx, setStateDialog) {
+        Future<void> summarizeNow() async {
+          try {
+            setStateDialog(() => _isSummarizing = true);
+            final backendUrl ="http://10.210.189.93:8000/summarize";
 
-  String content = article.excerpt; // fallback
-  if (article.url.isNotEmpty) {
-    final fullText = await fetchFullArticleText(article.url);
-    if (fullText.isNotEmpty) content = fullText;
-  }
+            final resp = await http.post(
+              Uri.parse(backendUrl),
+              headers: {'Content-Type': 'application/json'},
+              body: json.encode({'text': textContent}),
+            );
 
-  final summary = await fetchSummary(content);
-  Navigator.pop(context); // remove loading
+            debugPrint('Response status: ${resp.statusCode}');
+            debugPrint('Response body: ${resp.body}');
 
-  if (summary != null) {
-    setState(() => article.summary = summary); // cache locally
-    _showDialog(summary);
-  } else {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Failed to fetch summary')),
-    );
-  }
-}
+            if (resp.statusCode == 200) {
+              final data = json.decode(resp.body);
+              summary = data['summary'] ?? 'No summary generated.';
+            } else {
+              summary = '❌ Failed to summarize (Status: ${resp.statusCode})';
+              isError = true;
+            }
+          } catch (e) {
+            summary = '⚠️ Error: $e';
+            debugPrint('Error fetching summary: $e');
+            isError = true;
+          } finally {
+            setStateDialog(() => _isSummarizing = false);
+          }
+        }
 
+        // Run summarization once dialog is opened
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!_isSummarizing && summary.isEmpty) summarizeNow();
+        });
 
-void _showDialog(String summary) {
-  showDialog(
-    context: context,
-    builder: (_) => AlertDialog(
-      title: const Text('News Summary'),
-      content: Text(summary),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Close'),
-        ),
-      ],
+        return AlertDialog(
+          title: Text(article.title),
+          content: SingleChildScrollView(
+            child: _isSummarizing
+                ? const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: CircularProgressIndicator(),
+                    ),
+                  )
+                : Text(
+                    summary.isNotEmpty
+                        ? summary
+                        : isError
+                            ? 'Failed to summarize.'
+                            : 'No content.',
+                    style: const TextStyle(fontSize: 14),
+                  ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Close'),
+            ),
+          ],
+        );
+      },
     ),
   );
 }
-
 
   Widget _buildTopSearchRow() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
       child: Row(
         children: [
-          // Search box
           Expanded(
             child: Container(
               height: 48,
@@ -258,10 +254,7 @@ void _showDialog(String summary) {
               ),
             ),
           ),
-
           const SizedBox(width: 12),
-
-          // profile avatar
           Container(
             width: 42,
             height: 42,
@@ -294,9 +287,11 @@ void _showDialog(String summary) {
             return GestureDetector(
               onTap: () => setState(() => _tabIndex = idx),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
-                  color: isSelected ? const Color(0xFFEDECF0) : Colors.transparent,
+                  color:
+                      isSelected ? const Color(0xFFEDECF0) : Colors.transparent,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Center(
@@ -304,7 +299,8 @@ void _showDialog(String summary) {
                     tabs[idx],
                     style: TextStyle(
                       color: isSelected ? Colors.black87 : Colors.black54,
-                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                      fontWeight:
+                          isSelected ? FontWeight.w600 : FontWeight.w400,
                     ),
                   ),
                 ),
@@ -331,47 +327,50 @@ void _showDialog(String summary) {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Title
-            Text(
-              a.title,
-              style: const TextStyle(fontSize: 16.5, fontWeight: FontWeight.w800),
-            ),
+            Text(a.title,
+                style: const TextStyle(fontSize: 16.5, fontWeight: FontWeight.w800)),
             const SizedBox(height: 8),
-
-            // Date
-            Text(
-              dateFormatted,
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-            ),
+            Text(dateFormatted,
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
             const SizedBox(height: 8),
-
-            // Excerpt
             if (a.excerpt.isNotEmpty)
               Text(
                 a.excerpt,
-                style: TextStyle(fontSize: 14, color: Colors.grey.shade800, height: 1.35),
+                style: TextStyle(
+                    fontSize: 14, color: Colors.grey.shade800, height: 1.35),
                 maxLines: 4,
                 overflow: TextOverflow.ellipsis,
               ),
             const SizedBox(height: 10),
-
-            // Read more button + tags row
             Row(
               children: [
-                InkWell(
-                      onTap: () => _showSummary(a), // use _showSummary instead of _openUrl
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF05151).withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Text(
-                          "READ MORE",
-                          style: TextStyle(color: Color(0xFFF05151), fontWeight: FontWeight.w700, fontSize: 12),
-                        ),
-                      ),
-                    ),
+              SizedBox(
+  width: 100,
+  child: Material(
+    color: Colors.transparent,
+    child: InkWell(
+      onTap: () => _showFullStory(a),
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF05151).withOpacity(0.12),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Center(
+          child: Text(
+            "READ MORE",
+            style: TextStyle(
+              color: const Color(0xFFF05151),
+              fontWeight: FontWeight.w700,
+              fontSize: 12,
+            ),
+          ),
+        ),
+      ),
+    ),
+  ),
+),
 
                 const SizedBox(width: 12),
                 Expanded(
@@ -380,34 +379,21 @@ void _showDialog(String summary) {
                     runSpacing: 6,
                     children: (a.tags.isEmpty ? <String>['#news'] : a.tags)
                         .map((t) => Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                               decoration: BoxDecoration(
                                 color: Colors.grey.shade100,
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              child: Text(t, style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                              child: Text(t,
+                                  style: const TextStyle(
+                                      fontSize: 12, color: Colors.black54)),
                             ))
                         .toList(),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-
-            // Sentiment line (if available)
-            if (a.sentiment.isNotEmpty)
-              RichText(
-                text: TextSpan(
-                  text: "Sentiment: ",
-                  style: TextStyle(fontWeight: FontWeight.w700, color: Colors.grey.shade700, fontSize: 13),
-                  children: [
-                    TextSpan(
-                      text: a.sentiment,
-                      style: const TextStyle(fontWeight: FontWeight.w500, color: Colors.black87),
-                    ),
-                  ],
-                ),
-              ),
           ],
         ),
       ),
@@ -416,7 +402,8 @@ void _showDialog(String summary) {
 
   Widget _buildFeed() {
     if (_isLoading) {
-      return const Expanded(child: Center(child: CircularProgressIndicator()));
+      return const Expanded(
+          child: Center(child: CircularProgressIndicator()));
     }
 
     if (_error.isNotEmpty) {
@@ -435,13 +422,13 @@ void _showDialog(String summary) {
             ],
           ),
         ),
+        
       );
     }
 
     if (_filtered.isEmpty) {
       return const Expanded(
-        child: Center(child: Text('No articles found')),
-      );
+          child: Center(child: Text('No articles found')));
     }
 
     return Expanded(
@@ -450,7 +437,8 @@ void _showDialog(String summary) {
         child: ListView.builder(
           padding: const EdgeInsets.only(top: 10, bottom: 90),
           itemCount: _filtered.length,
-          itemBuilder: (context, index) => _buildArticleCard(_filtered[index]),
+          itemBuilder: (context, index) =>
+              _buildArticleCard(_filtered[index]),
         ),
       ),
     );
