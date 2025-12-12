@@ -5,6 +5,8 @@ const cors = require("cors");
 
 // Routes
 const authRoutes = require("./routes/authRoutes");
+const newsRoutes = require("./routes/newsRoutes");
+
 //const summarizerRoutes = require("./routes/summarizer");
 
 dotenv.config();
@@ -17,6 +19,8 @@ app.use(express.json());
 
 // Routes
 app.use("/api/auth", authRoutes);
+app.use("/api/news", newsRoutes);
+
 //app.use("/summarize", summarizerRoutes);
 
 // Health check route
