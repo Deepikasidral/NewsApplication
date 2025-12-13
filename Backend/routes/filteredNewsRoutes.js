@@ -15,10 +15,13 @@ function extractMainCompanyName(fullName) {
 // ✔ Fetch all filtered news sorted by PublishedAt
 router.get("/", async (req, res) => {
   try {
+    console.log("📰 Fetching all filtered news...");
     const items = await FilteredNews.find().sort({ PublishedAt: -1 });
+    console.log(`✅ Found ${items.length} filtered news items`);
     res.json(items);
   } catch (err) {
     console.error("🔥 Error fetching filtered news:", err);
+    console.error("🔥 Error details:", err.message);
     res.status(500).json({ error: "Server error while fetching filtered news" });
   }
 });
