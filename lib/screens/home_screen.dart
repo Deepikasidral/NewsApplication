@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:html/parser.dart' show parse;
 
 import '../models/article.dart';
+import 'company_screen.dart';
 
 class NewsFeedScreen extends StatefulWidget {
   const NewsFeedScreen({super.key});
@@ -71,7 +72,8 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
 
     try {
       final resp =
-          await http.get(Uri.parse("http://10.69.144.93:5000/api/news"));
+          // await http.get(Uri.parse("http://10.69.144.93:5000/api/news"));
+          await http.get(Uri.parse("http://192.168.1.7:5000/api/news"));
 
       if (resp.statusCode == 200) {
         final data = json.decode(resp.body);
@@ -362,7 +364,17 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _bottomIndex,
-        onTap: (i) => setState(() => _bottomIndex = i),
+        onTap: (i) {
+          if (i == 2) {
+            // Navigate to Company screen when Company tab is tapped
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const CompanyScreen()),
+            );
+          } else {
+            setState(() => _bottomIndex = i);
+          }
+        },
         type: BottomNavigationBarType.fixed,
         selectedItemColor: const Color(0xFFEA6B6B),
         unselectedItemColor: Colors.black54,
@@ -371,7 +383,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
           BottomNavigationBarItem(
               icon: Icon(Icons.local_fire_department), label: "Trending"),
           BottomNavigationBarItem(
-              icon: Icon(Icons.currency_bitcoin), label: "Crypto"),
+              icon: Icon(Icons.business), label: "Company"),
           BottomNavigationBarItem(icon: Icon(Icons.bookmark), label: "Saved"),
         ],
       ),
