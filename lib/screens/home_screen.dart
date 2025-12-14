@@ -1,3 +1,4 @@
+
 // lib/screens/news_feed_screen.dart
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -7,6 +8,7 @@ import 'package:html/parser.dart' show parse;
 
 import '../models/article.dart';
 import 'company_screen.dart';
+import 'events_screen.dart'; // Add this import
 
 class NewsFeedScreen extends StatefulWidget {
   const NewsFeedScreen({super.key});
@@ -29,8 +31,6 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
   void initState() {
     super.initState();
     _searchController.addListener(_applySearch);
-
-    // Load MongoDB news
     _fetchNewsFromMongo();
   }
 
@@ -41,7 +41,6 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
     super.dispose();
   }
 
-  // ------------------------- SEARCH -------------------------
   void _applySearch() {
     final q = _searchController.text.trim().toLowerCase();
     if (q.isEmpty) {
@@ -57,13 +56,11 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
     });
   }
 
-  // ------------------------- HTML CLEANER -------------------------
   String parseHtmlString(String htmlString) {
     final document = parse(htmlString);
     return document.body?.text ?? '';
   }
 
-  // ------------------------- FETCH FROM MONGODB -------------------------
   Future<void> _fetchNewsFromMongo() async {
     setState(() {
       _isLoading = true;
@@ -93,14 +90,6 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
     setState(() => _isLoading = false);
   }
 
-  // ------------------------- OLD API (COMMENTED) -------------------------
-  /*
-  Future<void> _fetchNews() async {
-     // your original PTI API logic (kept safe)
-  }
-  */
-
-  // ------------------------- SHOW FULL STORY (NO API CALL) -------------------------
   Future<void> _showFullStory(Article a) async {
     showDialog(
       context: context,
@@ -117,12 +106,6 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
                 Text(a.summary),
                 const SizedBox(height: 16),
               ],
-              // if (a.rationale.isNotEmpty) ...[
-              //   const Text("📌 Rationale",
-              //       style: TextStyle(fontWeight: FontWeight.bold)),
-              //   Text(a.rationale),
-              //   const SizedBox(height: 16),
-              // ],
               if (a.tone.isNotEmpty)
                 Text("🎭 Tone: ${a.tone}", style: const TextStyle(fontSize: 13)),
               if (a.sentiment.isNotEmpty)
@@ -147,7 +130,6 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
     );
   }
 
-  // ------------------------- UI WIDGETS -------------------------
   Widget _buildTopSearchRow() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
@@ -188,7 +170,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
   }
 
   Widget _buildTabsRow() {
-    final tabs = ["Home", "Markets", "For you", "Sector Wise", "Trending"];
+    final tabs = ["Home", "Events", "For you", "Sector Wise", "Trending"]; // Changed "Markets" to "Events"
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12.0),
@@ -201,7 +183,16 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
           itemBuilder: (context, idx) {
             final selected = idx == _tabIndex;
             return GestureDetector(
-              onTap: () => setState(() => _tabIndex = idx),
+              onTap: () {
+                if (idx == 1) { // Events tab
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const EventsScreen()),
+                  );
+                } else {
+                  setState(() => _tabIndex = idx);
+                }
+              },
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
@@ -346,7 +337,6 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
     );
   }
 
-  // ------------------------- MAIN BUILD -------------------------
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -365,7 +355,6 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
         currentIndex: _bottomIndex,
         onTap: (i) {
           if (i == 2) {
-            // Navigate to Company screen when Company tab is tapped
             Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => const CompanyScreen()),
@@ -389,7 +378,6 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
     );
   }
 }
-
 // // lib/screens/news_feed_screen.dart
 // import 'dart:convert';
 // import 'package:flutter/material.dart';
@@ -464,8 +452,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
 
 //     try {
 //       final resp =
-//           // await http.get(Uri.parse("http://10.69.144.93:5000/api/filtered-news"));
-//           await http.get(Uri.parse("http://192.168.1.7:5000/api/filtered-news"));
+//           await http.get(Uri.parse("http://192.168.1.7:5000/api/news"));
 
 //       if (resp.statusCode == 200) {
 //         final data = json.decode(resp.body);
