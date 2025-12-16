@@ -8,6 +8,7 @@ const authRoutes = require("./routes/authRoutes");
 const newsRoutes = require("./routes/newsRoutes");
 const companyRoutes = require("./routes/companyRoutes");
 const filteredNewsRoutes = require("./routes/filteredNewsRoutes");
+const eventRoutes = require("./routes/eventRoutes");
 
 //const summarizerRoutes = require("./routes/summarizer");
 
@@ -24,10 +25,11 @@ app.use("/api/auth", authRoutes);
 app.use("/api/news", newsRoutes);
 app.use("/api/companies", companyRoutes);
 app.use("/api/filtered-news", filteredNewsRoutes);
+app.use("/api/events", eventRoutes);
 
 // Test route to verify server is running
 app.get("/api/test", (req, res) => {
-  res.json({ message: "Server is running", routes: ["/api/news", "/api/filtered-news", "/api/companies", "/api/auth"] });
+  res.json({ message: "Server is running", routes: ["/api/news", "/api/filtered-news", "/api/companies", "/api/auth","/api/events"] });
 });
 
 //app.use("/summarize", summarizerRoutes);

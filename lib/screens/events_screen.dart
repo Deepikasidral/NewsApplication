@@ -1,6 +1,9 @@
+
 // lib/screens/events_screen.dart
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class EventsScreen extends StatefulWidget {
   const EventsScreen({super.key});
@@ -11,108 +14,64 @@ class EventsScreen extends StatefulWidget {
 
 class _EventsScreenState extends State<EventsScreen> {
   int _selectedTab = 0;
-  final List<String> _tabs = ["Corporate Events", "Macro Events"];
+  final List<String> _tabs = ["Today", "Upcoming"];
+  
+  bool _isLoading = true;
+  List<CorporateEvent> _todayEvents = [];
+  List<CorporateEvent> _upcomingEvents = [];
 
-  // Sample data - In real app, fetch from API
-  final List<CorporateEvent> _upcomingEvents = [
-    CorporateEvent(
-      title: "Reliance Industries AGM",
-      date: DateTime.now().add(const Duration(days: 2)),
-      time: "10:00 AM",
-      description: "Annual General Meeting for shareholders",
-      type: "AGM",
-      highlight: true,
-    ),
-    CorporateEvent(
-      title: "TCS Quarterly Results",
-      date: DateTime.now().add(const Duration(days: 1)),
-      time: "3:00 PM",
-      description: "Q4 FY2024 Results Announcement",
-      type: "Results",
-      highlight: true,
-    ),
-    CorporateEvent(
-      title: "Infosys Board Meeting",
-      date: DateTime.now().add(const Duration(days: 3)),
-      time: "11:30 AM",
-      description: "Board meeting to discuss expansion plans",
-      type: "Board Meeting",
-      highlight: true,
-    ),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _fetchEvents();
+  }
 
-  final List<CorporateEvent> _otherCorporateEvents = [
-    CorporateEvent(
-      title: "HDFC Bank Investor Meet",
-      date: DateTime.now().add(const Duration(days: 5)),
-      time: "2:00 PM",
-      description: "Meeting with institutional investors",
-      type: "Investor Meet",
-      highlight: false,
-    ),
-    CorporateEvent(
-      title: "ITC Product Launch",
-      date: DateTime.now().add(const Duration(days: 7)),
-      time: "6:00 PM",
-      description: "Launch of new FMCG product line",
-      type: "Product Launch",
-      highlight: false,
-    ),
-    CorporateEvent(
-      title: "Asian Paints Factory Inauguration",
-      date: DateTime.now().add(const Duration(days: 10)),
-      time: "9:00 AM",
-      description: "New manufacturing plant inauguration",
-      type: "Inauguration",
-      highlight: false,
-    ),
-    CorporateEvent(
-      title: "Bajaj Auto Earnings Call",
-      date: DateTime.now().add(const Duration(days: 4)),
-      time: "4:30 PM",
-      description: "Quarterly earnings conference call",
-      type: "Earnings Call",
-      highlight: false,
-    ),
-  ];
+  Future<void> _fetchEvents() async {
+    setState(() {
+      _isLoading = true;
+    });
 
-  final List<MacroEvent> _macroEvents = [
-    MacroEvent(
-      title: "RBI Monetary Policy Meeting",
-      date: DateTime.now().add(const Duration(days: 3)),
-      impact: "High",
-      description: "Interest rate decision and policy stance",
-      country: "India",
-    ),
-    MacroEvent(
-      title: "US Fed Interest Rate Decision",
-      date: DateTime.now().add(const Duration(days: 5)),
-      impact: "Very High",
-      description: "Federal Reserve rate decision and guidance",
-      country: "USA",
-    ),
-    MacroEvent(
-      title: "Union Budget 2024",
-      date: DateTime.now().add(const Duration(days: 15)),
-      impact: "High",
-      description: "Annual budget announcement",
-      country: "India",
-    ),
-    MacroEvent(
-      title: "Eurozone Inflation Data",
-      date: DateTime.now().add(const Duration(days: 2)),
-      impact: "Medium",
-      description: "CPI and inflation rate announcement",
-      country: "Eurozone",
-    ),
-    MacroEvent(
-      title: "OPEC Meeting",
-      date: DateTime.now().add(const Duration(days: 8)),
-      impact: "High",
-      description: "Oil production quota discussions",
-      country: "Global",
-    ),
-  ];
+    try {
+      final response = await http.get(
+        Uri.parse('http://192.168.1.4:5000/api/events'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final now = DateTime.now();
+        final today = DateTime(now.year, now.month, now.day);
+        
+        // Parse events from backend
+        final List<CorporateEvent> allEvents = (data['events'] as List)
+            .map((event) => CorporateEvent.fromJson(event))
+            .toList();
+
+        // Separate into today and upcoming
+        _todayEvents = allEvents.where((event) {
+          final eventDate = DateTime(event.date.year, event.date.month, event.date.day);
+          return eventDate.isAtSameMomentAs(today);
+        }).toList();
+
+        _upcomingEvents = allEvents.where((event) {
+          final eventDate = DateTime(event.date.year, event.date.month, event.date.day);
+          return eventDate.isAfter(today);
+        }).toList();
+
+        setState(() {
+          _isLoading = false;
+        });
+      } else {
+        throw Exception('Failed to load events');
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      // Handle error - you might want to show a snackbar
+      print('Error fetching events: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -160,6 +119,10 @@ class _EventsScreenState extends State<EventsScreen> {
                     ),
                   ),
                   const Spacer(),
+                  IconButton(
+                    onPressed: _fetchEvents,
+                    icon: const Icon(Icons.refresh, color: Color(0xFFF05151)),
+                  ),
                   const CircleAvatar(
                     radius: 20,
                     backgroundImage: NetworkImage('https://i.pravatar.cc/300'),
@@ -209,9 +172,11 @@ class _EventsScreenState extends State<EventsScreen> {
 
             // Content based on selected tab
             Expanded(
-              child: _selectedTab == 0
-                  ? _buildCorporateEventsTab()
-                  : _buildMacroEventsTab(),
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator(color: Color(0xFFF05151)))
+                  : _selectedTab == 0
+                      ? _buildTodayEventsTab()
+                      : _buildUpcomingEventsTab(),
             ),
           ],
         ),
@@ -219,16 +184,40 @@ class _EventsScreenState extends State<EventsScreen> {
     );
   }
 
-  Widget _buildCorporateEventsTab() {
+  Widget _buildTodayEventsTab() {
+    if (_todayEvents.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.event_note, size: 64, color: Colors.grey),
+            const SizedBox(height: 16),
+            const Text(
+              "No events for today",
+              style: TextStyle(fontSize: 18, color: Colors.grey),
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: _fetchEvents,
+              child: const Text(
+                "Refresh",
+                style: TextStyle(color: Color(0xFFF05151)),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return SingleChildScrollView(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Upcoming Corporate Events Section
+            // Today's Events Section
             const Text(
-              "Upcoming Corporate Events",
+              "Today's Events",
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -236,39 +225,48 @@ class _EventsScreenState extends State<EventsScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
-              "Actions today highlight",
-              style: TextStyle(
+            Text(
+              "${_todayEvents.length} event${_todayEvents.length > 1 ? 's' : ''} scheduled for today",
+              style: const TextStyle(
                 fontSize: 14,
                 color: Colors.black54,
               ),
             ),
             const SizedBox(height: 16),
 
-            // Upcoming Events List
-            ..._upcomingEvents.map((event) => _buildEventCard(event)),
-
-            const SizedBox(height: 24),
-
-            // Other Corporate Events Section
-            const Text(
-              "Other Corporate Events",
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF333333),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            ..._otherCorporateEvents.map((event) => _buildEventCard(event)),
+            // Today's Events List
+            ..._todayEvents.map((event) => _buildEventCard(event, isToday: true)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildMacroEventsTab() {
+  Widget _buildUpcomingEventsTab() {
+    if (_upcomingEvents.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.calendar_today, size: 64, color: Colors.grey),
+            const SizedBox(height: 16),
+            const Text(
+              "No upcoming events",
+              style: TextStyle(fontSize: 18, color: Colors.grey),
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: _fetchEvents,
+              child: const Text(
+                "Refresh",
+                style: TextStyle(color: Color(0xFFF05151)),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return SingleChildScrollView(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -276,7 +274,7 @@ class _EventsScreenState extends State<EventsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              "Macro Events",
+              "Upcoming Events",
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -284,24 +282,25 @@ class _EventsScreenState extends State<EventsScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
-              "Important economic events and announcements",
-              style: TextStyle(
+            Text(
+              "${_upcomingEvents.length} event${_upcomingEvents.length > 1 ? 's' : ''} scheduled",
+              style: const TextStyle(
                 fontSize: 14,
                 color: Colors.black54,
               ),
             ),
             const SizedBox(height: 16),
 
-            ..._macroEvents.map((event) => _buildMacroEventCard(event)),
+            ..._upcomingEvents.map((event) => _buildEventCard(event, isToday: false)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildEventCard(CorporateEvent event) {
+  Widget _buildEventCard(CorporateEvent event, {required bool isToday}) {
     final dateFormatted = DateFormat('MMM dd, yyyy').format(event.date);
+    final timeFormatted = DateFormat('hh:mm a').format(event.date);
     
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -310,8 +309,8 @@ class _EventsScreenState extends State<EventsScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: event.highlight ? const Color(0xFFF05151).withOpacity(0.3) : Colors.grey.shade200,
-          width: event.highlight ? 2 : 1,
+          color: isToday ? const Color(0xFFF05151).withOpacity(0.3) : Colors.grey.shade200,
+          width: isToday ? 2 : 1,
         ),
         boxShadow: [
           BoxShadow(
@@ -329,7 +328,7 @@ class _EventsScreenState extends State<EventsScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: event.highlight 
+                  color: isToday 
                       ? const Color(0xFFF05151).withOpacity(0.1)
                       : const Color(0xFFF6F7FA),
                   borderRadius: BorderRadius.circular(20),
@@ -339,11 +338,11 @@ class _EventsScreenState extends State<EventsScreen> {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: event.highlight ? const Color(0xFFF05151) : Colors.black54,
+                    color: isToday ? const Color(0xFFF05151) : Colors.black54,
                   ),
                 ),
               ),
-              if (event.highlight) ...[
+              if (isToday) ...[
                 const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -352,7 +351,7 @@ class _EventsScreenState extends State<EventsScreen> {
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: const Text(
-                    "TODAY'S HIGHLIGHT",
+                    "TODAY",
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.bold,
@@ -409,7 +408,7 @@ class _EventsScreenState extends State<EventsScreen> {
               ),
               const SizedBox(width: 6),
               Text(
-                event.time,
+                timeFormatted,
                 style: TextStyle(
                   fontSize: 13,
                   color: Colors.grey.shade600,
@@ -422,128 +421,7 @@ class _EventsScreenState extends State<EventsScreen> {
                   color: const Color(0xFFF05151).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(6),
                 ),
-                
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMacroEventCard(MacroEvent event) {
-    final dateFormatted = DateFormat('MMM dd, yyyy').format(event.date);
-    
-    Color impactColor;
-    switch (event.impact.toLowerCase()) {
-      case 'very high':
-        impactColor = const Color(0xFFF05151);
-        break;
-      case 'high':
-        impactColor = const Color(0xFFFF9800);
-        break;
-      default:
-        impactColor = const Color(0xFF4CAF50);
-    }
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.06),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  event.country,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black54,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: impactColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  "Impact: ${event.impact}",
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: impactColor,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            event.title,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            event.description,
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey.shade700,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Icon(
-                Icons.calendar_today,
-                size: 16,
-                color: Colors.grey.shade600,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                dateFormatted,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Colors.grey.shade600,
-                ),
-              ),
-              const Spacer(),
-              const Icon(
-                Icons.public,
-                size: 18,
-                color: Colors.black54,
-              ),
-              const SizedBox(width: 4),
-              Text(
-                "Global Impact",
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey.shade600,
-                ),
+               
               ),
             ],
           ),
@@ -554,35 +432,46 @@ class _EventsScreenState extends State<EventsScreen> {
 }
 
 class CorporateEvent {
+  final String id;
   final String title;
   final DateTime date;
-  final String time;
   final String description;
   final String type;
-  final bool highlight;
+  final String tags;
+  final String headline;
 
   CorporateEvent({
+    required this.id,
     required this.title,
     required this.date,
-    required this.time,
     required this.description,
     required this.type,
-    required this.highlight,
+    required this.tags,
+    required this.headline,
   });
+
+  factory CorporateEvent.fromJson(Map<String, dynamic> json) {
+    return CorporateEvent(
+      id: json['_id'] ?? json['id'],
+      title: json['title'],
+      date: DateTime.parse(json['date']),
+      description: json['description'],
+      type: json['type'],
+      tags: json['tags'],
+      headline: json['headline'],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'date': date.toIso8601String(),
+      'description': description,
+      'type': type,
+      'tags': tags,
+      'headline': headline,
+    };
+  }
 }
 
-class MacroEvent {
-  final String title;
-  final DateTime date;
-  final String impact;
-  final String description;
-  final String country;
-
-  MacroEvent({
-    required this.title,
-    required this.date,
-    required this.impact,
-    required this.description,
-    required this.country,
-  });
-}
