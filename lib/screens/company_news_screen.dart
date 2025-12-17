@@ -93,7 +93,7 @@ class _CompanyNewsScreenState extends State<CompanyNewsScreen> {
     try {
       final encodedName = Uri.encodeComponent(widget.companyName);
       final resp = await http.get(Uri.parse(
-          "http://192.168.1.4:5000/api/filtered-news/company/$encodedName"));
+          "http://192.168.1.6:5000/api/filtered-news/company/$encodedName"));
 
       if (resp.statusCode == 200) {
         final data = json.decode(resp.body);
@@ -125,7 +125,7 @@ class _CompanyNewsScreenState extends State<CompanyNewsScreen> {
     try {
       final encodedName = Uri.encodeComponent(widget.companyName);
       final resp = await http.get(Uri.parse(
-          "http://192.168.1.4:5000/api/filtered-news/company/$encodedName"));
+          "http://192.168.1.6:5000/api/filtered-news/company/$encodedName"));
 
       if (resp.statusCode == 200) {
         final data = json.decode(resp.body);
