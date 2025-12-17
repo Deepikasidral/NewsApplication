@@ -48,3 +48,14 @@ app.*.map.json
 .env.*
 node_modules/
 /Backend/.env
+/mcp_server/.env
+
+# Ignore all virtual environments (anywhere)
+.venv/
+*/.venv/
+
+# Python cache
+__pycache__/
+*.pyc
+
+

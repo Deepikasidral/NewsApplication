@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:html/parser.dart' show parse;
-
+import 'chatbot_screen.dart';
 import '../models/article.dart';
 
 class NewsFeedScreen extends StatefulWidget {
@@ -100,51 +100,74 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
   */
 
   // ------------------------- SHOW FULL STORY (NO API CALL) -------------------------
-  Future<void> _showFullStory(Article a) async {
-    showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (ctx) => AlertDialog(
-        title: Text(a.title),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (a.summary.isNotEmpty) ...[
-                const Text("📝 Summary",
-                    style: TextStyle(fontWeight: FontWeight.bold)),
-                Text(a.summary),
-                const SizedBox(height: 16),
-              ],
-              // if (a.rationale.isNotEmpty) ...[
-              //   const Text("📌 Rationale",
-              //       style: TextStyle(fontWeight: FontWeight.bold)),
-              //   Text(a.rationale),
-              //   const SizedBox(height: 16),
-              // ],
-              if (a.tone.isNotEmpty)
-                Text("🎭 Tone: ${a.tone}", style: const TextStyle(fontSize: 13)),
-              if (a.sentiment.isNotEmpty)
-                Text("💬 Sentiment: ${a.sentiment}",
-                    style: const TextStyle(fontSize: 13)),
-              if (a.impact.isNotEmpty)
-                Text("🔥 Impact: ${a.impact}",
-                    style: const TextStyle(fontSize: 13)),
-              if (a.sector.isNotEmpty)
-                Text("🏦 Sector: ${a.sector}",
-                    style: const TextStyle(fontSize: 13)),
+ Future<void> _showFullStory(Article a) async {
+  showDialog(
+    context: context,
+    barrierDismissible: true,
+    builder: (ctx) => AlertDialog(
+      title: Text(a.title),
+      content: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // -------- SUMMARY --------
+            if (a.summary.isNotEmpty) ...[
+              const Text(
+                "📝 Summary",
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              Text(a.summary),
+              const SizedBox(height: 16),
             ],
-          ),
+
+            // -------- META INFO --------
+            if (a.tone.isNotEmpty)
+              Text("🎭 Tone: ${a.tone}",
+                  style: const TextStyle(fontSize: 13)),
+            if (a.sentiment.isNotEmpty)
+              Text("💬 Sentiment: ${a.sentiment}",
+                  style: const TextStyle(fontSize: 13)),
+            if (a.impact.isNotEmpty)
+              Text("🔥 Impact: ${a.impact}",
+                  style: const TextStyle(fontSize: 13)),
+
+            // -------- COMPANIES --------
+            if (a.companies.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              const Text(
+                "🏢 Companies",
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: a.companies
+                    .map(
+                      (company) => Chip(
+                        label: Text(
+                          company,
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                        backgroundColor: Colors.blue.shade50,
+                      ),
+                    )
+                    .toList(),
+              ),
+            ],
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text("Close"),
-          )
-        ],
       ),
-    );
-  }
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text("Close"),
+        ),
+      ],
+    ),
+  );
+}
+
 
   // ------------------------- UI WIDGETS -------------------------
   Widget _buildTopSearchRow() {
@@ -187,7 +210,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
   }
 
   Widget _buildTabsRow() {
-    final tabs = ["Home", "Markets", "For you", "Sector Wise", "Trending"];
+    final tabs = ["LATEST", "TRENDING","GLOBAL","EVENTS","COMMODITIES"];
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12.0),
@@ -361,20 +384,32 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
         ),
       ),
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _bottomIndex,
-        onTap: (i) => setState(() => _bottomIndex = i),
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: const Color(0xFFEA6B6B),
-        unselectedItemColor: Colors.black54,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.feed), label: "Feed"),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.local_fire_department), label: "Trending"),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.currency_bitcoin), label: "Crypto"),
-          BottomNavigationBarItem(icon: Icon(Icons.bookmark), label: "Saved"),
-        ],
-      ),
+  currentIndex: _bottomIndex,
+  type: BottomNavigationBarType.fixed,
+  selectedItemColor: const Color(0xFFEA6B6B),
+  unselectedItemColor: Colors.black54,
+  onTap: (index) {
+    setState(() => _bottomIndex = index);
+
+    // 👉 ASK AI TAB
+    if (index == 2) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const ChatbotScreen(),
+        ),
+      );
+    }
+  },
+  items: const [
+    BottomNavigationBarItem(icon: Icon(Icons.feed), label: "NEWS"),
+    BottomNavigationBarItem(icon: Icon(Icons.local_fire_department), label: "INDEX"),
+    BottomNavigationBarItem(icon: Icon(Icons.currency_bitcoin), label: "ASK AI"),
+    BottomNavigationBarItem(icon: Icon(Icons.event), label: "EVENTS"),
+    BottomNavigationBarItem(icon: Icon(Icons.bookmark), label: "Saved"),
+  ],
+),
+
     );
   }
 }

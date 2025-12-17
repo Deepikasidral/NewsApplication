@@ -3,7 +3,6 @@
 import 'package:html/parser.dart' as html;
 import 'package:intl/intl.dart';
 
-
 class Article {
   final String title;       // Headline
   final String excerpt;     // Preview text
@@ -12,13 +11,14 @@ class Article {
   final String url;         // link
   final DateTime date;      // PublishedAt
 
-  // ---- NEW FIELDS FROM DB ----
+  // ---- AI / PROCESSED FIELDS ----
   final String summary;
   final String rationale;
   final String tone;
   final String impact;
-  final String sector;
+  final String sector;      // kept for compatibility
   final String sentiment;
+  final List<String> companies;
 
   Article({
     required this.title,
@@ -33,6 +33,7 @@ class Article {
     this.impact = "",
     this.sector = "",
     this.sentiment = "",
+    this.companies = const [],
   });
 
   // -------------------------------------------------------
@@ -41,7 +42,7 @@ class Article {
   static String cleanHtml(String? data) {
     if (data == null || data.isEmpty) return "";
     final doc = html.parse(data);
-    return doc.body?.text ?? "";
+    return doc.body?.text.trim() ?? "";
   }
 
   // -------------------------------------------------------
@@ -52,10 +53,17 @@ class Article {
     final rawStory = (json['story'] ?? '').toString();
     final storyText = cleanHtml(rawStory);
 
-    // Generate excerpt from cleaned story
+    // Generate excerpt
     final excerptText = storyText.length > 200
-        ? storyText.substring(0, 200) + '...'
+        ? '${storyText.substring(0, 200)}...'
         : storyText;
+
+    // Parse companies array
+    final List<String> companiesList =
+        (json['companies'] as List<dynamic>?)
+                ?.map((e) => e.toString())
+                .toList() ??
+            [];
 
     return Article(
       title: cleanHtml(json['Headline'] ?? 'Untitled'),
@@ -65,28 +73,32 @@ class Article {
       tags: [
         if (json['category'] != null) '#${json['category']}',
         if (json['subcategory'] != null)
-          '#${json['subcategory'].toString().trim()}'
+          '#${json['subcategory'].toString().trim()}',
       ],
 
       url: json['link'] ?? '',
       date: parsePublishedAt(json['PublishedAt']),
 
-
-      // --- Clean AI fields too ---
-      summary: cleanHtml(json['summary'] ?? ""),
-      rationale: cleanHtml(json['rationale'] ?? ""),
+      // ---- AI fields ----
+      summary: cleanHtml(json['summary']),
+      rationale: cleanHtml(json['rationale']),
       tone: json['tone'] ?? "",
       impact: json['impact'] ?? "",
       sector: json['sector'] ?? "",
       sentiment: json['sentiment'] ?? "",
+      companies: companiesList,
     );
   }
 }
+
+// -------------------------------------------------------
+//                DATE PARSER
+// -------------------------------------------------------
 DateTime parsePublishedAt(String? input) {
   if (input == null || input.isEmpty) return DateTime.now();
 
   try {
-    // Matches: Friday, Oct 17, 2025 16:10:52
+    // Example: Friday, Oct 17, 2025 17:51:17
     return DateFormat("EEEE, MMM d, yyyy HH:mm:ss").parse(input);
   } catch (e) {
     print("Date parse error: $e");
