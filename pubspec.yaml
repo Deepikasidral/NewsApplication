@@ -21,7 +21,7 @@ dependencies:
   intl: ^0.18.1
   url_launcher: ^6.3.1
   flutter_dotenv: ^5.1.0
-
+  yahoo_finance_data_reader: ^1.0.13
 dev_dependencies:
   flutter_test:
     sdk: flutter
