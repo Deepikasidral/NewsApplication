@@ -1,4 +1,3 @@
-
 // lib/screens/news_feed_screen.dart
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -8,7 +7,7 @@ import 'package:html/parser.dart' show parse;
 import 'chatbot_screen.dart';
 import '../models/article.dart';
 import 'company_screen.dart';
-import 'events_screen.dart'; // Add this import
+import 'events_screen.dart';
 
 class NewsFeedScreen extends StatefulWidget {
   const NewsFeedScreen({super.key});
@@ -31,6 +30,8 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
   void initState() {
     super.initState();
     _searchController.addListener(_applySearch);
+
+    // Load MongoDB news
     _fetchNewsFromMongo();
   }
 
@@ -41,6 +42,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
     super.dispose();
   }
 
+  // ------------------------- SEARCH -------------------------
   void _applySearch() {
     final q = _searchController.text.trim().toLowerCase();
     if (q.isEmpty) {
@@ -56,11 +58,13 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
     });
   }
 
+  // ------------------------- HTML CLEANER -------------------------
   String parseHtmlString(String htmlString) {
     final document = parse(htmlString);
     return document.body?.text ?? '';
   }
 
+  // ------------------------- FETCH FROM MONGODB -------------------------
   Future<void> _fetchNewsFromMongo() async {
     setState(() {
       _isLoading = true;
@@ -69,7 +73,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
 
     try {
       final resp =
-          await http.get(Uri.parse("http://192.168.1.6:5000/api/news"));
+          await http.get(Uri.parse("http://10.69.144.93:5000/api/news"));
 
       if (resp.statusCode == 200) {
         final data = json.decode(resp.body);
@@ -128,9 +132,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
             if (a.impact.isNotEmpty)
               Text("🔥 Impact: ${a.impact}",
                   style: const TextStyle(fontSize: 13)),
-             if (a.sector.isNotEmpty)
-              Text("🏦 Sector: ${a.sector}",
-                  style: const TextStyle(fontSize: 13)),
+
             // -------- COMPANIES --------
             if (a.companies.isNotEmpty) ...[
               const SizedBox(height: 12),
@@ -169,6 +171,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
 }
 
 
+  // ------------------------- UI WIDGETS -------------------------
   Widget _buildTopSearchRow() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
@@ -209,7 +212,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
   }
 
   Widget _buildTabsRow() {
-    final tabs = ["Home", "Events", "For you", "Sector Wise", "Trending"]; // Changed "Markets" to "Events"
+    final tabs = ["LATEST", "TRENDING","GLOBAL","EVENTS","COMMODITIES"];
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12.0),
@@ -222,16 +225,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
           itemBuilder: (context, idx) {
             final selected = idx == _tabIndex;
             return GestureDetector(
-              onTap: () {
-                if (idx == 1) { // Events tab
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const EventsScreen()),
-                  );
-                } else {
-                  setState(() => _tabIndex = idx);
-                }
-              },
+              onTap: () => setState(() => _tabIndex = idx),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
@@ -376,6 +370,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
     );
   }
 
+  // ------------------------- MAIN BUILD -------------------------
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -391,33 +386,47 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
         ),
       ),
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _bottomIndex,
-        onTap: (i) {
-          if (i == 2) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const CompanyScreen()),
-            );
-          } else {
-            setState(() => _bottomIndex = i);
-          }
-        },
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: const Color(0xFFEA6B6B),
-        unselectedItemColor: Colors.black54,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.feed), label: "Feed"),
-          BottomNavigationBarItem(icon: Icon(Icons.currency_bitcoin), label: "ASK AI"),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.business), label: "Company"),
-          BottomNavigationBarItem(icon: Icon(Icons.bookmark), label: "Saved"),
-        ],
-      ),
+  currentIndex: _bottomIndex,
+  type: BottomNavigationBarType.fixed,
+  selectedItemColor: const Color(0xFFEA6B6B),
+  unselectedItemColor: Colors.black54,
+  onTap: (index) {
+    setState(() => _bottomIndex = index);
+
+    // 👉 ASK AI TAB
+    if (index == 2) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const ChatbotScreen(),
+        ),
+      );
+    }
+    if(index==3)
+    {
+      Navigator.push(context,
+       MaterialPageRoute(
+        builder: (_)=> const CompanyScreen(),
+        ));
+    }
+     if(index==4)
+    {
+      Navigator.push(context,
+       MaterialPageRoute(
+        builder: (_)=> const EventsScreen(),
+        ));
+    }
+  },
+  items: const [
+    BottomNavigationBarItem(icon: Icon(Icons.feed), label: "NEWS"),
+    BottomNavigationBarItem(icon: Icon(Icons.local_fire_department), label: "INDEX"),
+    BottomNavigationBarItem(icon: Icon(Icons.currency_bitcoin), label: "ASK AI"),
+    BottomNavigationBarItem(icon: Icon(Icons.event), label: "COMPANIES"),
+    BottomNavigationBarItem(icon: Icon(Icons.event), label: "EVENTS"),
+    BottomNavigationBarItem(icon: Icon(Icons.bookmark), label: "Saved"),
+  ],
+),
+
     );
   }
 }
-
-
-
-
-
