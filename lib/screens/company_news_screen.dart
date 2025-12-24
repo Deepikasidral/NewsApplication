@@ -18,7 +18,6 @@ class CompanyNewsScreen extends StatefulWidget {
   State<CompanyNewsScreen> createState() => _CompanyNewsScreenState();
 }
 
-
 class _CompanyNewsScreenState extends State<CompanyNewsScreen> {
   List<Map<String, dynamic>> _news = [];
   Map<String, dynamic>? _stockData;
@@ -29,7 +28,7 @@ class _CompanyNewsScreenState extends State<CompanyNewsScreen> {
   String _error = '';
   String _stockError = '';
   String _aiError = '';
-  final String _apiToken = dotenv.env['APIFY_API_TOKEN']!;
+  final String _finedgeApiToken = dotenv.env['FINEDGE_API_TOKEN']!;
 
   @override
   void initState() {
@@ -46,36 +45,202 @@ class _CompanyNewsScreenState extends State<CompanyNewsScreen> {
     });
 
     try {
-      final response = await http.post(
-        Uri.parse("https://api.apify.com/v2/acts/akash9078~indian-stocks-financial-data-scraper/run-sync-get-dataset-items?token=$_apiToken"),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          "stockSymbol": widget.companySymbol.toUpperCase(),
-        }),
+      var symbol = widget.companySymbol.toUpperCase();
+      
+      // Remove .NSE or .BSE suffix if present
+      if (symbol.endsWith('.NSE') || symbol.endsWith('.BSE')) {
+        symbol = symbol.split('.').first;
+      }
+      
+      print('Fetching stock data for symbol: $symbol');
+      
+      // 1. First, just get quote data to ensure basic info works
+      final quoteResponse = await http.get(
+        Uri.parse("https://data.finedgeapi.com/api/v1/quote").replace(
+          queryParameters: {'symbol': symbol, 'token': _finedgeApiToken}
+        ),
+        headers: {'Accept': 'application/json'}
       );
 
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        final data = json.decode(response.body);
+      print('=== QUOTE RESPONSE ===');
+      print('Status: ${quoteResponse.statusCode}');
+      print('Body: ${quoteResponse.body}');
+
+      if (quoteResponse.statusCode >= 200 && quoteResponse.statusCode < 300) {
+        final responseData = json.decode(quoteResponse.body);
+        final quoteData = responseData[symbol];
         
-        // Handle both List and Map responses
-        Map<String, dynamic> stockData;
-        if (data is List && data.isNotEmpty) {
-          stockData = data.first.cast<String, dynamic>();
-        } else if (data is Map<String, dynamic>) {
-          stockData = data;
-        } else {
-          throw Exception("Unexpected response format");
+        if (quoteData == null) {
+          setState(() {
+            _stockError = "No data found for symbol: $symbol";
+          });
+          return;
+        }
+
+        // Parse quote data
+        final currentPrice = quoteData['current_price'];
+        final high = quoteData['high_price'];
+        final low = quoteData['low_price'];
+        final open = quoteData['open_price'];
+        final changePercent = quoteData['change'];
+        final volume = quoteData['volume'];
+        final marketCap = quoteData['market_cap'];
+        final tradeTime = quoteData['tradetime'];
+        
+        // Calculate change
+        double? changeValue;
+        double? changePct;
+        if (changePercent != null) {
+          try {
+            changePct = double.parse(changePercent.toString().replaceAll('%', ''));
+            if (currentPrice != null && open != null) {
+              changeValue = currentPrice - open;
+            }
+          } catch (e) {
+            print('Error parsing change percent: $e');
+          }
+        }
+
+        // Format trade time
+        String formattedDate = tradeTime ?? 'N/A';
+        if (tradeTime != null) {
+          try {
+            final dateTime = DateTime.parse(tradeTime);
+            formattedDate = DateFormat('MMM dd, yyyy').format(dateTime);
+          } catch (e) {
+            print('Error formatting date: $e');
+          }
+        }
+
+        // Initialize fundamental data
+        String? peRatio;
+        String? pbRatio;
+        String? bookValue;
+        String? roe;
+        String? roce;
+        String? dividendYield;
+
+        // Try fetching profitability ratios
+        try {
+          final profitabilityUrl = Uri.parse(
+            "https://data.finedgeapi.com/api/v1/ratios/$symbol"
+          ).replace(queryParameters: {
+            'token': _finedgeApiToken,
+            'statement_type': 's',
+            'ratio_type': 'pr',
+          });
+          
+          print('=== PROFITABILITY RATIOS REQUEST ===');
+          print('URL: $profitabilityUrl');
+          
+          final profitabilityResponse = await http.get(
+            profitabilityUrl,
+            headers: {'Accept': 'application/json'}
+          ).timeout(const Duration(seconds: 5));
+
+          print('=== PROFITABILITY RATIOS RESPONSE ===');
+          print('Status: ${profitabilityResponse.statusCode}');
+          print('Body: ${profitabilityResponse.body}');
+
+          if (profitabilityResponse.statusCode == 200) {
+            final profitData = json.decode(profitabilityResponse.body);
+            
+            if (profitData is Map && profitData['ratios'] is List) {
+              final ratios = profitData['ratios'] as List;
+              if (ratios.isNotEmpty) {
+                final latestRatio = ratios.first;
+                
+                final roeValue = latestRatio['returnOnEquity'];
+                if (roeValue != null) {
+                  roe = (roeValue * 100).toStringAsFixed(2);
+                }
+                
+                final roaValue = latestRatio['returnOnAsset'];
+                if (roaValue != null) {
+                  roce = (roaValue * 100).toStringAsFixed(2);
+                }
+                
+                print('Found ROE: $roe%, ROA (as ROCE): $roce%');
+              }
+            }
+          }
+        } catch (e) {
+          print('Error fetching profitability ratios: $e');
+        }
+
+        // Try fetching dividend data
+        try {
+          final dividendUrl = Uri.parse(
+            "https://data.finedgeapi.com/api/v1/dividend/$symbol"
+          ).replace(queryParameters: {'token': _finedgeApiToken});
+          
+          print('=== DIVIDEND REQUEST ===');
+          print('URL: $dividendUrl');
+          
+          final dividendResponse = await http.get(
+            dividendUrl,
+            headers: {'Accept': 'application/json'}
+          ).timeout(const Duration(seconds: 5));
+
+          print('=== DIVIDEND RESPONSE ===');
+          print('Status: ${dividendResponse.statusCode}');
+          
+          if (dividendResponse.statusCode == 200) {
+            final divData = json.decode(dividendResponse.body);
+            
+            if (divData is Map && divData['dividend'] is List) {
+              final dividends = divData['dividend'] as List;
+              if (dividends.isNotEmpty) {
+                final latestDiv = dividends.first;
+                final divAmount = latestDiv['amount'];
+                
+                if (divAmount != null && currentPrice != null && currentPrice > 0) {
+                  final yieldPct = (divAmount / currentPrice) * 100;
+                  dividendYield = yieldPct.toStringAsFixed(2);
+                  print('Calculated dividend yield: $dividendYield%');
+                }
+              }
+            }
+          }
+        } catch (e) {
+          print('Error fetching dividend data: $e');
         }
         
         setState(() {
-          _stockData = stockData;
+          _stockData = {
+            'Company Name': widget.companyName,
+            'Symbol': symbol,
+            'Current Price': currentPrice?.toString() ?? 'N/A',
+            'High': high?.toString() ?? 'N/A',
+            'Low': low?.toString() ?? 'N/A',
+            'Open': open?.toString() ?? 'N/A',
+            'Change Value': changeValue?.toStringAsFixed(2) ?? 'N/A',
+            'Change Percent': changePct?.toStringAsFixed(2) ?? 'N/A',
+            'Volume': volume?.toString() ?? 'N/A',
+            'Quote Date': formattedDate,
+            'Market Cap': marketCap?.toString() ?? 'N/A',
+            
+            'Stock P/E': peRatio ?? 'N/A',
+            'P/B Ratio': pbRatio ?? 'N/A',
+            'Book Value': bookValue ?? 'N/A',
+            'ROE': roe ?? 'N/A',
+            'ROCE': roce ?? 'N/A',
+            'Dividend Yield': dividendYield ?? 'N/A',
+            
+            'P/S Ratio': 'N/A',
+            'P/FCF Ratio': 'N/A',
+          };
+          _stockError = '';
         });
       } else {
         setState(() {
-          _stockError = "HTTP Error (${response.statusCode}): ${response.body}";
+          _stockError = "API Error (${quoteResponse.statusCode}): ${quoteResponse.body}";
         });
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      print('=== FATAL ERROR ===');
+      print('Error: $e');
+      print('Stack trace: $stackTrace');
       setState(() {
         _stockError = "Stock data fetch failed: $e";
       });
@@ -93,7 +258,7 @@ class _CompanyNewsScreenState extends State<CompanyNewsScreen> {
     try {
       final encodedName = Uri.encodeComponent(widget.companyName);
       final resp = await http.get(Uri.parse(
-          "http://192.168.1.6:5000/api/filtered-news/company/$encodedName"));
+          "http://192.168.1.100:5000/api/filtered-news/company/$encodedName"));
 
       if (resp.statusCode == 200) {
         final data = json.decode(resp.body);
@@ -125,7 +290,7 @@ class _CompanyNewsScreenState extends State<CompanyNewsScreen> {
     try {
       final encodedName = Uri.encodeComponent(widget.companyName);
       final resp = await http.get(Uri.parse(
-          "http://192.168.1.6:5000/api/filtered-news/company/$encodedName"));
+          "http://192.168.1.100:5000/api/filtered-news/company/$encodedName"));
 
       if (resp.statusCode == 200) {
         final data = json.decode(resp.body);
@@ -240,7 +405,7 @@ class _CompanyNewsScreenState extends State<CompanyNewsScreen> {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Stock Header
+                        // Stock Header with date
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
@@ -253,18 +418,16 @@ class _CompanyNewsScreenState extends State<CompanyNewsScreen> {
                               ),
                             ),
                             Text(
-                              _stockData!['Company Name'] ?? widget.companyName,
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFFEA6B6B),
+                              _stockData!['Quote Date'] ?? '',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade600,
                               ),
-                              textAlign: TextAlign.right,
                             ),
                           ],
                         ),
                         const SizedBox(height: 16),
-                        
+
                         // Historical Data Section
                         const Text(
                           "Historical Data",
@@ -275,8 +438,8 @@ class _CompanyNewsScreenState extends State<CompanyNewsScreen> {
                           ),
                         ),
                         const SizedBox(height: 12),
-                        
-                        // Historical Data Grid - FIXED: Using actual keys from your screenshot
+
+                        // Historical Data Grid
                         Table(
                           defaultVerticalAlignment: TableCellVerticalAlignment.middle,
                           columnWidths: const {
@@ -314,7 +477,6 @@ class _CompanyNewsScreenState extends State<CompanyNewsScreen> {
                                 _buildStockInfo(
                                   "Change",
                                   _calculateChange(),
-                                  isPrice: true,
                                   changeColor: true,
                                 ),
                               ],
@@ -322,7 +484,7 @@ class _CompanyNewsScreenState extends State<CompanyNewsScreen> {
                           ],
                         ),
                         const SizedBox(height: 16),
-                        
+
                         // Market Cap Row
                         Container(
                           padding: const EdgeInsets.all(12),
@@ -352,7 +514,7 @@ class _CompanyNewsScreenState extends State<CompanyNewsScreen> {
                           ),
                         ),
                         const SizedBox(height: 20),
-                        
+
                         // Fundamental Data Section
                         const Text(
                           "Fundamental Data",
@@ -363,8 +525,8 @@ class _CompanyNewsScreenState extends State<CompanyNewsScreen> {
                           ),
                         ),
                         const SizedBox(height: 12),
-                        
-                        // Fundamental Data Grid - FIXED: Using actual keys
+
+                        // Fundamental Data Grid
                         Table(
                           defaultVerticalAlignment: TableCellVerticalAlignment.middle,
                           columnWidths: const {
@@ -408,8 +570,8 @@ class _CompanyNewsScreenState extends State<CompanyNewsScreen> {
                           ],
                         ),
                         const SizedBox(height: 12),
-                        
-                        // Additional Data Row
+
+                        // Dividend Yield Row
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
@@ -427,9 +589,9 @@ class _CompanyNewsScreenState extends State<CompanyNewsScreen> {
                                 ),
                               ),
                               Text(
-                                _stockData!['Dividend Yield'] != null 
-                                  ? '${_stockData!['Dividend Yield']}%'
-                                  : 'N/A',
+                                _stockData!['Dividend Yield'] != null
+                                    ? '${_stockData!['Dividend Yield']}%'
+                                    : 'N/A',
                                 style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w600,
@@ -453,7 +615,7 @@ class _CompanyNewsScreenState extends State<CompanyNewsScreen> {
         textColor = Colors.green;
       }
     }
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -484,7 +646,7 @@ class _CompanyNewsScreenState extends State<CompanyNewsScreen> {
     } else if (isPrice && value != 'N/A') {
       displayValue = '₹$value';
     }
-    
+
     return Container(
       padding: const EdgeInsets.all(12),
       margin: const EdgeInsets.only(bottom: 8),
@@ -518,21 +680,19 @@ class _CompanyNewsScreenState extends State<CompanyNewsScreen> {
   }
 
   String _calculateChange() {
-    if (_stockData?['Current Price'] == null ||
-        _stockData?['High'] == null ||
-        _stockData?['Low'] == null) {
+    final changeValue = _stockData?['Change Value'];
+    final changePct = _stockData?['Change Percent'];
+    
+    if (changeValue == null || changePct == null) {
       return 'N/A';
     }
-    
+
     try {
-      final currentPrice = double.parse(_parseIndianNumber(_stockData!['Current Price'].toString()));
-      final high = double.parse(_parseIndianNumber(_stockData!['High'].toString()));
-      final low = double.parse(_parseIndianNumber(_stockData!['Low'].toString()));
+      final value = double.parse(changeValue.toString());
+      final pct = double.parse(changePct.toString());
       
-      // Simple change calculation: from low to current
-      final changeFromLow = ((currentPrice - low) / low) * 100;
-      
-      return '+${changeFromLow.toStringAsFixed(2)}%';
+      final sign = value >= 0 ? '+' : '';
+      return '$sign₹${changeValue.toString()} ($sign${changePct.toString()}%)';
     } catch (e) {
       return 'N/A';
     }
@@ -540,8 +700,8 @@ class _CompanyNewsScreenState extends State<CompanyNewsScreen> {
 
   String _formatMarketCap() {
     final marketCap = _stockData?['Market Cap'];
-    if (marketCap == null || marketCap == 'N/A') return 'N/A';
-    
+    if (marketCap == null || marketCap.toString() == 'N/A') return 'N/A';
+
     try {
       final value = double.parse(_parseIndianNumber(marketCap.toString()));
       if (value >= 100000) {
@@ -551,7 +711,7 @@ class _CompanyNewsScreenState extends State<CompanyNewsScreen> {
       }
       return '₹${value.toStringAsFixed(2)} Cr';
     } catch (e) {
-      return '₹$marketCap Cr';
+      return '₹${marketCap.toString()} Cr';
     }
   }
 

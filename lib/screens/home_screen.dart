@@ -461,7 +461,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
   int _bottomIndex = 0;
   int _tabIndex = 0;
 
-  final String baseUrl = "http://10.69.144.93:5000";
+  final String baseUrl = "http://192.168.1.100:5000";
 
   @override
   void initState() {
