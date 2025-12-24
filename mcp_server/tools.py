@@ -89,6 +89,8 @@
 #         {"_id": 0, "Headline": 1, "summary": 1}
 #     ).limit(limit)
 #     return list(docs)
+
+
 from mcp_server.db import filtered_news
 
 
@@ -140,30 +142,3 @@ def get_news_by_sector(sector: str, limit: int = 5):
     ).limit(limit))
 
 
-# 🔥 MCP Registry (THIS WAS MISSING)
-class MCP:
-    def __init__(self):
-        self.tools = {
-            "search_news": search_news,
-            "get_latest_news": get_latest_news,
-            "get_news_by_company": get_news_by_company,
-            "get_news_by_sentiment": get_news_by_sentiment,
-            "get_news_by_impact": get_news_by_impact,
-            "get_news_by_sector": get_news_by_sector,
-        }
-
-    async def run(self):
-        # Startup hook
-        print("✅ MCP tools registered:", list(self.tools.keys()))
-
-    async def cleanup(self):
-        # Shutdown hook
-        print("🛑 MCP server cleanup complete")
-
-    def call(self, tool_name: str, **kwargs):
-        if tool_name not in self.tools:
-            raise ValueError(f"Tool '{tool_name}' not found")
-        return self.tools[tool_name](**kwargs)
-
-
-mcp = MCP()
