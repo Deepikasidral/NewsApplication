@@ -8,6 +8,7 @@ router.get("/", async (req, res) => {
     console.log("📊 Fetching companies from new_company_data collection...");
     const items = await Company.find().sort({ "Company Name": 1 });
     console.log(`✅ Found ${items.length} companies`);
+    console.log("📋 Sample company:", items[0]); // Debug log
     res.json(items);
   } catch (err) {
     console.error("🔥 Error fetching companies:", err);
