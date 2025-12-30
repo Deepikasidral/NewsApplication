@@ -5,8 +5,8 @@ const Company = require("../models/company");
 // ✔ Fetch all companies sorted by NAME OF COMPANY
 router.get("/", async (req, res) => {
   try {
-    console.log("📊 Fetching companies from Company_data collection...");
-    const items = await Company.find().sort({ "NAME OF COMPANY": 1 });
+    console.log("📊 Fetching companies from new_company_data collection...");
+    const items = await Company.find().sort({ "Company Name": 1 });
     console.log(`✅ Found ${items.length} companies`);
     res.json(items);
   } catch (err) {

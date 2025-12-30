@@ -73,29 +73,78 @@ router.post("/signin", async (req, res) => {
 // GOOGLE LOGIN
 router.post("/google-login", async (req, res) => {
   try {
-    const { name, email } = req.body;
+    const { name, email, uid, googleId } = req.body;
 
-    if (!email) return res.status(400).json({ message: "Email is required" });
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
 
-    let user = await User.findOne({ email });
+    // Find user by email or googleId
+    let user = await User.findOne({
+      $or: [{ email }, { googleId: googleId || null }]
+    });
 
     if (!user) {
-      user = new User({ name, email, loginType: "google" });
+      // Create new user
+      user = new User({
+        name,
+        email,
+        loginType: "google",
+        uid,
+        googleId,
+        lastLogin: new Date(),
+      });
       await user.save();
-    } else {
-      user.name = name;
-      user.loginType = "google";
-      await user.save();
+      
+      return res.status(201).json({
+        message: "Google account created successfully",
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          loginType: user.loginType,
+        },
+      });
     }
+
+    // Update existing user
+    user.name = name;
+    user.loginType = "google";
+    user.lastLogin = new Date();
+    
+    if (uid && !user.uid) {
+      user.uid = uid;
+    }
+    if (googleId && !user.googleId) {
+      user.googleId = googleId;
+    }
+    
+    await user.save();
 
     res.json({
       message: "Google login successful",
-      user: { id: user._id, name: user.name, email: user.email, loginType: user.loginType },
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        loginType: user.loginType,
+      },
     });
   } catch (error) {
     console.error("❌ GOOGLE LOGIN ERROR:", error.message);
     console.error("📄 FULL ERROR:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
+    
+    if (error.code === 11000) {
+      return res.status(400).json({
+        message: "This Google account is already registered",
+      });
+    }
+    
+    res.status(500).json({
+      message: "Server error during Google login",
+      error: error.message,
+    });
   }
 });
+
 module.exports = router;

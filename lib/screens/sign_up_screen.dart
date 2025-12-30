@@ -1,19 +1,35 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'sign_in_screen.dart';
-import 'home_screen.dart'; // ✅ Add your home page import
+import 'home_screen.dart';
 
-class SignUpScreen extends StatelessWidget {
+class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
 
-  Future<void> _handleSignUp(
-    BuildContext context,
-    String name,
-    String email,
-    String password,
-    String confirmPassword,
-  ) async {
+  @override
+  State<SignUpScreen> createState() => _SignUpScreenState();
+}
+
+class _SignUpScreenState extends State<SignUpScreen> {
+  final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmController = TextEditingController();
+  
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    scopes: ['email', 'profile'],
+  );
+
+  Future<void> _handleSignUp() async {
+    final name = _nameController.text.trim();
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+    final confirmPassword = _confirmController.text.trim();
+
     if (password != confirmPassword) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Passwords do not match")),
@@ -25,7 +41,7 @@ class SignUpScreen extends StatelessWidget {
     
     try {
       final response = await http.post(
-        Uri.parse("http://10.69.144.93:5000/api/auth/signup"), // backend unchanged
+        Uri.parse("http://192.168.1.102:5000/api/auth/signup"), // backend unchanged
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({
           "name": name,
@@ -60,13 +76,127 @@ class SignUpScreen extends StatelessWidget {
 
   }
 
+  Future<void> _handleGoogleSignIn() async {
+    print("🚀 Starting Google Sign-In...");
+    try {
+      await _googleSignIn.signOut();
+      
+      final googleUser = await _googleSignIn.signIn();
+      print("📧 Google User: ${googleUser?.email}");
+      
+      if (googleUser == null) {
+        print("❌ Google Sign-In cancelled");
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Google Sign-In was cancelled")),
+        );
+        return;
+      }
+
+      final googleAuth = await googleUser.authentication;
+      print("🔑 Got authentication tokens");
+      
+      if (googleAuth.idToken == null || googleAuth.accessToken == null) {
+        throw Exception("Failed to get authentication tokens");
+      }
+
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      print("🔥 Signing in with Firebase...");
+      final userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
+
+      if (userCredential.user == null) {
+        throw Exception("Firebase authentication failed");
+      }
+
+      print("✅ Firebase sign-in successful: ${userCredential.user!.email}");
+
+      final userData = {
+        'name': userCredential.user!.displayName ?? googleUser.displayName ?? 'User',
+        'email': userCredential.user!.email ?? googleUser.email,
+        'loginType': 'google',
+        'uid': userCredential.user!.uid,
+        'googleId': googleUser.id,
+      };
+
+      // Save to MongoDB
+      print("💾 Saving to MongoDB...");
+      try {
+        final response = await http.post(
+          Uri.parse("http://192.168.1.102:5000/api/auth/google-login"),
+          headers: {"Content-Type": "application/json"},
+          body: jsonEncode(userData),
+        ).timeout(const Duration(seconds: 10));
+
+        if (response.statusCode == 200 || response.statusCode == 201) {
+          print("✅ User saved in MongoDB: ${response.body}");
+        }
+      } catch (mongoError) {
+        print("⚠️ MongoDB error (continuing): $mongoError");
+      }
+
+      // Save to Firestore
+      print("📝 Saving to Firestore...");
+      try {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userCredential.user!.uid)
+            .set(userData, SetOptions(merge: true))
+            .timeout(const Duration(seconds: 10));
+        print("✅ Firestore save successful");
+      } catch (firestoreError) {
+        print("⚠️ Firestore error (continuing): $firestoreError");
+        // Continue even if Firestore fails
+      }
+
+      if (!mounted) {
+        print("⚠️ Widget not mounted, cannot navigate");
+        return;
+      }
+
+      print("🎉 Showing success message...");
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Signed in with Google successfully!"),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
+        ),
+      );
+
+      // Small delay to let user see the success message
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      print("🚀 Navigating to home screen...");
+      if (!mounted) return;
+      
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const NewsFeedScreen()),
+      );
+      
+      print("✅ Navigation complete");
+
+    } catch (e, stackTrace) {
+      print("❌ Google Sign-In Error: $e");
+      print("📚 Stack trace: $stackTrace");
+      
+      if (!mounted) return;
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Google Sign-In failed: ${e.toString()}"),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 5),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final nameController = TextEditingController();
-    final emailController = TextEditingController();
-    final passwordController = TextEditingController();
-    final confirmController = TextEditingController();
-
     return Scaffold(
       body: Container(
         width: double.infinity,
@@ -159,7 +289,7 @@ class SignUpScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 8),
                         TextField(
-                          controller: nameController,
+                          controller: _nameController,
                           decoration: InputDecoration(
                             hintText: 'Enter full name',
                             contentPadding: const EdgeInsets.symmetric(
@@ -184,7 +314,7 @@ class SignUpScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 8),
                         TextField(
-                          controller: emailController,
+                          controller: _emailController,
                           keyboardType: TextInputType.emailAddress,
                           decoration: InputDecoration(
                             hintText: 'Email',
@@ -210,7 +340,7 @@ class SignUpScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 8),
                         TextField(
-                          controller: passwordController,
+                          controller: _passwordController,
                           obscureText: true,
                           decoration: InputDecoration(
                             hintText: 'Password',
@@ -236,7 +366,7 @@ class SignUpScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 8),
                         TextField(
-                          controller: confirmController,
+                          controller: _confirmController,
                           obscureText: true,
                           decoration: InputDecoration(
                             hintText: 'Confirm Password',
@@ -259,13 +389,7 @@ class SignUpScreen extends StatelessWidget {
                           width: double.infinity,
                           height: 48,
                           child: ElevatedButton(
-                            onPressed: () => _handleSignUp(
-                              context,
-                              nameController.text.trim(),
-                              emailController.text.trim(),
-                              passwordController.text.trim(),
-                              confirmController.text.trim(),
-                            ),
+                            onPressed: _handleSignUp,
                             style: ElevatedButton.styleFrom(
                               backgroundColor:
                                   const Color(0xFFFFF0F0).withOpacity(0.95),
@@ -288,28 +412,77 @@ class SignUpScreen extends StatelessWidget {
                   ),
                 ),
 
+                const SizedBox(height: 20),
+
+                // Add Divider
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                  child: Row(
+                    children: [
+                      Expanded(child: Divider(color: Colors.grey.shade300)),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 8.0),
+                        child: Text('OR', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w600)),
+                      ),
+                      Expanded(child: Divider(color: Colors.grey.shade300)),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // Google Sign-In Button
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: _handleGoogleSignIn,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFF8C5C5),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 34,
+                            height: 34,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Center(
+                              child: Text('G', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          const Expanded(
+                            child: Text(
+                              'Continue with Google',
+                              style: TextStyle(color: Colors.black87, fontSize: 16, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+
                 const SizedBox(height: 26),
 
                 // Link to Sign In
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text("Already have an account?",
-                        style: TextStyle(color: Colors.black54)),
+                    const Text("Already have an account?", style: TextStyle(color: Colors.black54)),
                     TextButton(
                       onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) => const SignInScreen()),
-                        );
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const SignInScreen()));
                       },
-                      child: const Text(
-                        "Sign In",
-                        style: TextStyle(
-                            color: Colors.black,
-                            fontWeight: FontWeight.bold),
-                      ),
+                      child: const Text("Sign In", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
                     ),
                   ],
                 ),

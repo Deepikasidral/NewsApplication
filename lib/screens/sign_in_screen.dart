@@ -17,7 +17,10 @@ class SignInScreen extends StatefulWidget {
 class _SignInScreenState extends State<SignInScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    scopes: ['email', 'profile'],
+    // Removed explicit clientId - will use from google-services.json
+  );
 
   // ===========================
   // EMAIL SIGN-IN (Backend commented)
@@ -37,7 +40,7 @@ class _SignInScreenState extends State<SignInScreen> {
     
     try {
       final response = await http.post(
-        Uri.parse("http://10.69.144.93:5000/api/auth/signin"),
+        Uri.parse("http://192.168.1.102:5000/api/auth/signin"),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({"email": email, "password": password, "loginType": "email"}),
       );
@@ -68,62 +71,160 @@ class _SignInScreenState extends State<SignInScreen> {
   }
 
   // ===========================
-  // GOOGLE SIGN-IN (Backend commented)
+  // GOOGLE SIGN-IN (Fixed with proper error handling)
   // ===========================
   Future<void> _handleGoogleSignIn() async {
-    // 🔒 Commented all backend + Firebase logic for demo build
-    
+    print("🚀 Starting Google Sign-In...");
     try {
+      await _googleSignIn.signOut();
+      
       final googleUser = await _googleSignIn.signIn();
-      if (googleUser == null) return;
+      print("📧 Google User: ${googleUser?.email}");
+      
+      if (googleUser == null) {
+        print("❌ Google Sign-In cancelled");
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Google Sign-In was cancelled")),
+        );
+        return;
+      }
 
       final googleAuth = await googleUser.authentication;
+      print("🔑 Got authentication tokens");
+      
+      if (googleAuth.idToken == null || googleAuth.accessToken == null) {
+        throw Exception("Failed to get authentication tokens");
+      }
+
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 
+      print("🔥 Signing in with Firebase...");
       final userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
 
-      final userData = {
-        'name': userCredential.user!.displayName,
-        'email': userCredential.user!.email,
-        'loginType': 'google',
-      };
-
-      final response = await http.post(
-        Uri.parse("http://10.69.144.93:5000/api/auth/google-login"),
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode(userData),
-      );
-
-      if (response.statusCode == 200) {
-        print("User saved in MongoDB: ${response.body}");
-      } else {
-        print("MongoDB save failed: ${response.body}");
+      if (userCredential.user == null) {
+        throw Exception("Firebase authentication failed");
       }
 
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(userCredential.user!.uid)
-          .set(userData, SetOptions(merge: true));
+      print("✅ Firebase sign-in successful: ${userCredential.user!.email}");
 
+      final userData = {
+        'name': userCredential.user!.displayName ?? googleUser.displayName ?? 'User',
+        'email': userCredential.user!.email ?? googleUser.email,
+        'loginType': 'google',
+        'uid': userCredential.user!.uid,
+        'googleId': googleUser.id,
+      };
+
+      // Save to MongoDB
+      print("💾 Saving to MongoDB...");
+      try {
+        final response = await http.post(
+          Uri.parse("http://192.168.1.102:5000/api/auth/google-login"),
+          headers: {"Content-Type": "application/json"},
+          body: jsonEncode(userData),
+        ).timeout(const Duration(seconds: 10));
+
+        if (response.statusCode == 200 || response.statusCode == 201) {
+          print("✅ User saved in MongoDB: ${response.body}");
+        } else {
+          print("⚠️ MongoDB save failed (${response.statusCode}): ${response.body}");
+        }
+      } catch (mongoError) {
+        print("⚠️ MongoDB error (continuing): $mongoError");
+      }
+
+      // Save to Firestore
+      print("📝 Saving to Firestore...");
+      try {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userCredential.user!.uid)
+            .set(userData, SetOptions(merge: true))
+            .timeout(const Duration(seconds: 10));
+        print("✅ Firestore save successful");
+      } catch (firestoreError) {
+        print("⚠️ Firestore error (continuing): $firestoreError");
+      }
+
+      if (!mounted) {
+        print("⚠️ Widget not mounted, cannot navigate");
+        return;
+      }
+
+      print("🎉 Showing success message...");
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Signed in with Google successfully!")),
+        const SnackBar(
+          content: Text("Signed in with Google successfully!"),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
+        ),
       );
 
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      print("🚀 Navigating to home screen...");
+      if (!mounted) return;
+      
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const NewsFeedScreen()),
       );
-    } catch (e) {
+      
+      print("✅ Navigation complete");
+
+    } on FirebaseAuthException catch (e) {
+      print("🔥 Firebase Auth Error: ${e.code} - ${e.message}");
+      String message = "Firebase authentication failed";
+      
+      switch (e.code) {
+        case 'account-exists-with-different-credential':
+          message = "Account exists with different sign-in method";
+          break;
+        case 'invalid-credential':
+          message = "Invalid Google credentials";
+          break;
+        case 'operation-not-allowed':
+          message = "Google Sign-In not enabled in Firebase";
+          break;
+        case 'user-disabled':
+          message = "This account has been disabled";
+          break;
+        default:
+          message = "Authentication failed: ${e.message}";
+      }
+      
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Google Sign-In failed: $e")),
+        SnackBar(content: Text(message), backgroundColor: Colors.red),
+      );
+    } catch (e, stackTrace) {
+      print("❌ Google Sign-In Error: $e");
+      print("📚 Stack trace: $stackTrace");
+      
+      if (!mounted) return;
+      
+      String errorMessage = "Google Sign-In failed";
+      
+      if (e.toString().contains('sign_in_failed')) {
+        errorMessage = "Google Sign-In configuration error. Please contact support.";
+      } else if (e.toString().contains('network_error')) {
+        errorMessage = "Network error. Check your internet connection.";
+      } else if (e.toString().contains('DEVELOPER_ERROR')) {
+        errorMessage = "App configuration error. SHA certificate not registered.";
+      }
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(errorMessage),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 5),
+        ),
       );
     }
-    
-
-  
   }
 
   @override

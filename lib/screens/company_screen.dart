@@ -40,8 +40,8 @@ class _CompanyScreenState extends State<CompanyScreen> {
 
     setState(() {
       _filteredCompanies = _companies.where((company) {
-        final companyName = (company["NAME OF COMPANY"] ?? "").toLowerCase();
-        final symbol = (company["SYMBOL"] ?? "").toLowerCase();
+        final companyName = (company["Company Name"] ?? "").toLowerCase();
+        final symbol = (company["Symbol"] ?? "").toLowerCase();
         return companyName.contains(query) || symbol.contains(query);
       }).toList();
     });
@@ -54,7 +54,7 @@ class _CompanyScreenState extends State<CompanyScreen> {
     });
 
     try {
-      final resp = await http.get(Uri.parse("http://10.69.144.93:5000/api/companies"));
+      final resp = await http.get(Uri.parse("http://192.168.1.102:5000/api/companies"));
 
       if (resp.statusCode == 200) {
         final data = json.decode(resp.body);
@@ -146,8 +146,8 @@ class _CompanyScreenState extends State<CompanyScreen> {
                                 itemCount: _filteredCompanies.length,
                                 itemBuilder: (context, index) {
                                   final company = _filteredCompanies[index];
-                                  final companyName = company["NAME OF COMPANY"] ?? "Unknown";
-                                  final symbol = company["SYMBOL"] ?? "";
+                                  final companyName = company["Company Name"] ?? "Unknown";
+                                  final symbol = company["Symbol"] ?? "";
 
                                   return Padding(
                                     padding: const EdgeInsets.symmetric(
