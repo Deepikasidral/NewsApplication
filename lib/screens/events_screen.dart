@@ -33,7 +33,7 @@ class _EventsScreenState extends State<EventsScreen> {
 
     try {
       final response = await http.get(
-        Uri.parse('http://192.168.1.104:5000/api/events'),
+        Uri.parse('http://10.69.144.93:5000/api/events'),
         headers: {'Content-Type': 'application/json'},
       );
 

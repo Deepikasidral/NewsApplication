@@ -13,6 +13,23 @@ from mcp_server.tools import (
     get_news_by_impact,
 )
 
+# ============================
+# 🔐 FINAL SYSTEM PROMPT
+# ============================
+SYSTEM_FINAL_PROMPT = """
+You are a smart and knowledgeable financial assistant.
+
+Follow these rules:
+- Respond like ChatGPT with clear structure, headings, bullet points, and bold text when helpful.
+- Use emojis naturally to improve readability.
+- Never mention tools, databases, filters, storage, or sources.
+- Never say phrases like "based on the data", "according to news records", or "from the database".
+- If information is available, blend it naturally into your response.
+- If information is missing, answer confidently using your general financial knowledge.
+- Keep the tone professional, clear, and easy to understand.
+"""
+
+
 client = AzureOpenAI(
     api_key=AZURE_OPENAI_KEY,
     azure_endpoint=AZURE_OPENAI_ENDPOINT,
@@ -96,15 +113,15 @@ TOOL_MAP = {
 
 
 def ask_llm(question: str) -> str:
-    # 1️⃣ LLM decides which tool to use
+    # Step 1: Let model decide tool usage
     response = client.chat.completions.create(
         model=AZURE_DEPLOYMENT,
         messages=[
             {
                 "role": "system",
                 "content": (
-                    "You are a smart financial news assistant. "
-                    "Understand the user's intent and decide which tool to use."
+                    "You are a smart financial assistant. "
+                    "Decide if a tool is required to answer the user's question."
                 ),
             },
             {"role": "user", "content": question},
@@ -116,7 +133,7 @@ def ask_llm(question: str) -> str:
 
     msg = response.choices[0].message
 
-    # 2️⃣ Tool selected
+    # Step 2: Tool call path
     if msg.tool_calls:
         tool_call = msg.tool_calls[0]
         tool_name = tool_call.function.name
@@ -124,28 +141,28 @@ def ask_llm(question: str) -> str:
 
         tool_result = TOOL_MAP[tool_name](**args)
 
+        # Step 3: If tool has no data → fallback to LLM knowledge
         if not tool_result:
-            return "🤔 I couldn't find any relevant news for your query."
+            fallback = client.chat.completions.create(
+                model=AZURE_DEPLOYMENT,
+                messages=[
+                    {"role": "system", "content": SYSTEM_FINAL_PROMPT},
+                    {"role": "user", "content": question},
+                ],
+                temperature=0.6,
+            )
+            return fallback.choices[0].message.content
 
-        # 3️⃣ GPT-style reasoning over query + data
+        # Step 4: Reason over data silently
         final_response = client.chat.completions.create(
             model=AZURE_DEPLOYMENT,
             messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are a friendly financial assistant. "
-                        "Answer the user's question using the provided news data. "
-                        "Use simple language, be clear and helpful. "
-                        "Include relevant emojis where appropriate. "
-                        "Do NOT mention JSON, databases, or tools."
-                    ),
-                },
+                {"role": "system", "content": SYSTEM_FINAL_PROMPT},
                 {
                     "role": "user",
                     "content": (
-                        f"User question:\n{question}\n\n"
-                        f"Relevant news data:\n{json.dumps(tool_result, indent=2)}"
+                        f"{question}\n\n"
+                        f"Information:\n{json.dumps(tool_result)}"
                     ),
                 },
             ],
@@ -154,5 +171,5 @@ def ask_llm(question: str) -> str:
 
         return final_response.choices[0].message.content
 
-    # 4️⃣ No tool needed → normal GPT answer
+    # Step 5: No tool needed
     return msg.content

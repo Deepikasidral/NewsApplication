@@ -66,6 +66,8 @@
 #         {"sector": {"$regex": sector, "$options": "i"}},
 #         {"_id": 0}
 #     ).limit(limit))
+
+
 from datetime import datetime
 from bson import ObjectId
 from mcp_server.db import filtered_news
