@@ -1,14 +1,13 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-from chatbot_service.chatbot import ask_bot
+from mcp_server.llm import ask_llm
 
-app = FastAPI(title="Rupee Letter Chatbot")
+app = FastAPI(title="RupeeLetter Chat API")
 
 class ChatRequest(BaseModel):
     question: str
 
 @app.post("/chat")
-def chat(req: ChatRequest):
-    answer = ask_bot(req.question)
+async def chat(req: ChatRequest):
+    answer = ask_llm(req.question)
     return {"answer": answer}
-

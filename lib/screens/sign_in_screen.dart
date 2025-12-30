@@ -34,10 +34,10 @@ class _SignInScreenState extends State<SignInScreen> {
     }
 
     // 🔒 Commented backend logic (local IP will fail on other phones)
-    /*
+    
     try {
       final response = await http.post(
-        Uri.parse("http://10.170.141.198:5000/api/auth/signin"),
+        Uri.parse("http://10.69.144.93:5000/api/auth/signin"),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({"email": email, "password": password, "loginType": "email"}),
       );
@@ -62,16 +62,9 @@ class _SignInScreenState extends State<SignInScreen> {
         SnackBar(content: Text("Sign in failed: $e")),
       );
     }
-    */
+    
 
-    // ✅ Temporary direct navigation for demo APK
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Signed in successfully (demo mode)")),
-    );
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => const NewsFeedScreen()),
-    );
+   
   }
 
   // ===========================
@@ -79,7 +72,7 @@ class _SignInScreenState extends State<SignInScreen> {
   // ===========================
   Future<void> _handleGoogleSignIn() async {
     // 🔒 Commented all backend + Firebase logic for demo build
-    /*
+    
     try {
       final googleUser = await _googleSignIn.signIn();
       if (googleUser == null) return;
@@ -99,7 +92,7 @@ class _SignInScreenState extends State<SignInScreen> {
       };
 
       final response = await http.post(
-        Uri.parse("http://10.170.141.198:5000/api/auth/google-login"),
+        Uri.parse("http://10.69.144.93:5000/api/auth/google-login"),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode(userData),
       );
@@ -121,23 +114,16 @@ class _SignInScreenState extends State<SignInScreen> {
 
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
+        MaterialPageRoute(builder: (_) => const NewsFeedScreen()),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Google Sign-In failed: $e")),
       );
     }
-    */
+    
 
-    // ✅ Temporary demo navigation
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Signed in with Google (demo mode)")),
-    );
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => const NewsFeedScreen()),
-    );
+  
   }
 
   @override

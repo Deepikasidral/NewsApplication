@@ -22,10 +22,10 @@ class SignUpScreen extends StatelessWidget {
     }
 
     // ------------------ BACKEND SIGNUP CODE (TEMPORARILY DISABLED) ------------------
-    /*
+    
     try {
       final response = await http.post(
-        Uri.parse("http://10.170.141.198:5000/api/auth/signup"), // backend unchanged
+        Uri.parse("http://10.69.144.93:5000/api/auth/signup"), // backend unchanged
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({
           "name": name,
@@ -38,14 +38,15 @@ class SignUpScreen extends StatelessWidget {
       final data = jsonDecode(response.body);
 
       if (response.statusCode == 201) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Account created successfully!")),
-        );
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const SignInScreen()),
-        );
-      } else {
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(content: Text("Account created successfully!")),
+  );
+  Navigator.pushReplacement(
+    context,
+    MaterialPageRoute(builder: (_) => const NewsFeedScreen()),
+  );
+}
+ else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(data['message'] ?? "Sign up failed")),
         );
@@ -55,16 +56,8 @@ class SignUpScreen extends StatelessWidget {
         SnackBar(content: Text("Sign up failed: $e")),
       );
     }
-    */
+    
 
-    // ------------------ TEMPORARY OFFLINE REDIRECT ------------------
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Welcome! Redirecting to Home Page...")),
-    );
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => const NewsFeedScreen()),
-    );
   }
 
   @override
