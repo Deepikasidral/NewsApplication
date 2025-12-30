@@ -7,6 +7,9 @@ from dotenv import load_dotenv
 from pymongo import MongoClient
 from openai import AzureOpenAI
 
+import firebase_admin
+from firebase_admin import credentials, messaging
+
 # ================================
 # 🔧 CONFIGURATION
 # ================================
@@ -32,6 +35,17 @@ AZURE_DEPLOYMENT = os.getenv("AZURE_DEPLOYMENT")
 # Ensure deduplication (safe to run multiple times)
 filtered_news.create_index("FileName", unique=True)
 
+FIREBASE_KEY_PATH = os.path.join(
+    os.path.dirname(__file__),
+    "..",
+    "firebase_admin_key.json"
+)
+
+
+if not firebase_admin._apps:
+    cred = credentials.Certificate(FIREBASE_KEY_PATH)
+    firebase_admin.initialize_app(cred)
+
 # ================================
 # ⏱ TIME WINDOW HANDLING
 # ================================
@@ -56,7 +70,6 @@ def fetch_pti_news():
     start_time = get_last_run_time()
     end_time = datetime.now(timezone.utc)
 
-
     from_time = quote(start_time.strftime("%Y/%m/%d %H:%M:%S"))
     to_time = quote(end_time.strftime("%Y/%m/%d %H:%M:%S"))
 
@@ -70,9 +83,19 @@ def fetch_pti_news():
     print(f"⏱ Fetching PTI news: {start_time} → {end_time}")
 
     response = requests.get(url, timeout=30)
-    response.raise_for_status()
 
-    data = response.json()
+    if response.status_code != 200:
+        print("❌ PTI API Error:", response.status_code)
+        print(response.text[:500])
+        return []
+
+    try:
+        data = response.json()
+    except ValueError:
+        print("❌ PTI API returned NON-JSON response")
+        print("Response preview:")
+        print(response.text[:500])
+        return []
 
     # PTI may return dict or list
     if isinstance(data, dict):
@@ -87,7 +110,7 @@ def fetch_pti_news():
 
 
 # ================================
-# ⚙️ GROQ CALL HELPER
+# ⚙️ llm CALL HELPER
 # ================================
 def get_llm_response(system_prompt, user_input):
     try:
@@ -103,6 +126,39 @@ def get_llm_response(system_prompt, user_input):
     except Exception as e:
         print("❌ Azure OpenAI Error:", str(e))
         return None
+
+# ================================
+# ⚙️ notification CALL HELPER
+# ================================
+
+def send_push_notification(article, agent2, agent3):
+    title = "🚨 High Impact Market News"
+
+    body = (
+        f"{article.get('Headline')}\n"
+        f"Sentiment: {agent3['sentiment']} | Impact: {agent3['impact']}"
+    )
+
+    message = messaging.Message(
+        notification=messaging.Notification(
+            title=title,
+            body=body,
+        ),
+       data={
+            "FileName": article.get("FileName", ""),
+            "headline": article.get("Headline", ""),
+            "sentiment": agent3["sentiment"],
+            "impact": agent3["impact"]
+        },
+
+        topic="market_alerts"
+    )
+
+    try:
+        messaging.send(message)
+        print("🔔 Push notification sent")
+    except Exception as e:
+        print("❌ Push notification failed:", e)
 
 
 # ================================
@@ -362,6 +418,15 @@ def run_pipeline():
         agent3 = process_agent3(agent2)
         if not agent3:
             continue
+
+        notify = (
+            agent3["impact"] == "Very High" or
+            agent3["sentiment"] in ["Very Bullish", "Very Bearish"]
+        )
+
+        if notify:
+            send_push_notification(article, agent2, agent3)
+
 
         final_doc = {
             **article,  # ALL PTI API FIELDS

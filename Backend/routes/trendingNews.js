@@ -7,10 +7,12 @@ const FilteredNews = require("../models/filteredNews");
  * GET /api/trending-news
  */
 router.get("/", async (req, res) => {
-  try {
+ try {
     const trendingNews = await FilteredNews.find({
-      impact: { $in: ["Very High"] },
-      sentiment: { $in: ["Very Bearish", "Very Bullish"] }
+      $or: [
+        { impact: "Very High" },
+        { sentiment: { $in: ["Very Bullish", "Very Bearish"] } }
+      ]
     })
       .sort({ published_at: -1 })
       .limit(50);
