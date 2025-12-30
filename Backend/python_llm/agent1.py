@@ -1,313 +1,3 @@
-# import os
-# import json
-# from datetime import datetime
-# from dotenv import load_dotenv
-# from pymongo import MongoClient
-# from groq import Groq
-
-# # ================================
-# # 🔧 CONFIGURATION
-# # ================================
-# load_dotenv(dotenv_path="../.env")
-
-# mongo_uri = os.getenv("MONGO_URI")
-# db_name = os.getenv("DB_NAME")
-# collection_name = os.getenv("COLLECTION_NAME")
-# groq_api_key = os.getenv("GROQ_API_KEY")
-
-# # MongoDB setup
-# client = MongoClient(mongo_uri)
-# db = client[db_name]
-# all_news = db[collection_name]
-# filtered_news = db["filtered_news"]
-# companies_col = db["companies"]  # company database with {name, symbol, sector}
-
-# # Groq setup
-# groq_client = Groq(api_key=groq_api_key)
-
-# # ================================
-# # 🧠 AGENT 1: NEWS FILTER
-# # ================================
-# agent1_prompt = """You are Agent 1, the News Filter for Rupee Letter — India’s fast, simple finance insights app.
-
-# Your job is to decide if a news article is **useful** for investors or traders and worth showing on the app feed.
-
-# Return only:
-# - "keep" → if it contains **specific, actionable, or significant** market or company impact.
-# - "discard" → if it’s routine, repetitive, or trivial.
-
-# ---
-
-# ### ✅ KEEP only if the article covers:
-# 1. **Company-specific impact**
-#    - Earnings, M&A, orders, partnerships, IPOs, leadership changes, rating changes.
-# 2. **Policy / regulatory moves**
-#    - RBI, SEBI, government, fiscal, or tax announcements that influence markets.
-# 3. **Exceptional market moves**
-#    - Sharp rallies/crashes (Sensex/Nifty move ≥ 1.5%), sector rotations, FII inflows/outflows, global shock events.
-# 4. **Macro or global developments**
-#    - Fed, oil, currency, or geopolitical events that directly affect Indian markets.
-
-# ---
-
-# ### ❌ DISCARD if:
-# - It’s a **routine daily market wrap** (e.g., “Sensex up 300 pts, Nifty ends higher for 3rd day”).
-# - It contains **no new trigger** or explanation beyond market direction.
-# - It’s a **commodity rate**, **currency rate**, or **price table**.
-# - It’s a **short flash** (NEWSALERT, schedule, RBI operations, etc.).
-# - It’s **duplicative or purely statistical** (e.g., “Gold up 0.2%”, “Rupee rises 3 paise”).
-# - Word count < 80 words.
-
-# ---
-
-# ### 🔍 Guidance for “Market Movement” stories
-# Keep **only** if:
-# - It mentions *cause or driver* of the move (e.g., “Sensex up 800 pts on Fed rate cut hopes”), **and**
-# - The move is *exceptionally large or unusual* (≥ 1.5% in Sensex/Nifty or major sector index).
-
-# Otherwise → **discard** as routine update.
-
-# ---
-
-# ### 🧾 OUTPUT FORMAT (STRICT JSON)
-# {
-#   "decision": "keep" or "discard",
-#   "reason": "brief reason (10–20 words)"
-# }
-
-
-
-# Do not add any extra commentary.
-# """
-
-# # ================================
-# # 🧠 AGENT 2: SUMMARIZATION & SECTOR TAGGING (Updated)
-# # ================================
-# agent2_prompt = """
-# You are Agent 2, the Summarization & Sector Classification Agent for Rupee Letter — India’s finance and stock market platform.
-
-# ### YOUR INPUT
-# You will receive:
-# 1. A news article (title + content)
-# 2. A company database (list of dicts) where each entry has: {"SYMBOL": "...", "NAME OF COMPANY": "..."}
-
-# ### YOUR TASK
-# 1. Summarize the article concisely in 40–60 words — factual, objective, investor-oriented.
-# 2. From the given company database, find companies actually mentioned in the article.
-#    - Match by **exact name** or **symbol** (case-insensitive).
-#    - Include a company only if its name/symbol appears **anywhere in the article text**.
-#    - Do **not** infer or guess.
-# 3. If one or more companies are found, set `"sector"` as `"Company Specific"`.
-#    If none found, set `"sector"` = `"General Market"`.
-# 4. Set `"tone"` = `"neutral"` always.
-
-# ### OUTPUT FORMAT (strict JSON only)
-# {
-#   "summary": "<40–60 word factual summary>",
-#   "sector": "<'Company Specific' or 'General Market'>",
-#   "companies": [<list of matched company names>],
-#   "tone": "neutral"
-# }
-# Return JSON only, no commentary.
-# """
-# # ================================
-# # 🧠 AGENT 3: SENTIMENT & IMPACT ANALYZER
-# # ================================
-# agent3_prompt = """
-# You are Agent 3, the Sentiment & Impact Analyzer for Rupee Letter — India’s fast, actionable finance insights platform.
-
-# ### YOUR ROLE
-# Analyze the summarized article and estimate:
-# 1. **Short-term sentiment** (≈ 1 week outlook) for the mentioned company or market.
-# 2. **Impact strength** of this news on price or sentiment.
-
-# ### 📊 SENTIMENT SCALE
-# - "Very Bullish" → strong positive trigger; likely short-term upside.
-# - "Bullish" → moderately positive; supports price sentiment.
-# - "Neutral" → balanced or minimal directional bias.
-# - "Bearish" → moderately negative; may cause minor downside.
-# - "Very Bearish" → strong negative trigger; likely short-term drop.
-
-# ### ⚡ IMPACT SCALE
-# - "Very High" → highly influential, major event (e.g., earnings surprise, policy shift, large order, merger).
-# - "High" → notable but not game-changing (e.g., mid-sized deal, positive rating).
-# - "Mild" → limited reaction expected.
-# - "Negligible" → almost no effect.
-
-# ### 🧭 RULES
-# - Use financial reasoning — consider profits, losses, guidance, rating changes, major orders, or regulatory actions.
-# - If multiple companies, infer overall sentiment.
-# - If macro/policy news, assess general market tone.
-
-# ### 🧾 OUTPUT FORMAT (STRICT JSON)
-# {
-#   "sentiment": "<Very Bullish | Bullish | Neutral | Bearish | Very Bearish>",
-#   "impact": "<Very High | High | Mild | Negligible>",
-#   "rationale": "<one short 15–25 word reasoning (for internal audit)>"
-# }
-# Return JSON only, no commentary.
-# """
-
-# # ================================
-# # ⚙️ GROQ CALL HELPER
-# # ================================
-# def get_groq_response(system_prompt, user_input):
-#     try:
-#         response = groq_client.chat.completions.create(
-#             model="llama-3.1-8b-instant",
-#             messages=[
-#                 {"role": "system", "content": system_prompt},
-#                 {"role": "user", "content": user_input},
-#             ],
-#             temperature=0.0,
-#         )
-#         return response.choices[0].message.content.strip()
-#     except Exception as e:
-#         print("❌ Groq API Error:", str(e))
-#         return None
-
-# # ================================
-# # 🧩 AGENT 1
-# # ================================
-# def process_agent1(article):
-#     title = article.get("Headline", "") or article.get("title", "")
-#     content = article.get("story", "") or article.get("content", "")
-#     text = f"Title: {title}\n\nContent:\n{content}"
-
-#     result = get_groq_response(agent1_prompt, text)
-#     if not result:
-#         return None
-#     try:
-#         decision_data = json.loads(result)
-#     except json.JSONDecodeError:
-#         print(f"⚠️ JSON parse error (Agent1): {title}")
-#         return None
-
-#     decision = decision_data.get("decision", "").lower()
-#     all_news.update_one(
-#         {"_id": article["_id"]},
-#         {"$set": {
-#             "processed_by_agent1": True,
-#             "decision": decision,
-#             "reason": decision_data.get("reason")
-#         }},
-#     )
-
-#     if decision == "keep":
-#         filtered_news.insert_one({
-#             **article,
-#             "decision": "keep",
-#             "reason": decision_data.get("reason"),
-#             "processed_at": datetime.utcnow()
-#         })
-#         print(f"✅ Kept: {title}")
-#     else:
-#         print(f"🗑️ Discarded: {title}")
-#     return decision_data
-
-# # ================================
-# # 🧩 AGENT 2 (Updated)
-# # ================================
-# def process_agent2(article):
-#     title = article.get("Headline", "") or article.get("title", "")
-#     content = article.get("story", "") or article.get("content", "")
-#     text = f"Title: {title}\n\nContent:\n{content}"
-
-#     # ✅ Fetch company data from your actual field names
-#     companies_data = list(companies_col.find({}, {"SYMBOL": 1, "NAME OF COMPANY": 1, "_id": 0}))
-#     company_list_json = json.dumps(companies_data, ensure_ascii=False)
-
-#     llm_input = f"""
-# Article:
-# {text}
-
-# Below is Rupee Letter's official company database (use only this list):
-# {company_list_json}
-
-# Now find which companies are mentioned in the article and summarize as instructed.
-# """
-
-#     result = get_groq_response(agent2_prompt, llm_input)
-#     if not result:
-#         return None
-
-#     try:
-#         summary_data = json.loads(result)
-#     except json.JSONDecodeError:
-#         print(f"⚠️ JSON parse error (Agent2): {title}")
-#         print("Raw:", result)
-#         return None
-
-#     filtered_news.update_one(
-#         {"_id": article["_id"]},
-#         {"$set": {
-#             "summary": summary_data.get("summary"),
-#             "sector": summary_data.get("sector"),
-#             "companies": summary_data.get("companies", []),
-#             "tone": summary_data.get("tone", "neutral"),
-#             "processed_by_agent2": True
-#         }},
-#     )
-
-#     print(f"🧠 Summarized: {title} → {summary_data.get('sector')}")
-#     print(f"🏢 Companies found: {summary_data.get('companies', [])}")
-#     return summary_data
-# # ================================
-# # 🧩 AGENT 3
-# # ================================
-# def process_agent3(article):
-#     title = article.get("Headline", "") or article.get("title", "")
-#     summary = article.get("summary", "")
-#     sector = article.get("sector", "")
-#     companies = article.get("companies", [])
-
-#     if not summary:
-#         print(f"⚠️ Skipping Agent3: No summary for {title}")
-#         return None
-
-#     input_text = f"Summary: {summary}\nSector: {sector}\nCompanies: {', '.join(companies)}"
-#     result = get_groq_response(agent3_prompt, input_text)
-#     if not result:
-#         return None
-#     try:
-#         sentiment_data = json.loads(result)
-#     except json.JSONDecodeError:
-#         print(f"⚠️ JSON parse error (Agent3): {title}")
-#         print("Raw:", result)
-#         return None
-
-#     filtered_news.update_one(
-#         {"_id": article["_id"]},
-#         {"$set": {
-#             "sentiment": sentiment_data.get("sentiment"),
-#             "impact": sentiment_data.get("impact"),
-#             "rationale": sentiment_data.get("rationale"),
-#             "processed_by_agent3": True
-#         }},
-#     )
-#     print(f"📈 Sentiment: {sentiment_data.get('sentiment')} | Impact: {sentiment_data.get('impact')} for {title}")
-#     return sentiment_data
-
-# # ================================
-# # 🚀 PIPELINE RUNNER
-# # ================================
-# def run_pipeline(limit=20):
-#     unprocessed = all_news.find({"processed_by_agent1": {"$exists": False}}).limit(limit)
-#     for article in unprocessed:
-#         print(f"\n📰 Processing: {article.get('Headline', article.get('title', 'Untitled'))[:80]}...")
-#         decision = process_agent1(article)
-#         if decision and decision.get("decision") == "keep":
-#             summary_data = process_agent2(article)
-#             if summary_data:
-#                 process_agent3({**article, **summary_data})
-#     print("\n🎯 Pipeline complete.")
-
-# # ================================
-# # 🏁 ENTRY POINT
-# # ================================
-# if __name__ == "__main__":
-#     run_pipeline()
-
 import os
 import json
 import requests
@@ -315,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from urllib.parse import quote
 from dotenv import load_dotenv
 from pymongo import MongoClient
-from groq import Groq
+from openai import AzureOpenAI
 
 # ================================
 # 🔧 CONFIGURATION
@@ -324,7 +14,6 @@ load_dotenv(dotenv_path="../.env")
 
 mongo_uri = os.getenv("MONGO_URI")
 db_name = os.getenv("DB_NAME")
-groq_api_key = os.getenv("GROQ_API_KEY")
 
 client = MongoClient(mongo_uri)
 db = client[db_name]
@@ -332,7 +21,13 @@ db = client[db_name]
 filtered_news = db["filtered_news"]
 companies_col = db["companies"]
 
-groq_client = Groq(api_key=groq_api_key)
+azure_client = AzureOpenAI(
+    api_key=os.getenv("AZURE_OPENAI_KEY"),
+    azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+    api_version=os.getenv("AZURE_OPENAI_API_VERSION")
+)
+
+AZURE_DEPLOYMENT = os.getenv("AZURE_DEPLOYMENT")
 
 # Ensure deduplication (safe to run multiple times)
 filtered_news.create_index("FileName", unique=True)
@@ -394,10 +89,10 @@ def fetch_pti_news():
 # ================================
 # ⚙️ GROQ CALL HELPER
 # ================================
-def get_groq_response(system_prompt, user_input):
+def get_llm_response(system_prompt, user_input):
     try:
-        response = groq_client.chat.completions.create(
-            model="llama-3.1-8b-instant",
+        response = azure_client.chat.completions.create(
+            model=AZURE_DEPLOYMENT,  # deployment name
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_input},
@@ -406,67 +101,68 @@ def get_groq_response(system_prompt, user_input):
         )
         return response.choices[0].message.content.strip()
     except Exception as e:
-        print("❌ Groq API Error:", str(e))
+        print("❌ Azure OpenAI Error:", str(e))
         return None
+
 
 # ================================
 # 🧠 AGENT 1: NEWS FILTER
 # ================================
-agent1_prompt = """You are Agent 1, the News Filter for Rupee Letter — India’s fast, simple finance insights app.
+agent1_prompt = """
+You are Agent 1, a Financial News Filter for Rupee Letter (India).
 
-Your job is to decide if a news article is **useful** for investors or traders and worth showing on the app feed.
+Your task is to decide whether a news article is useful for investors, traders, or finance readers.
 
-Return only:
-- "keep" → if it contains **specific, actionable, or significant** market or company impact.
-- "discard" → if it’s routine, repetitive, or trivial.
-
----
-
-### ✅ KEEP only if the article covers:
-1. **Company-specific impact**
-   - Earnings, M&A, orders, partnerships, IPOs, leadership changes, rating changes.
-2. **Policy / regulatory moves**
-   - RBI, SEBI, government, fiscal, or tax announcements that influence markets.
-3. **Exceptional market moves**
-   - Sharp rallies/crashes (Sensex/Nifty move ≥ 1.5%), sector rotations, FII inflows/outflows, global shock events.
-4. **Macro or global developments**
-   - Fed, oil, currency, or geopolitical events that directly affect Indian markets.
+### CLASSIFICATION (choose ONE only)
+- "keep" → Market-relevant, actionable, or sentiment-impacting
+- "discard" → Trivial, repetitive, or irrelevant to investing/markets
 
 ---
 
-### ❌ DISCARD if:
-- It’s a **routine daily market wrap** (e.g., “Sensex up 300 pts, Nifty ends higher for 3rd day”).
-- It contains **no new trigger** or explanation beyond market direction.
-- It’s a **commodity rate**, **currency rate**, or **price table**.
-- It’s a **short flash** (NEWSALERT, schedule, RBI operations, etc.).
-- It’s **duplicative or purely statistical** (e.g., “Gold up 0.2%”, “Rupee rises 3 paise”).
-- Word count < 80 words.
+### ✅ KEEP the article ONLY if it contains:
+1. **Company or stock developments**
+   - Earnings, results, M&A, IPOs, deals, large orders
+   - Board/management changes
+   - Credit rating upgrades/downgrades
+
+2. **Significant market trends**
+   - Sensex/Nifty or sector moves ONLY IF exceptional and explained
+   - FII/DII flows, sector rotation, global cues affecting India
+
+3. **Economic or policy updates**
+   - RBI, SEBI, government policy
+   - GDP, inflation, interest rates, fiscal or trade decisions
+
+4. **Major corporate or startup news**
+   - Events impacting valuation or investor sentiment
+
+5. **Global financial events**
+   - Fed policy, crude oil, FX, geopolitics affecting Indian markets
 
 ---
 
-### 🔍 Guidance for “Market Movement” stories
-Keep **only** if:
-- It mentions *cause or driver* of the move (e.g., “Sensex up 800 pts on Fed rate cut hopes”), **and**
-- The move is *exceptionally large or unusual* (≥ 1.5% in Sensex/Nifty or major sector index).
-
-Otherwise → **discard** as routine update.
+### ❌ DISCARD the article if:
+- It is headline-only or a “NEWSALERT”
+- It reports prices/rates without context or explanation
+- It is a schedule, table, or raw data dump
+- It is duplicate or repetitive
+- It is under 80 words with no clear market impact
 
 ---
 
-### 🧾 OUTPUT FORMAT (STRICT JSON)
+### 🧾 OUTPUT FORMAT (STRICT JSON ONLY)
 {
   "decision": "keep" or "discard",
   "reason": "brief reason (10–20 words)"
 }
 
-
-
-Do not add any extra commentary.
+Do not add any commentary outside JSON.
 """
+
 
 def process_agent1(article):
     text = f"Title: {article.get('Headline','')}\n\nContent:\n{article.get('story','')}"
-    result = get_groq_response(agent1_prompt, text)
+    result = get_llm_response(agent1_prompt, text)
     if not result:
         return None
     return json.loads(result)
@@ -475,31 +171,86 @@ def process_agent1(article):
 # 🧠 AGENT 2: SUMMARY & COMPANY TAGGING
 # ================================
 agent2_prompt = """
-You are Agent 2, the Summarization & Sector Classification Agent for Rupee Letter — India’s finance and stock market platform.
+You are Agent 2, the Summarization & Sector Classification Agent for Rupee Letter (India).
 
-### YOUR INPUT
-You will receive:
-1. A news article (title + content)
-2. A company database (list of dicts) where each entry has: {"SYMBOL": "...", "NAME OF COMPANY": "..."}
+### TASKS
+1. Read the article carefully.
+2. Write a **40–60 word investor-friendly summary**.
+3. Identify NSE/BSE-listed companies mentioned in the article using Rupee Letter’s database.
+4. Assign sector and flags based on strict rules below.
 
-### YOUR TASK
-1. Summarize the article concisely in 40–60 words — factual, objective, investor-oriented.
-2. From the given company database, find companies actually mentioned in the article.
-   - Match by **exact name** or **symbol** (case-insensitive).
-   - Include a company only if its name/symbol appears **anywhere in the article text**.
-   - Do **not** infer or guess.
-3. If one or more companies are found, set `"sector"` as `"Company Specific"`.
-   If none found, set `"sector"` = `"General Market"`.
-4. Set `"tone"` = `"neutral"` always.
+---
 
-### OUTPUT FORMAT (strict JSON only)
+### 📝 SUMMARIZATION RULES
+- Neutral, factual, journalistic tone
+- Focus only on financial, strategic, policy, or market-impacting information
+- Exclude source tags, fillers, and quotes
+- Length strictly between 40–60 words (never exceed 70)
+
+---
+
+### 🏢 COMPANY TAGGING RULES
+- Tag ONLY companies that exist in the provided NSE–BSE database
+- Match by **exact company name or symbol** (case-insensitive)
+- Include only if explicitly mentioned in article text
+- Do NOT infer or guess
+
+---
+
+### 🏷️ SECTOR ASSIGNMENT RULES
+Choose ONE dominant sector ONLY if an Indian listed company is mentioned:
+- Banking and Financial Services
+- IT and Services Sector
+- Media
+- FMCG
+- Pharma and Healthcare
+- Automobile
+- Metal and Infrastructure
+- Energy and Oil & Gas
+- Realty
+
+If **no Indian listed company** is mentioned:
+- sector = "General Market" OR "Macro / Economy" (choose best fit)
+
+---
+
+### 🌍 GLOBAL FLAG RULE
+Set `"global": true` ONLY if:
+- The article primarily relates to **countries or markets outside India**
+- Examples: US Fed, China economy, Europe inflation, global recession, foreign central banks
+
+Otherwise:
+- `"global": false`
+
+---
+
+### 🪙 COMMODITIES FLAG RULE
+Set `"commodities": true` ONLY if:
+- The article is mainly about **gold, silver, crude oil, natural gas, bullion, commodities prices, or commodity outlook**
+- Includes global or domestic commodity movement
+
+Otherwise:
+- `"commodities": false`
+
+---
+
+### ❗ IMPORTANT PRIORITY LOGIC
+- Global commodity news → `global = true` AND `commodities = true`
+- India-focused commodity news → `commodities = true`, `global = false`
+- Company-specific news → both flags = false
+
+---
+
+### 🧾 OUTPUT FORMAT (STRICT JSON ONLY)
 {
-  "summary": "<40–60 word factual summary>",
-  "sector": "<'Company Specific' or 'General Market'>",
+  "summary": "<40–60 word summary>",
   "companies": [<list of matched company names>],
-  "tone": "neutral"
+  "sector": "<sector name or fallback>",
+  "global": true or false,
+  "commodities": true or false
 }
-Return JSON only, no commentary.
+
+Return JSON only. No commentary.
 """
 
 def process_agent2(article):
@@ -517,7 +268,7 @@ def process_agent2(article):
     {json.dumps(companies_data, ensure_ascii=False)}
     """
 
-    result = get_groq_response(agent2_prompt, llm_input)
+    result = get_llm_response(agent2_prompt, llm_input)
     if not result:
         return None
     return json.loads(result)
@@ -526,38 +277,49 @@ def process_agent2(article):
 # 🧠 AGENT 3: SENTIMENT & IMPACT
 # ================================
 agent3_prompt = """
-You are Agent 3, the Sentiment & Impact Analyzer for Rupee Letter — India’s fast, actionable finance insights platform.
+You are Agent 3, the Sentiment & Impact Analyzer for Rupee Letter (India).
 
-### YOUR ROLE
-Analyze the summarized article and estimate:
-1. **Short-term sentiment** (≈ 1 week outlook) for the mentioned company or market.
-2. **Impact strength** of this news on price or sentiment.
+### TASKS
+Based on the summarized article, determine:
+1. Short-term sentiment (≈ 1-week market reaction)
+2. Impact strength on price or investor sentiment
 
-### 📊 SENTIMENT SCALE
-- "Very Bullish" → strong positive trigger; likely short-term upside.
-- "Bullish" → moderately positive; supports price sentiment.
-- "Neutral" → balanced or minimal directional bias.
-- "Bearish" → moderately negative; may cause minor downside.
-- "Very Bearish" → strong negative trigger; likely short-term drop.
+---
 
-### ⚡ IMPACT SCALE
-- "Very High" → highly influential, major event (e.g., earnings surprise, policy shift, large order, merger).
-- "High" → notable but not game-changing (e.g., mid-sized deal, positive rating).
-- "Mild" → limited reaction expected.
-- "Negligible" → almost no effect.
+### 📊 SENTIMENT OPTIONS (choose ONE)
+- Very Bullish
+- Bullish
+- Neutral
+- Bearish
+- Very Bearish
 
-### 🧭 RULES
-- Use financial reasoning — consider profits, losses, guidance, rating changes, major orders, or regulatory actions.
-- If multiple companies, infer overall sentiment.
-- If macro/policy news, assess general market tone.
+(Assess short-term reaction, not long-term fundamentals)
 
-### 🧾 OUTPUT FORMAT (STRICT JSON)
+---
+
+### ⚡ IMPACT OPTIONS (choose ONE)
+- Very High → major trigger (earnings surprise, policy shift, merger, large order)
+- High → notable but limited-scale event
+- Mild → small or temporary reaction
+- Negligible → minimal market effect
+
+---
+
+### RULES
+- Base decisions on financial logic (earnings, guidance, orders, ratings, regulation)
+- If multiple companies, infer overall sentiment
+- For macro news, assess broad market tone
+- Avoid hype or opinionated language
+
+---
+
+### 🧾 OUTPUT FORMAT (STRICT JSON ONLY)
 {
   "sentiment": "<Very Bullish | Bullish | Neutral | Bearish | Very Bearish>",
-  "impact": "<Very High | High | Mild | Negligible>",
-  "rationale": "<one short 15–25 word reasoning (for internal audit)>"
+  "impact": "<Very High | High | Mild | Negligible>"
 }
-Return JSON only, no commentary.
+
+Return JSON only. No commentary.
 """
 
 def process_agent3(agent2_data):
@@ -567,7 +329,7 @@ def process_agent3(agent2_data):
         f"Companies: {', '.join(agent2_data.get('companies', []))}"
     )
 
-    result = get_groq_response(agent3_prompt, input_text)
+    result = get_llm_response(agent3_prompt, input_text)
     if not result:
         return None
     return json.loads(result)
@@ -609,18 +371,21 @@ def run_pipeline():
             "filter_reason": agent1.get("reason"),
 
             # Agent 2
+          
             "summary": agent2["summary"],
             "sector": agent2["sector"],
             "companies": agent2["companies"],
-            "tone": agent2["tone"],
+            "global": agent2["global"],
+            "commodities": agent2["commodities"],
+
 
             # Agent 3
             "sentiment": agent3["sentiment"],
             "impact": agent3["impact"],
-            "rationale": agent3["rationale"],
 
             # System
-            "ingested_at": datetime.utcnow()
+            "ingested_at": datetime.now(timezone.utc)
+
         }
 
         filtered_news.insert_one(final_doc)
