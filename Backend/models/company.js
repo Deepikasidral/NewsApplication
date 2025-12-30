@@ -1,10 +1,10 @@
 const mongoose = require("mongoose");
 
 const companySchema = new mongoose.Schema({
-  SYMBOL: String,
-  "NAME OF COMPANY": String,
+  Symbol: String,
+  "Company Name": String,
+  Industry: String,
 });
 
-// Your collection is `Company_data`, so:
-module.exports = mongoose.model("Company_data", companySchema, "Company_data");
+module.exports = mongoose.model("new_company_data", companySchema, "new_company_data");
 

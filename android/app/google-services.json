@@ -14,11 +14,11 @@
       },
       "oauth_client": [
         {
-          "client_id": "256768829103-9140jnijkuirc4s73id8cd301dkvr8at.apps.googleusercontent.com",
+          "client_id": "256768829103-el38teiaqoi5trnrtp9hg0fpe1a5nk3c.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "News.App",
-            "certificate_hash": "cb4717ccb82d168f5a00422aa5703a17d1a4c949"
+            "certificate_hash": "5a1708843da8236282b9378e0803343fe810eac9"
           }
         },
         {
