@@ -10,6 +10,119 @@ from openai import AzureOpenAI
 import firebase_admin
 from firebase_admin import credentials, messaging
 
+import re
+
+# ================================
+# 🧪 MOCK PTI ARTICLES (TEMP)
+# ================================
+MOCK_PTI_ARTICLES = [
+    {
+        "FileName": "1710202517DCM64",
+        "Byline": "",
+        "Copyrights": "PTI",
+        "EDNote": "",
+        "Headline": "NHPC begins commercial operations of 300 MW solar project in Rajasthan",
+        "Priority": "PRI",
+        "PublishedAt": "Friday, Oct 17, 2025 16:10:52",
+        "__v": 0,
+        "category": "BUSINESS",
+        "link": "http://www.ptinews.com",
+        "slug": "BIZ--NHPC",
+        "source": "India",
+        "story": (
+            "<p> New Delhi, Oct 17 (PTI) State-owned NHPC on Friday declared commercial operation "
+            "of its 300 MW solar project in Rajasthan.</p>"
+            "<p> The development comes after the successful trial run of the final phase of the "
+            "85.72 MW part capacity of the 300 MW Karnisar Solar Project in Bikaner, which was "
+            "completed last Friday, NHPC said in a stock exchange filing.</p>"
+            "<p> The company also received approval of Punjab State Electricity Regulatory "
+            "Commission (PSERC) on Thursday, it said.</p>"
+            "<p> NHPC Ltd said it has declared the commercial operation of the full 300 MW capacity "
+            "of the Karnisar solar project in Bikaner, Rajasthan with effect from October 16. "
+            "PTI ABI ABI DR DR</p>"
+        ),
+        "subcategory": " COM ECO ESPL"
+    },
+
+    {
+        "FileName": "1710202517DCM65",
+        "Byline": "",
+        "Copyrights": "PTI",
+        "EDNote": "",
+        "Headline": "KPI Green Energy bags orders worth Rs 696.5 cr from SJVN",
+        "Priority": "PRI",
+        "PublishedAt": "Friday, Oct 17, 2025 16:11:21",
+        "__v": 0,
+        "category": "BUSINESS",
+        "link": "http://www.ptinews.com",
+        "slug": "BIZ-KPI GREEN-SJVN",
+        "source": "India",
+        "story": (
+            "<p> New Delhi, Oct 17 (PTI) KPI Green Energy has bagged three letters of award from "
+            "state-owned SJVN for projects worth Rs 696.50 crore.</p>"
+            "<p> The project encompasses a full-scope EPC (Engineering, Procurement, and "
+            "Construction) package followed by a long-term operation & maintenance (O&M) "
+            "contract, KPI Green Energy said in a regulatory filing.</p>"
+            "<p> \"...KPI Green Energy Limited has received three distinct Letters of Award (LOAs) "
+            "from SJVN Limited (a Government of India enterprise) for a major 200 MW (AC) solar "
+            "power project at the GIPCL Renewable Energy Park, Khavda, Gujarat,\" it said. "
+            "PTI ABI ABI SHW</p>"
+        ),
+        "subcategory": " COM ECO ESPL"
+    },
+
+    {
+        "FileName": "1710202517DCM70",
+        "Byline": "",
+        "Copyrights": "PTI",
+        "EDNote": "",
+        "Headline": "CAI maintains cotton output estimates at 312.40 lakh bales for 2024-25 season",
+        "Priority": "PRI",
+        "PublishedAt": "Friday, Oct 17, 2025 16:28:46",
+        "__v": 0,
+        "category": "BUSINESS",
+        "link": "http://www.ptinews.com",
+        "slug": "BIZ-COTTON-CAI",
+        "source": "India",
+        "story": (
+            "<p> Mumbai, Oct 17 (PTI) The Cotton Association of India (CAI) on Friday maintained "
+            "its cotton production estimate for 2024-25 season at 312.40 lakh bales, amid "
+            "report of crop loss due to rains in Maharashtra.</p>"
+            "<p> CAI president Atul Ganatra said late crop arrival may help offset losses.</p>"
+            "<p> Total cotton supply till September 30, 2025, was estimated at 392.59 lakh "
+            "bales including imports and opening stock.</p>"
+            "<p> Export shipments are estimated at 18 lakh bales for the season. "
+            "PTI SM DRR</p>"
+        ),
+        "subcategory": " COM ECO ESPL"
+    },
+
+    {
+        "FileName": "1710202517DCM72",
+        "Byline": "",
+        "Copyrights": "PTI",
+        "EDNote": "",
+        "Headline": "AU Small Finance Bank Q2 net dips 2 pc at Rs 561 cr",
+        "Priority": "PRI",
+        "PublishedAt": "Friday, Oct 17, 2025 16:33:48",
+        "__v": 0,
+        "category": "BUSINESS",
+        "link": "http://www.ptinews.com",
+        "slug": "BIZ-RESULTS-AU SMALL BANK",
+        "source": "India",
+        "story": (
+            "<p> New Delhi, Oct 17 (PTI) AU Small Finance Bank on Friday reported a 2 per cent "
+            "dip in net profit at Rs 561 crore for the second quarter ended September 30.</p>"
+            "<p> Net total income rose 9 per cent to Rs 2,857 crore, while provisioning rose "
+            "29 per cent year-on-year.</p>"
+            "<p> Total deposits grew 21 per cent YoY to over Rs 1.32 lakh crore.</p>"
+            "<p> Shares closed at Rs 793.75 on BSE. PTI JD JD DR DR</p>"
+        ),
+        "subcategory": " COM ECO ESPL"
+    }
+]
+
+
 # ================================
 # 🔧 CONFIGURATION
 # ================================
@@ -22,7 +135,7 @@ client = MongoClient(mongo_uri)
 db = client[db_name]
 
 filtered_news = db["filtered_news"]
-companies_col = db["companies"]
+companies_col = db["Company_data"]
 
 azure_client = AzureOpenAI(
     api_key=os.getenv("AZURE_OPENAI_KEY"),
@@ -56,8 +169,15 @@ LAST_RUN_FILE = os.path.join(BASE_DIR, "last_run_time.txt")
 def get_last_run_time():
     if os.path.exists(LAST_RUN_FILE):
         with open(LAST_RUN_FILE, "r") as f:
-            return datetime.fromisoformat(f.read().strip())
-    return datetime.now(timezone.utc)- timedelta(minutes=5)
+            last_time_str = f.read().strip()
+            # Parse and ensure it has timezone info
+            last_time = datetime.fromisoformat(last_time_str)
+            if last_time.tzinfo is None:
+                # Assume UTC if no timezone
+                last_time = last_time.replace(tzinfo=timezone.utc)
+            return last_time
+    # Default to 5 minutes ago
+    return datetime.now(timezone.utc) - timedelta(minutes=5)
 
 def save_last_run_time(dt):
     with open(LAST_RUN_FILE, "w") as f:
@@ -66,6 +186,10 @@ def save_last_run_time(dt):
 # ================================
 # 🌐 FETCH PTI NEWS
 # ================================
+def fetch_mock_pti_news():
+    print("🧪 Running pipeline with MOCK PTI data")
+    return MOCK_PTI_ARTICLES
+
 def fetch_pti_news():
     start_time = get_last_run_time()
     end_time = datetime.now(timezone.utc)
@@ -79,14 +203,26 @@ def fetch_pti_news():
         f"&FromTime={from_time}"
         f"&EndTime={to_time}"
     )
+    
 
     print(f"⏱ Fetching PTI news: {start_time} → {end_time}")
 
-    response = requests.get(url, timeout=30)
+    try:
+        headers = {
+        "User-Agent": "Mozilla/5.0",
+        "Accept": "application/json,text/plain,*/*",
+        "Connection": "keep-alive",
+}
+
+        response = requests.get(url, headers=headers, timeout=30)
+
+    except Exception as e:
+        print("❌ PTI request failed:", e)
+        return []
 
     if response.status_code != 200:
-        print("❌ PTI API Error:", response.status_code)
-        print(response.text[:500])
+        print("❌ PTI API HTTP error:", response.status_code)
+        print(response.text[:300])
         return []
 
     try:
@@ -94,7 +230,7 @@ def fetch_pti_news():
     except ValueError:
         print("❌ PTI API returned NON-JSON response")
         print("Response preview:")
-        print(response.text[:500])
+        print(response.text[:300])
         return []
 
     # PTI may return dict or list
@@ -107,7 +243,6 @@ def fetch_pti_news():
 
     save_last_run_time(end_time)
     return articles
-
 
 # ================================
 # ⚙️ llm CALL HELPER
@@ -165,54 +300,38 @@ def send_push_notification(article, agent2, agent3):
 # 🧠 AGENT 1: NEWS FILTER
 # ================================
 agent1_prompt = """
-You are Agent 1, a Financial News Filter for Rupee Letter (India).
 
-Your task is to decide whether a news article is useful for investors, traders, or finance readers.
+You are Agent 1, a financial news filter for a news platform.
+Your goal is to decide whether an incoming news article is USEFUL for investors, traders, or finance readers, especially in the short term.
 
-### CLASSIFICATION (choose ONE only)
-- "keep" → Market-relevant, actionable, or sentiment-impacting
-- "discard" → Trivial, repetitive, or irrelevant to investing/markets
+You must classify the article strictly into one of:
+- "keep" - The article contains market-relevant, actionable, or insightful information.
+- "discard" - The article is trivial, repetitive, or irrelevant to stock markets or investing.
 
----
+### KEEP if the article includes:
+1. Company or stock market developments
+   - Quarterly results, earnings, M&A, IPOs, major deals, partnerships, board changes, rating outlooks.
+2. Market trends
+   - Sensex/Nifty movement, FII/DII flows, sectoral or global market cues.
+3. Economic or policy updates
+   - RBI decisions, SEBI guidelines, trade policies, macro indicators (GDP, inflation, exports, etc.).
+4. Major corporate or startup news impacting valuations or investor sentiment.
+5. Global financial events affecting India’s markets (US Fed, crude oil, currency moves).
 
-### ✅ KEEP the article ONLY if it contains:
-1. **Company or stock developments**
-   - Earnings, results, M&A, IPOs, deals, large orders
-   - Board/management changes
-   - Credit rating upgrades/downgrades
+### DISCARD if:
+- It’s a short “📰 NEWSALERT” or headline-only story.
+- It lists prices/rates without context (e.g., bullion, pepper, copra, exchange rates, futures tickers).
+- It’s a schedule, data dump, or table (RBI operations, business schedules, etc.).
+- It’s duplicate or repetitive of a similar headline.
+- It’s under 80 words with no analytical or market impact content.
+- Any news that might appear useful but has no Direct impact on the short term price of the relevant stock or an index
 
-2. **Significant market trends**
-   - Sensex/Nifty or sector moves ONLY IF exceptional and explained
-   - FII/DII flows, sector rotation, global cues affecting India
-
-3. **Economic or policy updates**
-   - RBI, SEBI, government policy
-   - GDP, inflation, interest rates, fiscal or trade decisions
-
-4. **Major corporate or startup news**
-   - Events impacting valuation or investor sentiment
-
-5. **Global financial events**
-   - Fed policy, crude oil, FX, geopolitics affecting Indian markets
-
----
-
-### ❌ DISCARD the article if:
-- It is headline-only or a “NEWSALERT”
-- It reports prices/rates without context or explanation
-- It is a schedule, table, or raw data dump
-- It is duplicate or repetitive
-- It is under 80 words with no clear market impact
-
----
-
-### 🧾 OUTPUT FORMAT (STRICT JSON ONLY)
+Return a short, structured JSON output only:
 {
   "decision": "keep" or "discard",
-  "reason": "brief reason (10–20 words)"
+  "reason": "brief reason (10-20 words max)"
 }
-
-Do not add any commentary outside JSON.
+Do not add any extra commentary.
 """
 
 
@@ -226,6 +345,47 @@ def process_agent1(article):
 # ================================
 # 🧠 AGENT 2: SUMMARY & COMPANY TAGGING
 # ================================
+
+STOP_WORDS = {
+    "limited", "ltd", "private", "bank", "group",
+    "industries", "company", "corp", "corporation"
+}
+
+def prefilter_companies(article_text, companies_data, max_candidates=20):
+    text = article_text.lower()
+    candidates = []
+
+    for c in companies_data:
+        name = c.get("NAME OF COMPANY", "")
+        symbol = c.get("SYMBOL", "")
+
+        # 1️⃣ SYMBOL match (word-boundary safe)
+        if symbol:
+            pattern = rf"\b{re.escape(symbol.lower())}\b"
+            if re.search(pattern, text):
+                candidates.append(c)
+                continue
+
+        # 2️⃣ COMPANY NAME token match (fallback)
+        tokens = [
+            t.lower()
+            for t in re.split(r"\W+", name)
+            if len(t) > 3 and t.lower() not in STOP_WORDS
+        ]
+
+        for token in tokens:
+            pattern = rf"\b{re.escape(token)}\b"
+            if re.search(pattern, text):
+                candidates.append(c)
+                break
+
+        if len(candidates) >= max_candidates:
+            break
+
+    return candidates
+
+
+
 agent2_prompt = """
 You are Agent 2, the Summarization & Sector Classification Agent for Rupee Letter (India).
 
@@ -252,8 +412,32 @@ You are Agent 2, the Summarization & Sector Classification Agent for Rupee Lette
 - Do NOT infer or guess
 
 ---
+### 🔒 STRICT NAME OUTPUT RULE (MANDATORY)
+- You MUST return company names EXACTLY as they appear in the provided company list.
+- Do NOT shorten names.
+- Do NOT remove words like "Limited", "Ltd", "Bank", etc.
+- Do NOT change capitalization.
+- If unsure, DO NOT include the company.
+
 
 ### 🏷️ SECTOR ASSIGNMENT RULES
+
+#### 🔥 HIGHEST PRIORITY — IPO
+Set:
+- `"sector": "IPO"`
+
+ONLY if the article is **primarily about an Initial Public Offering**, including:
+- IPO filing (DRHP, RHP)
+- IPO launch or announcement
+- Issue size, price band, lot size
+- Subscription status, anchor investors
+- IPO listing, debut, GMP, allotment, grey market premium
+
+If the article is IPO-related, **DO NOT assign any other sector**, even if companies are mentioned.
+
+---
+
+#### 📌 STANDARD SECTOR RULES (apply only if NOT IPO)
 Choose ONE dominant sector ONLY if an Indian listed company is mentioned:
 - Banking and Financial Services
 - IT and Services Sector
@@ -265,6 +449,9 @@ Choose ONE dominant sector ONLY if an Indian listed company is mentioned:
 - Energy and Oil & Gas
 - Realty
 
+---
+
+#### 📉 FALLBACK (no listed company mentioned)
 If **no Indian listed company** is mentioned:
 - sector = "General Market" OR "Macro / Economy" (choose best fit)
 
@@ -290,10 +477,11 @@ Otherwise:
 
 ---
 
-### ❗ IMPORTANT PRIORITY LOGIC
-- Global commodity news → `global = true` AND `commodities = true`
-- India-focused commodity news → `commodities = true`, `global = false`
-- Company-specific news → both flags = false
+### ❗ IMPORTANT PRIORITY LOGIC (FINAL ORDER)
+1. IPO news → `sector = "IPO"`
+2. Global commodity news → `global = true`, `commodities = true`
+3. India-focused commodity news → `commodities = true`, `global = false`
+4. Company-specific news → both flags = false
 
 ---
 
@@ -301,81 +489,136 @@ Otherwise:
 {
   "summary": "<40–60 word summary>",
   "companies": [<list of matched company names>],
-  "sector": "<sector name or fallback>",
+  "sector": "<IPO | sector name | General Market | Macro / Economy>",
   "global": true or false,
   "commodities": true or false
 }
 
 Return JSON only. No commentary.
 """
+def normalize_company_name(name: str) -> str:
+    name = name.lower()
+    name = re.sub(r"\blimited\b|\bltd\b|\bplc\b|\bcorp\b|\bcorporation\b", "", name)
+    name = re.sub(r"\s+", " ", name)
+    return name.strip()
+
 
 def process_agent2(article):
     text = f"Title: {article.get('Headline','')}\n\nContent:\n{article.get('story','')}"
 
+    # 1️⃣ Fetch all companies (same as before)
     companies_data = list(
         companies_col.find({}, {"SYMBOL": 1, "NAME OF COMPANY": 1, "_id": 0})
     )
+
+    full_db_map = {
+    normalize_company_name(c["NAME OF COMPANY"]): c["NAME OF COMPANY"]
+    for c in companies_data
+}
+
+
+    # 2️⃣ 🔥 NEW: prefilter companies in Python
+    candidate_companies = prefilter_companies(text, companies_data)
+
+    # Safety fallback (rare)
+    if not candidate_companies:
+        candidate_companies = []
+
+    # 3️⃣ Send ONLY filtered companies to LLM
+    company_list_formatted = "\n".join([
+        f"- Symbol: {c.get('SYMBOL')}, Name: {c.get('NAME OF COMPANY')}"
+        for c in candidate_companies
+    ])
 
     llm_input = f"""
     Article:
     {text}
 
-    Company database:
-    {json.dumps(companies_data, ensure_ascii=False)}
+    Below is Rupee Letter's official company database.
+    Match companies ONLY from this list:
+
+    {company_list_formatted}
     """
 
     result = get_llm_response(agent2_prompt, llm_input)
     if not result:
         return None
-    return json.loads(result)
+
+    try:
+        agent2_data = json.loads(result)
+    except json.JSONDecodeError:
+        print("⚠️ Agent2 JSON error")
+        print(result)
+        return None
+
+    # 4️⃣ HARD validation (anti-hallucination)
+    valid_names = {
+    normalize_company_name(c["NAME OF COMPANY"]): c["NAME OF COMPANY"]
+    for c in candidate_companies
+    }
+
+    validated_companies = []
+
+    for comp in agent2_data.get("companies", []):
+        key = normalize_company_name(comp)
+
+        if key in valid_names:
+            validated_companies.append(valid_names[key])
+            print(f"✅ Matched company: {comp} → {valid_names[key]}")
+
+        elif key in full_db_map:
+            validated_companies.append(full_db_map[key])
+            print(f"🛟 Fallback DB match: {comp} → {full_db_map[key]}")
+
+        else:
+            print(f"⚠️ Removed hallucinated company: {comp}")
+    agent2_data["companies"] = validated_companies
+
+    return agent2_data
 
 # ================================
 # 🧠 AGENT 3: SENTIMENT & IMPACT
 # ================================
 agent3_prompt = """
-You are Agent 3, the Sentiment & Impact Analyzer for Rupee Letter (India).
+You are Agent 3, the Sentiment & Impact Analyzer for Rupee Letter — India’s fast, actionable finance insights platform.
 
-### TASKS
-Based on the summarized article, determine:
-1. Short-term sentiment (≈ 1-week market reaction)
-2. Impact strength on price or investor sentiment
+### YOUR ROLE
+Analyze the summarized article and estimate:
+1. **Short-term sentiment** (≈ 1 week outlook) for the mentioned company or market.
+2. **Impact strength** of this news on price or sentiment STRICTLY in short term (next 2-3 days) outlook.
+---
+### 📊 SENTIMENT SCALE (choose one word only)
+- "Very Bullish" → strong positive trigger; likely short-term upside.
+- "Bullish" → moderately positive; supports price sentiment.
+- "Neutral" → balanced or minimal directional bias.
+- "Bearish" → moderately negative; may cause minor downside.
+- "Very Bearish" → strong negative trigger; likely short-term drop.
+
+🔹 Sentiment should reflect *market reaction within a week*, not long-term fundamentals.
+---
+### ⚡ IMPACT SCALE (choose one)
+- "Very High" → highly influential, major event (e.g., earnings surprise, policy shift, large order, merger).
+- "High" → may shift the price. (e.g., mid-sized deal, positive rating).
+- "Mild" → limited reaction expected or long-term price change.
+- "Negligible" → almost no effect.
+---
+
+### 🧭 RULES
+- Use financial reasoning — consider profits, losses, guidance, rating changes, major orders, or regulatory actions.
+- If multiple companies, infer overall sentiment.
+- If macro/policy news, assess general market tone.
+- Always keep output strictly factual, no hype.
 
 ---
 
-### 📊 SENTIMENT OPTIONS (choose ONE)
-- Very Bullish
-- Bullish
-- Neutral
-- Bearish
-- Very Bearish
-
-(Assess short-term reaction, not long-term fundamentals)
-
----
-
-### ⚡ IMPACT OPTIONS (choose ONE)
-- Very High → major trigger (earnings surprise, policy shift, merger, large order)
-- High → notable but limited-scale event
-- Mild → small or temporary reaction
-- Negligible → minimal market effect
-
----
-
-### RULES
-- Base decisions on financial logic (earnings, guidance, orders, ratings, regulation)
-- If multiple companies, infer overall sentiment
-- For macro news, assess broad market tone
-- Avoid hype or opinionated language
-
----
-
-### 🧾 OUTPUT FORMAT (STRICT JSON ONLY)
+### 🧾 OUTPUT FORMAT (STRICT JSON)
 {
   "sentiment": "<Very Bullish | Bullish | Neutral | Bearish | Very Bearish>",
-  "impact": "<Very High | High | Mild | Negligible>"
+  "impact": "<Very High | High | Mild | Negligible>",
+  "rationale": "<one short 15–25 word reasoning (for internal audit)>"
 }
 
-Return JSON only. No commentary.
+Return JSON only, no extra commentary.
 """
 
 def process_agent3(agent2_data):
@@ -394,7 +637,9 @@ def process_agent3(agent2_data):
 # 🚀 PIPELINE RUNNER
 # ================================
 def run_pipeline():
-    articles = fetch_pti_news()
+    articles = fetch_mock_pti_news()   # TEMP
+    # articles = fetch_pti_news()      # REAL (enable later)
+
 
     for article in articles:
         file_name = article.get("FileName")
@@ -419,10 +664,13 @@ def run_pipeline():
         if not agent3:
             continue
 
-        notify = (
-            agent3["impact"] == "Very High" or
-            agent3["sentiment"] in ["Very Bullish", "Very Bearish"]
-        )
+        # notify = (
+        #     agent3["impact"] == "Very High" or
+        #     agent3["sentiment"] in ["Very Bullish", "Very Bearish"]
+        # )
+
+        notify = agent3["impact"] in ["High", "Very High"]
+
 
         if notify:
             send_push_notification(article, agent2, agent3)
@@ -447,6 +695,7 @@ def run_pipeline():
             # Agent 3
             "sentiment": agent3["sentiment"],
             "impact": agent3["impact"],
+            "impact_rationale": agent3.get("rationale"),
 
             # System
             "ingested_at": datetime.now(timezone.utc)
@@ -463,3 +712,413 @@ def run_pipeline():
 # ================================
 if __name__ == "__main__":
     run_pipeline()
+
+# import os
+# import json
+# import requests
+# from datetime import datetime, timedelta, timezone
+# from urllib.parse import quote
+# from dotenv import load_dotenv
+# from pymongo import MongoClient
+# from openai import AzureOpenAI
+
+# # ================================
+# # 🔧 CONFIGURATION
+# # ================================
+# load_dotenv(dotenv_path="../.env")
+
+# mongo_uri = os.getenv("MONGO_URI")
+# db_name = os.getenv("DB_NAME")
+
+# client = MongoClient(mongo_uri)
+# db = client[db_name]
+
+# filtered_news = db["filtered_news"]
+# companies_col = db["companies"]
+
+# azure_client = AzureOpenAI(
+#     api_key=os.getenv("AZURE_OPENAI_KEY"),
+#     azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+#     api_version=os.getenv("AZURE_OPENAI_API_VERSION")
+# )
+
+# AZURE_DEPLOYMENT = os.getenv("AZURE_DEPLOYMENT")
+
+# # Ensure deduplication (safe to run multiple times)
+# filtered_news.create_index("FileName", unique=True)
+
+# # ================================
+# # ⏱ TIME WINDOW HANDLING
+# # ================================
+# BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# LAST_RUN_FILE = os.path.join(BASE_DIR, "last_run_time.txt")
+
+
+# def get_last_run_time():
+#     if os.path.exists(LAST_RUN_FILE):
+#         with open(LAST_RUN_FILE, "r") as f:
+#             return datetime.fromisoformat(f.read().strip())
+#     return datetime.now(timezone.utc)- timedelta(minutes=5)
+
+# def save_last_run_time(dt):
+#     with open(LAST_RUN_FILE, "w") as f:
+#         f.write(dt.isoformat())
+
+# # ================================
+# # 🌐 FETCH PTI NEWS
+# # ================================
+# def fetch_pti_news():
+#     start_time = get_last_run_time()
+#     end_time = datetime.now(timezone.utc)
+
+#     from_time = quote(start_time.strftime("%Y/%m/%d %H:%M:%S"))
+#     to_time = quote(end_time.strftime("%Y/%m/%d %H:%M:%S"))
+
+#     url = (
+#         "https://editorial.pti.in/ptiapi/webservice1.asmx/JsonFile1"
+#         f"?centercode=17102025001RL"
+#         f"&FromTime={from_time}"
+#         f"&EndTime={to_time}"
+#     )
+
+#     print(f"⏱ Fetching PTI news: {start_time} → {end_time}")
+
+#     response = requests.get(url, timeout=30)
+
+#     if response.status_code != 200:
+#         print("❌ PTI API HTTP Error:", response.status_code)
+#         return []
+
+#     try:
+#         data = response.json()
+#     except json.JSONDecodeError:
+#         print("❌ PTI API returned NON-JSON response")
+#         print(response.text[:500])
+#         return []
+
+#     # PTI response format handling
+#     if isinstance(data, dict):
+#         articles = data.get("Table", [])
+#     elif isinstance(data, list):
+#         articles = data
+#     else:
+#         articles = []
+
+#     # ✅ Save only on success
+#     save_last_run_time(end_time)
+
+#     return articles
+
+
+# # ================================
+# # ⚙️ GROQ CALL HELPER
+# # ================================
+# def get_llm_response(system_prompt, user_input):
+#     try:
+#         response = azure_client.chat.completions.create(
+#             model=AZURE_DEPLOYMENT,  # deployment name
+#             messages=[
+#                 {"role": "system", "content": system_prompt},
+#                 {"role": "user", "content": user_input},
+#             ],
+#             temperature=0.0,
+#         )
+#         return response.choices[0].message.content.strip()
+#     except Exception as e:
+#         print("❌ Azure OpenAI Error:", str(e))
+#         return None
+
+
+# # ================================
+# # 🧠 AGENT 1: NEWS FILTER
+# # ================================
+# agent1_prompt = """
+# You are Agent 1, a Financial News Filter for Rupee Letter (India).
+
+# Your task is to decide whether a news article is useful for investors, traders, or finance readers.
+
+# ### CLASSIFICATION (choose ONE only)
+# - "keep" → Market-relevant, actionable, or sentiment-impacting
+# - "discard" → Trivial, repetitive, or irrelevant to investing/markets
+
+# ---
+
+# ### ✅ KEEP the article ONLY if it contains:
+# 1. **Company or stock developments**
+#    - Earnings, results, M&A, IPOs, deals, large orders
+#    - Board/management changes
+#    - Credit rating upgrades/downgrades
+
+# 2. **Significant market trends**
+#    - Sensex/Nifty or sector moves ONLY IF exceptional and explained
+#    - FII/DII flows, sector rotation, global cues affecting India
+
+# 3. **Economic or policy updates**
+#    - RBI, SEBI, government policy
+#    - GDP, inflation, interest rates, fiscal or trade decisions
+
+# 4. **Major corporate or startup news**
+#    - Events impacting valuation or investor sentiment
+
+# 5. **Global financial events**
+#    - Fed policy, crude oil, FX, geopolitics affecting Indian markets
+
+# ---
+
+# ### ❌ DISCARD the article if:
+# - It is headline-only or a “NEWSALERT”
+# - It reports prices/rates without context or explanation
+# - It is a schedule, table, or raw data dump
+# - It is duplicate or repetitive
+# - It is under 80 words with no clear market impact
+
+# ---
+
+# ### 🧾 OUTPUT FORMAT (STRICT JSON ONLY)
+# {
+#   "decision": "keep" or "discard",
+#   "reason": "brief reason (10–20 words)"
+# }
+
+# Do not add any commentary outside JSON.
+# """
+
+
+# def process_agent1(article):
+#     text = f"Title: {article.get('Headline','')}\n\nContent:\n{article.get('story','')}"
+#     result = get_llm_response(agent1_prompt, text)
+#     if not result:
+#         return None
+#     return json.loads(result)
+
+# # ================================
+# # 🧠 AGENT 2: SUMMARY & COMPANY TAGGING
+# # ================================
+# agent2_prompt = """
+# You are Agent 2, the Summarization & Sector Classification Agent for Rupee Letter (India).
+
+# ### TASKS
+# 1. Read the article carefully.
+# 2. Write a **40–60 word investor-friendly summary**.
+# 3. Identify NSE/BSE-listed companies mentioned in the article using Rupee Letter’s database.
+# 4. Assign sector and flags based on strict rules below.
+
+# ---
+
+# ### 📝 SUMMARIZATION RULES
+# - Neutral, factual, journalistic tone
+# - Focus only on financial, strategic, policy, or market-impacting information
+# - Exclude source tags, fillers, and quotes
+# - Length strictly between 40–60 words (never exceed 70)
+
+# ---
+
+# ### 🏢 COMPANY TAGGING RULES
+# - Tag ONLY companies that exist in the provided NSE–BSE database
+# - Match by **exact company name or symbol** (case-insensitive)
+# - Include only if explicitly mentioned in article text
+# - Do NOT infer or guess
+
+# ---
+
+# ### 🏷️ SECTOR ASSIGNMENT RULES
+# Choose ONE dominant sector ONLY if an Indian listed company is mentioned:
+# - Banking and Financial Services
+# - IT and Services Sector
+# - Media
+# - FMCG
+# - Pharma and Healthcare
+# - Automobile
+# - Metal and Infrastructure
+# - Energy and Oil & Gas
+# - Realty
+
+# If **no Indian listed company** is mentioned:
+# - sector = "General Market" OR "Macro / Economy" (choose best fit)
+
+# ---
+
+# ### 🌍 GLOBAL FLAG RULE
+# Set `"global": true` ONLY if:
+# - The article primarily relates to **countries or markets outside India**
+# - Examples: US Fed, China economy, Europe inflation, global recession, foreign central banks
+
+# Otherwise:
+# - `"global": false`
+
+# ---
+
+# ### 🪙 COMMODITIES FLAG RULE
+# Set `"commodities": true` ONLY if:
+# - The article is mainly about **gold, silver, crude oil, natural gas, bullion, commodities prices, or commodity outlook**
+# - Includes global or domestic commodity movement
+
+# Otherwise:
+# - `"commodities": false`
+
+# ---
+
+# ### ❗ IMPORTANT PRIORITY LOGIC
+# - Global commodity news → `global = true` AND `commodities = true`
+# - India-focused commodity news → `commodities = true`, `global = false`
+# - Company-specific news → both flags = false
+
+# ---
+
+# ### 🧾 OUTPUT FORMAT (STRICT JSON ONLY)
+# {
+#   "summary": "<40–60 word summary>",
+#   "companies": [<list of matched company names>],
+#   "sector": "<sector name or fallback>",
+#   "global": true or false,
+#   "commodities": true or false
+# }
+
+# Return JSON only. No commentary.
+# """
+
+# def process_agent2(article):
+#     text = f"Title: {article.get('Headline','')}\n\nContent:\n{article.get('story','')}"
+
+#     companies_data = list(
+#         companies_col.find({}, {"SYMBOL": 1, "NAME OF COMPANY": 1, "_id": 0})
+#     )
+
+#     llm_input = f"""
+#     Article:
+#     {text}
+
+#     Company database:
+#     {json.dumps(companies_data, ensure_ascii=False)}
+#     """
+
+#     result = get_llm_response(agent2_prompt, llm_input)
+#     if not result:
+#         return None
+#     return json.loads(result)
+
+# # ================================
+# # 🧠 AGENT 3: SENTIMENT & IMPACT
+# # ================================
+# agent3_prompt = """
+# You are Agent 3, the Sentiment & Impact Analyzer for Rupee Letter (India).
+
+# ### TASKS
+# Based on the summarized article, determine:
+# 1. Short-term sentiment (≈ 1-week market reaction)
+# 2. Impact strength on price or investor sentiment
+
+# ---
+
+# ### 📊 SENTIMENT OPTIONS (choose ONE)
+# - Very Bullish
+# - Bullish
+# - Neutral
+# - Bearish
+# - Very Bearish
+
+# (Assess short-term reaction, not long-term fundamentals)
+
+# ---
+
+# ### ⚡ IMPACT OPTIONS (choose ONE)
+# - Very High → major trigger (earnings surprise, policy shift, merger, large order)
+# - High → notable but limited-scale event
+# - Mild → small or temporary reaction
+# - Negligible → minimal market effect
+
+# ---
+
+# ### RULES
+# - Base decisions on financial logic (earnings, guidance, orders, ratings, regulation)
+# - If multiple companies, infer overall sentiment
+# - For macro news, assess broad market tone
+# - Avoid hype or opinionated language
+
+# ---
+
+# ### 🧾 OUTPUT FORMAT (STRICT JSON ONLY)
+# {
+#   "sentiment": "<Very Bullish | Bullish | Neutral | Bearish | Very Bearish>",
+#   "impact": "<Very High | High | Mild | Negligible>"
+# }
+
+# Return JSON only. No commentary.
+# """
+
+# def process_agent3(agent2_data):
+#     input_text = (
+#         f"Summary: {agent2_data['summary']}\n"
+#         f"Sector: {agent2_data['sector']}\n"
+#         f"Companies: {', '.join(agent2_data.get('companies', []))}"
+#     )
+
+#     result = get_llm_response(agent3_prompt, input_text)
+#     if not result:
+#         return None
+#     return json.loads(result)
+
+# # ================================
+# # 🚀 PIPELINE RUNNER
+# # ================================
+# def run_pipeline():
+#     articles = fetch_pti_news()
+
+#     for article in articles:
+#         file_name = article.get("FileName")
+#         if not file_name:
+#             continue
+
+#         # Skip if already processed
+#         if filtered_news.find_one({"FileName": file_name}):
+#             continue
+
+#         print(f"\n📰 Processing: {article.get('Headline','')[:80]}")
+
+#         agent1 = process_agent1(article)
+#         if not agent1 or agent1["decision"] != "keep":
+#             continue
+
+#         agent2 = process_agent2(article)
+#         if not agent2:
+#             continue
+
+#         agent3 = process_agent3(agent2)
+#         if not agent3:
+#             continue
+
+#         final_doc = {
+#             **article,  # ALL PTI API FIELDS
+
+#             # Agent 1
+#             "decision": agent1["decision"],
+#             "filter_reason": agent1.get("reason"),
+
+#             # Agent 2
+          
+#             "summary": agent2["summary"],
+#             "sector": agent2["sector"],
+#             "companies": agent2["companies"],
+#             "global": agent2["global"],
+#             "commodities": agent2["commodities"],
+
+
+#             # Agent 3
+#             "sentiment": agent3["sentiment"],
+#             "impact": agent3["impact"],
+
+#             # System
+#             "ingested_at": datetime.now(timezone.utc)
+
+#         }
+
+#         filtered_news.insert_one(final_doc)
+#         print("✅ Stored enriched PTI article")
+
+#     print("\n🎯 Pipeline complete.")
+
+# # ================================
+# # 🏁 ENTRY POINT
+# # ================================
+# if __name__ == "__main__":
+#     run_pipeline()
