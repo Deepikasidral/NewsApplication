@@ -6,6 +6,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:http/http.dart' as http;
 import 'sign_up_screen.dart';
 import 'home_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
@@ -21,6 +23,16 @@ class _SignInScreenState extends State<SignInScreen> {
     scopes: ['email', 'profile'],
     // Removed explicit clientId - will use from google-services.json
   );
+
+  Future<void> _saveUserSession(Map<String, dynamic> user) async {
+  final prefs = await SharedPreferences.getInstance();
+
+  await prefs.setString("userId", user["_id"]); // 🔑 MongoDB _id
+  await prefs.setString("userName", user["name"] ?? "");
+  await prefs.setString("userEmail", user["email"] ?? "");
+  await prefs.setString("loginType", user["loginType"] ?? "");
+  await prefs.setBool("isLoggedIn", true);
+}
 
   // ===========================
   // EMAIL SIGN-IN (Backend commented)
@@ -40,22 +52,26 @@ class _SignInScreenState extends State<SignInScreen> {
     
     try {
       final response = await http.post(
-        Uri.parse("http://192.168.1.102:5000/api/auth/signin"),
+        Uri.parse("http://10.69.144.93:5000/api/auth/signin"),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({"email": email, "password": password, "loginType": "email"}),
       );
 
       final data = jsonDecode(response.body);
 
-      if (response.statusCode == 200) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Signed in successfully")),
-        );
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const NewsFeedScreen()),
-        );
-      } else {
+     if (response.statusCode == 200) {
+  await _saveUserSession(data["user"]); // ✅ ADD THIS
+
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(content: Text("Signed in successfully")),
+  );
+
+  Navigator.pushReplacement(
+    context,
+    MaterialPageRoute(builder: (_) => const NewsFeedScreen()),
+  );
+}
+ else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(data['message'] ?? "Sign in failed")),
         );
@@ -123,14 +139,21 @@ class _SignInScreenState extends State<SignInScreen> {
       print("💾 Saving to MongoDB...");
       try {
         final response = await http.post(
-          Uri.parse("http://192.168.1.102:5000/api/auth/google-login"),
+          Uri.parse("http://10.69.144.93:5000/api/auth/google-login"),
           headers: {"Content-Type": "application/json"},
           body: jsonEncode(userData),
         ).timeout(const Duration(seconds: 10));
 
-        if (response.statusCode == 200 || response.statusCode == 201) {
-          print("✅ User saved in MongoDB: ${response.body}");
-        } else {
+       if (response.statusCode == 200 || response.statusCode == 201) {
+  final data = jsonDecode(response.body);
+
+  if (data["user"] != null) {
+    await _saveUserSession(data["user"]); // ✅ STORE MongoDB _id
+  }
+
+  print("✅ User saved in MongoDB & session stored");
+}
+ else {
           print("⚠️ MongoDB save failed (${response.statusCode}): ${response.body}");
         }
       } catch (mongoError) {

@@ -6,6 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'sign_in_screen.dart';
 import 'home_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -23,6 +24,16 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     scopes: ['email', 'profile'],
   );
+  
+  Future<void> _saveUserSession(Map<String, dynamic> user) async {
+  final prefs = await SharedPreferences.getInstance();
+
+  await prefs.setString("userId", user["_id"]); // 🔑 MongoDB _id
+  await prefs.setString("userName", user["name"] ?? "");
+  await prefs.setString("userEmail", user["email"] ?? "");
+  await prefs.setString("loginType", user["loginType"] ?? "");
+  await prefs.setBool("isLoggedIn", true);
+}
 
   Future<void> _handleSignUp() async {
     final name = _nameController.text.trim();
@@ -41,7 +52,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     
     try {
       final response = await http.post(
-        Uri.parse("http://192.168.1.102:5000/api/auth/signup"), // backend unchanged
+        Uri.parse("http://10.69.144.93:5000/api/auth/signup"), // backend unchanged
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({
           "name": name,
@@ -53,10 +64,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
       final data = jsonDecode(response.body);
 
-      if (response.statusCode == 201) {
+       if (response.statusCode == 200) {
+  await _saveUserSession(data["user"]); // ✅ ADD THIS
+
   ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(content: Text("Account created successfully!")),
+    const SnackBar(content: Text("Account Created successfully")),
   );
+
   Navigator.pushReplacement(
     context,
     MaterialPageRoute(builder: (_) => const NewsFeedScreen()),
@@ -126,14 +140,20 @@ class _SignUpScreenState extends State<SignUpScreen> {
       print("💾 Saving to MongoDB...");
       try {
         final response = await http.post(
-          Uri.parse("http://192.168.1.102:5000/api/auth/google-login"),
+          Uri.parse("http://10.69.144.93:5000/api/auth/google-login"),
           headers: {"Content-Type": "application/json"},
           body: jsonEncode(userData),
         ).timeout(const Duration(seconds: 10));
 
         if (response.statusCode == 200 || response.statusCode == 201) {
-          print("✅ User saved in MongoDB: ${response.body}");
-        }
+  final data = jsonDecode(response.body);
+
+  if (data["user"] != null) {
+    await _saveUserSession(data["user"]); // ✅ STORE MongoDB _id
+  }
+
+  print("✅ User saved in MongoDB & session stored");
+}
       } catch (mongoError) {
         print("⚠️ MongoDB error (continuing): $mongoError");
       }

@@ -4,6 +4,7 @@ import 'package:html/parser.dart' as html;
 import 'package:intl/intl.dart';
 
 class Article {
+  final String id; // MongoDB _id
   final String title;       // Headline
   final String excerpt;     // Preview text
   final String story;       // Full story
@@ -21,6 +22,7 @@ class Article {
   final List<String> companies;
 
   Article({
+    required this.id,
     required this.title,
     required this.excerpt,
     required this.story,
@@ -66,6 +68,7 @@ class Article {
             [];
 
     return Article(
+      id: json['_id'].toString(), // ✅ REQUIRED
       title: cleanHtml(json['Headline'] ?? 'Untitled'),
       excerpt: excerptText,
       story: storyText,
