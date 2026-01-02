@@ -29,10 +29,16 @@ router.post("/signup", async (req, res) => {
 
     await user.save();
 
-    res.status(201).json({
-      message: "User registered successfully",
-      user: { id: user._id, name: user.name, email: user.email, loginType: user.loginType },
-    });
+   res.status(201).json({
+  message: "User registered successfully",
+  user: {
+    _id: user._id,          // ✅ CHANGE HERE
+    name: user.name,
+    email: user.email,
+    loginType: user.loginType,
+  },
+});
+
   } catch (error) {
     console.error("❌ SIGNUP ERROR:", error.message);     // print only message
     console.error("📄 FULL ERROR:", error);               // full stack trace
@@ -58,11 +64,22 @@ router.post("/signin", async (req, res) => {
       if (!isMatch)
         return res.status(400).json({ message: "Invalid password" });
     }
+    user.lastLogin = new Date();
+    await user.save();
 
-    res.json({
-      message: "Sign in successful",
-      user: { id: user._id, name: user.name, email: user.email, loginType: user.loginType },
-    });
+    user.lastLogin = new Date();
+    await user.save();
+
+  res.json({
+  message: "Sign in successful",
+  user: {
+    _id: user._id,          // ✅ CHANGE HERE
+    name: user.name,
+    email: user.email,
+    loginType: user.loginType,
+  },
+});
+
   } catch (error) {
     console.error("❌ SIGNIN ERROR:", error.message);
     console.error("📄 FULL ERROR:", error);
@@ -96,15 +113,16 @@ router.post("/google-login", async (req, res) => {
       });
       await user.save();
       
-      return res.status(201).json({
-        message: "Google account created successfully",
-        user: {
-          id: user._id,
-          name: user.name,
-          email: user.email,
-          loginType: user.loginType,
-        },
-      });
+     return res.status(201).json({
+  message: "Google account created successfully",
+  user: {
+    _id: user._id,          // ✅ CHANGE HERE
+    name: user.name,
+    email: user.email,
+    loginType: user.loginType,
+  },
+});
+
     }
 
     // Update existing user
@@ -122,14 +140,15 @@ router.post("/google-login", async (req, res) => {
     await user.save();
 
     res.json({
-      message: "Google login successful",
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        loginType: user.loginType,
-      },
-    });
+  message: "Google login successful",
+  user: {
+    _id: user._id,          // ✅ CHANGE HERE
+    name: user.name,
+    email: user.email,
+    loginType: user.loginType,
+  },
+});
+
   } catch (error) {
     console.error("❌ GOOGLE LOGIN ERROR:", error.message);
     console.error("📄 FULL ERROR:", error);

@@ -1,23 +1,47 @@
 const mongoose = require("mongoose");
 
+const savedNewsSchema = new mongoose.Schema(
+  {
+    newsId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "FilteredNews",
+      required: true,
+    },
+    savedAt: {
+      type: Date,
+      default: Date.now,
+    },
+  },
+  { _id: false }
+);
+
 const userSchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
     email: { type: String, required: true, unique: true },
-    password: { type: String }, // Not required for social login
-    googleId: { type: String, sparse: true, unique: true }, // Google OAuth ID
-    uid: { type: String }, // Firebase UID
-    loginType: { type: String, enum: ["email", "google", "apple", "facebook"], default: "email" },
+    password: { type: String }, // email login
+    googleId: { type: String, sparse: true, unique: true },
+    uid: { type: String }, // Firebase UID (optional)
+    loginType: {
+      type: String,
+      enum: ["email", "google", "apple", "facebook"],
+      default: "email",
+    },
+
+    // ✅ ADD THIS
+    saved_news: {
+      type: [savedNewsSchema],
+      default: [],
+    },
+
     createdAt: { type: Date, default: Date.now },
     lastLogin: { type: Date, default: Date.now },
   },
-  { collection: "Users" } // 👈 use your exact collection name
+  { collection: "Users" }
 );
 
-// Index for email uniqueness
+// Indexes
 userSchema.index({ email: 1 }, { unique: true });
-
-// Index for googleId (allows null values)
 userSchema.index({ googleId: 1 }, { unique: true, sparse: true });
 
 module.exports = mongoose.model("User", userSchema);

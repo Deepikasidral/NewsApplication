@@ -27,6 +27,7 @@ Follow these rules:
 - If information is available, blend it naturally into your response.
 - If information is missing, answer confidently using your general financial knowledge.
 - Keep the tone professional, clear, and easy to understand.
+- Never say something like "A tool is not required to answer your question". 
 """
 
 
@@ -113,15 +114,15 @@ TOOL_MAP = {
 
 
 def ask_llm(question: str) -> str:
-    # Step 1: Let model decide tool usage
+    # Step 1: Decide tool usage (INTERNAL ONLY)
     response = client.chat.completions.create(
         model=AZURE_DEPLOYMENT,
         messages=[
             {
                 "role": "system",
                 "content": (
-                    "You are a smart financial assistant. "
-                    "Decide if a tool is required to answer the user's question."
+                    "Decide whether a tool is required. "
+                    "Do NOT explain your decision."
                 ),
             },
             {"role": "user", "content": question},
@@ -133,7 +134,9 @@ def ask_llm(question: str) -> str:
 
     msg = response.choices[0].message
 
-    # Step 2: Tool call path
+    # ============================
+    # TOOL PATH
+    # ============================
     if msg.tool_calls:
         tool_call = msg.tool_calls[0]
         tool_name = tool_call.function.name
@@ -141,9 +144,9 @@ def ask_llm(question: str) -> str:
 
         tool_result = TOOL_MAP[tool_name](**args)
 
-        # Step 3: If tool has no data → fallback to LLM knowledge
+        # Tool returned nothing → fallback to LLM
         if not tool_result:
-            fallback = client.chat.completions.create(
+            final = client.chat.completions.create(
                 model=AZURE_DEPLOYMENT,
                 messages=[
                     {"role": "system", "content": SYSTEM_FINAL_PROMPT},
@@ -151,10 +154,10 @@ def ask_llm(question: str) -> str:
                 ],
                 temperature=0.6,
             )
-            return fallback.choices[0].message.content
+            return final.choices[0].message.content
 
-        # Step 4: Reason over data silently
-        final_response = client.chat.completions.create(
+        # Tool has data → reason silently
+        final = client.chat.completions.create(
             model=AZURE_DEPLOYMENT,
             messages=[
                 {"role": "system", "content": SYSTEM_FINAL_PROMPT},
@@ -168,8 +171,18 @@ def ask_llm(question: str) -> str:
             ],
             temperature=0.4,
         )
+        return final.choices[0].message.content
 
-        return final_response.choices[0].message.content
+    # ============================
+    # NO TOOL NEEDED (FIXED)
+    # ============================
+    final = client.chat.completions.create(
+        model=AZURE_DEPLOYMENT,
+        messages=[
+            {"role": "system", "content": SYSTEM_FINAL_PROMPT},
+            {"role": "user", "content": question},
+        ],
+        temperature=0.6,
+    )
 
-    # Step 5: No tool needed
-    return msg.content
+    return final.choices[0].message.content

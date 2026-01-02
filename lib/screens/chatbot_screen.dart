@@ -3,6 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_markdown/flutter_markdown.dart';
 import '../models/chat_message.dart';
+import 'home_screen.dart';
+import 'company_screen.dart';
+import 'saved_screen.dart';
+import 'events_screen.dart';
 
 class ChatbotScreen extends StatefulWidget {
   const ChatbotScreen({super.key});
@@ -16,6 +20,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   final TextEditingController _controller = TextEditingController();
   final List<ChatMessage> _messages = [];
   bool _loading = false;
+  int _bottomIndex = 0;
 
   @override
 void dispose() {
@@ -26,7 +31,7 @@ void dispose() {
 
 
   // 🔹 Chatbot API URL (same as service)
-  static const String _baseUrl = "http://192.168.1.102:8001/chat";
+  static const String _baseUrl = "http://10.69.144.93:8001/chat";
   // 👉 If testing on real phone, replace with your LAN IP
 
   // 🔹 SAME LOGIC as ChatbotService.askQuestion()
@@ -152,33 +157,81 @@ void dispose() {
       ),
     );
   }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("Ask AI"),
-        backgroundColor: const Color(0xFFF05151),
-      ),
-      body: Column(
-        children: [
-          Expanded(
-            child: ListView.builder(
-              controller: _scrollController, // ✅ ADD
-              reverse: false,
-              itemCount: _messages.length,
-              itemBuilder: (_, i) => _buildMessage(_messages[i]),
-            ),
+@override
+Widget build(BuildContext context) {
+  return Scaffold(
+    backgroundColor: const Color(0xFFF6F7FA),
+    appBar: AppBar(
+      title: const Text("Ask AI"),
+      backgroundColor: const Color(0xFFF05151),
+    ),
+    body: Column(
+      children: [
+        Expanded(
+          child: ListView.builder(
+            controller: _scrollController,
+            itemCount: _messages.length,
+            itemBuilder: (_, i) => _buildMessage(_messages[i]),
           ),
-          if (_loading)
-            const Padding(
-              padding: EdgeInsets.all(8.0),
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-          _buildInputBar(),
-        ],
-      ),
-    );
-  }
+        ),
+        if (_loading)
+          const Padding(
+            padding: EdgeInsets.all(8.0),
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        _buildInputBar(),
+      ],
+    ),
+    bottomNavigationBar: BottomNavigationBar(
+      currentIndex: _bottomIndex,
+      type: BottomNavigationBarType.fixed,
+      selectedItemColor: const Color(0xFFEA6B6B),
+      unselectedItemColor: Colors.black54,
+      onTap: (index) {
+        if (index == _bottomIndex) return;
+
+        setState(() => _bottomIndex = index);
+
+        switch (index) {
+          case 0:
+            Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const NewsFeedScreen()));
+            break;
+
+          case 1:
+            // INDEX screen (if exists)
+            break;
+
+          case 2:
+            // ASK AI → already here
+            break;
+
+          case 3:
+            Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const CompanyScreen()));
+            break;
+
+          case 4:
+            Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const EventsScreen()));
+            break;
+
+          case 5:
+            Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const SavedNewsFeedScreen()));
+            break;
+        }
+      },
+      items: const [
+        BottomNavigationBarItem(icon: Icon(Icons.feed), label: "NEWS"),
+        BottomNavigationBarItem(icon: Icon(Icons.local_fire_department), label: "INDEX"),
+        BottomNavigationBarItem(icon: Icon(Icons.currency_bitcoin), label: "ASK AI"),
+        BottomNavigationBarItem(icon: Icon(Icons.event), label: "COMPANIES"),
+        BottomNavigationBarItem(icon: Icon(Icons.event), label: "EVENTS"),
+        BottomNavigationBarItem(icon: Icon(Icons.bookmark), label: "Saved"),
+      ],
+    ),
+  );
+}
 }
 
