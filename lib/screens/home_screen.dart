@@ -35,7 +35,7 @@ late String currentUserId;
 
 
 
-  final String baseUrl = "http://10.69.144.93:5000";
+  final String baseUrl = "http://10.244.218.93:5000";
 
  @override
 void initState() {

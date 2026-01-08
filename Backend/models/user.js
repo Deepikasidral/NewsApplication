@@ -14,6 +14,21 @@ const savedNewsSchema = new mongoose.Schema(
   },
   { _id: false }
 );
+const savedEventSchema = new mongoose.Schema(
+  {
+    eventId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Event", // 👈 your events model name
+      required: true,
+    },
+    savedAt: {
+      type: Date,
+      default: Date.now,
+    },
+  },
+  { _id: false }
+);
+
 
 const userSchema = new mongoose.Schema(
   {
@@ -33,6 +48,11 @@ const userSchema = new mongoose.Schema(
       type: [savedNewsSchema],
       default: [],
     },
+    saved_events: {
+      type: [savedEventSchema],
+      default: [],
+    },
+
 
     createdAt: { type: Date, default: Date.now },
     lastLogin: { type: Date, default: Date.now },

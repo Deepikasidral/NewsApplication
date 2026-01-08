@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class EventsScreen extends StatefulWidget {
   const EventsScreen({super.key});
@@ -12,6 +14,7 @@ class EventsScreen extends StatefulWidget {
   State<EventsScreen> createState() => _EventsScreenState();
 }
 
+
 class _EventsScreenState extends State<EventsScreen> {
   int _selectedTab = 0;
   final List<String> _tabs = ["Today", "Upcoming"];
@@ -19,12 +22,37 @@ class _EventsScreenState extends State<EventsScreen> {
   bool _isLoading = true;
   List<CorporateEvent> _todayEvents = [];
   List<CorporateEvent> _upcomingEvents = [];
+  Set<String> _locallySavedEventIds = {};
+  late String currentUserId;
+
 
   @override
-  void initState() {
-    super.initState();
+void initState() {
+  super.initState();
+  _loadUserId().then((_) {
+    _loadSavedEventIds();
     _fetchEvents();
+  });
+}
+Future<void> _loadUserId() async {
+  final prefs = await SharedPreferences.getInstance();
+  currentUserId = prefs.getString("userId") ?? "";
+}
+
+Future<void> _loadSavedEventIds() async {
+  final resp = await http.get(
+    Uri.parse("http://10.244.218.93:5000/api/users/$currentUserId/saved-events"),
+  );
+
+  if (resp.statusCode == 200) {
+    final body = jsonDecode(resp.body);
+    setState(() {
+      _locallySavedEventIds =
+          body["data"].map<String>((e) => e["_id"].toString()).toSet();
+    });
   }
+}
+
 
   Future<void> _fetchEvents() async {
     setState(() {
@@ -33,7 +61,7 @@ class _EventsScreenState extends State<EventsScreen> {
 
     try {
       final response = await http.get(
-        Uri.parse('http://10.69.144.93:5000/api/events'),
+        Uri.parse('http://10.244.218.93:5000/api/events'),
         headers: {'Content-Type': 'application/json'},
       );
 
@@ -72,6 +100,86 @@ class _EventsScreenState extends State<EventsScreen> {
       print('Error fetching events: $e');
     }
   }
+
+
+Future<void> _toggleSaveEvent(CorporateEvent event) async {
+  final eventId = event.id;
+  final wasSaved = _locallySavedEventIds.contains(eventId);
+
+  // 1️⃣ Optimistic UI
+  setState(() {
+    wasSaved
+        ? _locallySavedEventIds.remove(eventId)
+        : _locallySavedEventIds.add(eventId);
+  });
+
+  try {
+    final resp = await http.post(
+      Uri.parse("http://10.244.218.93:5000/api/users/save-event"),
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode({
+        "userId": currentUserId,
+        "eventId": eventId,
+      }),
+    );
+
+    if (resp.statusCode != 200) throw Exception();
+
+    // ✅ ONLY WHEN SAVED (NOT UNSAVED)
+    if (!wasSaved) {
+      // 2️⃣ Success Snackbar
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Event saved successfully"),
+          duration: Duration(seconds: 2),
+        ),
+      );
+
+      // 3️⃣ Ask to add to Google Calendar
+      showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text("Add to Google Calendar"),
+          content: const Text(
+              "Do you want to add this event to your Google Calendar?"),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("No"),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                addEventToGoogleCalendar(
+                  title: event.title,
+                  description: event.description,
+                  startTime: event.date,
+                  endTime: event.date.add(const Duration(hours: 1)),
+                );
+              },
+              child: const Text("Yes"),
+            ),
+          ],
+        ),
+      );
+    }
+  } catch (e) {
+    // 🔁 Rollback UI
+    setState(() {
+      wasSaved
+          ? _locallySavedEventIds.add(eventId)
+          : _locallySavedEventIds.remove(eventId);
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text("Failed to save event"),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+}
+
 
   @override
   Widget build(BuildContext context) {
@@ -361,11 +469,19 @@ class _EventsScreenState extends State<EventsScreen> {
                 ),
               ],
               const Spacer(),
-              const Icon(
-                Icons.notifications_none,
-                color: Colors.black54,
-                size: 20,
-              ),
+              IconButton(
+                  icon: Icon(
+                    _locallySavedEventIds.contains(event.id)
+                        ? Icons.bookmark
+                        : Icons.bookmark_border,
+                    color: _locallySavedEventIds.contains(event.id)
+                        ? Colors.red
+                        : Colors.grey,
+                  ),
+                  onPressed: () => _toggleSaveEvent(event),
+
+                ),
+
             ],
           ),
           const SizedBox(height: 12),
@@ -428,6 +544,34 @@ class _EventsScreenState extends State<EventsScreen> {
         ],
       ),
     );
+  }
+}
+Future<void> addEventToGoogleCalendar({
+  required String title,
+  required String description,
+  required DateTime startTime,
+  required DateTime endTime,
+}) async {
+  String formatDate(DateTime dt) {
+    return DateFormat("yyyyMMdd'T'HHmmss").format(dt);
+  }
+
+  final start = formatDate(startTime);
+  final end = formatDate(endTime);
+
+  final url =
+      "https://www.google.com/calendar/render?action=TEMPLATE"
+      "&text=${Uri.encodeComponent(title)}"
+      "&details=${Uri.encodeComponent(description)}"
+      "&dates=$start/$end";
+
+  final uri = Uri.parse(url);
+
+  if (!await launchUrl(
+    uri,
+    mode: LaunchMode.externalApplication,
+  )) {
+    throw 'Could not launch Google Calendar';
   }
 }
 

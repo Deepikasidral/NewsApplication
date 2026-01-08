@@ -52,7 +52,7 @@ class _SignInScreenState extends State<SignInScreen> {
     
     try {
       final response = await http.post(
-        Uri.parse("http://10.69.144.93:5000/api/auth/signin"),
+        Uri.parse("http://10.244.218.93:5000/api/auth/signin"),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({"email": email, "password": password, "loginType": "email"}),
       );
@@ -139,7 +139,7 @@ class _SignInScreenState extends State<SignInScreen> {
       print("💾 Saving to MongoDB...");
       try {
         final response = await http.post(
-          Uri.parse("http://10.69.144.93:5000/api/auth/google-login"),
+          Uri.parse("http://10.244.218.93:5000/api/auth/google-login"),
           headers: {"Content-Type": "application/json"},
           body: jsonEncode(userData),
         ).timeout(const Duration(seconds: 10));

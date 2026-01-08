@@ -7,6 +7,8 @@ import 'home_screen.dart';
 import 'company_screen.dart';
 import 'saved_screen.dart';
 import 'events_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 
 class ChatbotScreen extends StatefulWidget {
   const ChatbotScreen({super.key});
@@ -21,6 +23,8 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   final List<ChatMessage> _messages = [];
   bool _loading = false;
   int _bottomIndex = 0;
+  bool _rateLimited = false;
+
 
   @override
 void dispose() {
@@ -31,28 +35,52 @@ void dispose() {
 
 
   // 🔹 Chatbot API URL (same as service)
-  static const String _baseUrl = "http://10.69.144.93:8001/chat";
+  static const String _baseUrl = "http://10.244.218.93:8001/chat";
   // 👉 If testing on real phone, replace with your LAN IP
 
   // 🔹 SAME LOGIC as ChatbotService.askQuestion()
-  Future<String> _askQuestion(String question) async {
-    try {
-      final response = await http.post(
-        Uri.parse(_baseUrl),
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode({"question": question}),
-      );
+ Future<String> _askQuestion(String question) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getString("userId");
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return data["answer"] ?? "No response";
-      } else {
-        return "Server error. Please try again.";
-      }
-    } catch (e) {
-      return "Connection failed. Check backend.";
+    final response = await http.post(
+      Uri.parse(_baseUrl),
+      headers: {
+        "Content-Type": "application/json",
+        "X-User-Id": userId ?? "",
+      },
+      body: jsonEncode({"question": question}),
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return data["answer"] ?? "No response";
     }
+
+    // 🔒 RATE LIMIT HIT
+    if (response.statusCode == 429) {
+      setState(() {
+        _rateLimited = true;
+      });
+
+      return "🚫 **Daily limit reached**\n\n"
+             "You’ve used all **5 questions for today**.\n"
+             "Please try again **tomorrow** ⏳";
+    }
+
+    if (response.statusCode == 401) {
+      return "❌ Session expired. Please login again.";
+    }
+
+    return "⚠️ Server error. Please try again.";
+
+  } catch (e) {
+    return "❌ Connection failed. Please check your internet.";
   }
+}
+
+
   void _scrollToBottom() {
   WidgetsBinding.instance.addPostFrameCallback((_) {
     if (_scrollController.hasClients) {
@@ -128,6 +156,7 @@ void dispose() {
       ),
     );
   }
+  
 
   Widget _buildInputBar() {
     return Container(
@@ -142,7 +171,8 @@ void dispose() {
         children: [
           Expanded(
             child: TextField(
-              controller: _controller,
+                controller: _controller,
+                enabled: !_rateLimited,
               decoration: const InputDecoration(
                 hintText: "Ask about news, companies, impact...",
                 border: InputBorder.none,
@@ -151,7 +181,8 @@ void dispose() {
           ),
           IconButton(
             icon: const Icon(Icons.send, color: Color(0xFFF05151)),
-            onPressed: _loading ? null : _sendMessage,
+           onPressed: (_loading || _rateLimited) ? null : _sendMessage,
+
           )
         ],
       ),
@@ -166,22 +197,40 @@ Widget build(BuildContext context) {
       backgroundColor: const Color(0xFFF05151),
     ),
     body: Column(
-      children: [
-        Expanded(
-          child: ListView.builder(
-            controller: _scrollController,
-            itemCount: _messages.length,
-            itemBuilder: (_, i) => _buildMessage(_messages[i]),
-          ),
-        ),
-        if (_loading)
-          const Padding(
-            padding: EdgeInsets.all(8.0),
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-        _buildInputBar(),
-      ],
+  children: [
+    Expanded(
+      child: ListView.builder(
+        controller: _scrollController,
+        itemCount: _messages.length,
+        itemBuilder: (_, i) => _buildMessage(_messages[i]),
+      ),
     ),
+
+    if (_loading)
+      const Padding(
+        padding: EdgeInsets.all(8.0),
+        child: CircularProgressIndicator(strokeWidth: 2),
+      ),
+
+    // 🔒 RATE LIMIT MESSAGE (ADD HERE)
+    if (_rateLimited)
+      Container(
+        padding: const EdgeInsets.all(10),
+        color: Colors.red.shade100,
+        child: const Text(
+          "🚫 Daily limit reached. Try again tomorrow.",
+          style: TextStyle(
+            color: Colors.red,
+            fontWeight: FontWeight.bold,
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ),
+
+    _buildInputBar(),
+  ],
+),
+
     bottomNavigationBar: BottomNavigationBar(
       currentIndex: _bottomIndex,
       type: BottomNavigationBarType.fixed,
