@@ -1,4 +1,3 @@
-
 // lib/screens/events_screen.dart
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -6,6 +5,10 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'home_screen.dart';
+import 'chatbot_screen.dart';
+import 'company_screen.dart';
+import 'saved_screen.dart';
 
 class EventsScreen extends StatefulWidget {
   const EventsScreen({super.key});
@@ -24,6 +27,7 @@ class _EventsScreenState extends State<EventsScreen> {
   List<CorporateEvent> _upcomingEvents = [];
   Set<String> _locallySavedEventIds = {};
   late String currentUserId;
+  int _bottomIndex = 4;
 
 
   @override
@@ -288,6 +292,62 @@ Future<void> _toggleSaveEvent(CorporateEvent event) async {
             ),
           ],
         ),
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _bottomIndex,
+        type: BottomNavigationBarType.fixed,
+        selectedItemColor: const Color(0xFFEA6B6B),
+        unselectedItemColor: Colors.black54,
+        onTap: (index) {
+          if (index == _bottomIndex) return;
+
+          setState(() => _bottomIndex = index);
+
+          switch (index) {
+            case 0:
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const NewsFeedScreen()),
+              );
+              break;
+
+            case 2:
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ChatbotScreen()),
+              );
+              break;
+
+            case 3:
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const CompanyScreen()),
+              );
+              break;
+
+            case 4:
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const EventsScreen()),
+              );
+              break;
+
+            case 5:
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SavedNewsFeedScreen()),
+              );
+              break;
+          }
+        },
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.newspaper), label: "NEWS"),
+          BottomNavigationBarItem(icon: Icon(Icons.show_chart), label: "INDEX"),
+          BottomNavigationBarItem(icon: Icon(Icons.smart_toy), label: "ASK AI"),
+          BottomNavigationBarItem(icon: Icon(Icons.business), label: "COMPANIES"),
+          BottomNavigationBarItem(icon: Icon(Icons.event_available), label: "EVENTS"),
+          BottomNavigationBarItem(icon: Icon(Icons.bookmark), label: "Saved"),
+        ],
       ),
     );
   }

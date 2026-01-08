@@ -1,5 +1,6 @@
-from flask import Flask, request, jsonify
-from flask_cors import CORS
+from fastapi import FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 import requests
 import os
 from dotenv import load_dotenv
@@ -7,7 +8,8 @@ from openai import AzureOpenAI
 from datetime import datetime
 import json
 import asyncio
-from threading import Thread
+from typing import Optional, Dict, Any, List
+import uvicorn
 
 # MCP SDK imports
 try:
@@ -21,8 +23,20 @@ except ImportError:
 # Load environment variables
 load_dotenv()
 
-app = Flask(__name__)
-CORS(app)
+app = FastAPI(
+    title="AI Overview MCP Server",
+    description="Financial AI Overview using Model Context Protocol (MCP)",
+    version="1.0.0"
+)
+
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 AZURE_OPENAI_ENDPOINT = os.getenv('AZURE_OPENAI_ENDPOINT', '')
 AZURE_OPENAI_KEY = os.getenv('AZURE_OPENAI_KEY', '')
@@ -498,14 +512,18 @@ def calculate_financial_ratios(financials: dict) -> dict:
     return ratios
 
 # ============================================================================
-# FLASK REST API ENDPOINTS
+# FASTAPI REST API ENDPOINTS
 # ============================================================================
 
-@app.route('/api/ai-overview/<symbol>', methods=['GET'])
-def get_ai_overview(symbol):
+@app.get('/api/ai-overview/{symbol}')
+async def get_ai_overview(
+    symbol: str,
+    company_name: Optional[str] = Query(None)
+):
     """REST API endpoint that uses MCP protocol internally"""
     try:
-        company_name = request.args.get('company_name', symbol)
+        if company_name is None:
+            company_name = symbol
         
         print(f"\n{'='*60}")
         print(f"🚀 MCP Financial Analysis Pipeline")
@@ -523,7 +541,7 @@ def get_ai_overview(symbol):
         # MCP Tool Call: generate_investment_overview
         print("\n[MCP TOOL CALL] generate_investment_overview")
         formatted_context = format_financial_context_for_llm(financials, company_name, symbol)
-        print("🤖 Feeding MCP context to Groq LLM...")
+        print("🤖 Feeding MCP context to Azure OpenAI LLM...")
         
         ai_overview = generate_llm_overview(company_name, symbol, formatted_context)
         
@@ -531,7 +549,7 @@ def get_ai_overview(symbol):
             print("✓ AI Overview generated via MCP protocol")
             print(f"{'='*60}\n")
             
-            return jsonify({
+            return {
                 'success': True,
                 'company_name': company_name,
                 'symbol': symbol,
@@ -552,27 +570,23 @@ def get_ai_overview(symbol):
                 },
                 'financial_data': financials,
                 'generated_at': datetime.now().isoformat()
-            })
+            }
         else:
-            return jsonify({
-                'success': False,
-                'error': ai_overview or 'Failed to generate overview'
-            }), 500
+            raise HTTPException(status_code=500, detail=ai_overview or 'Failed to generate overview')
             
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"\n✗ Error: {e}\n")
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
+        raise HTTPException(status_code=500, detail=str(e))
 
-@app.route('/mcp/resources', methods=['GET'])
-def list_mcp_resources():
+@app.get('/mcp/resources')
+async def list_mcp_resources():
     """List available MCP resources"""
     if not MCP_AVAILABLE:
-        return jsonify({'error': 'MCP SDK not available'}), 503
+        raise HTTPException(status_code=503, detail='MCP SDK not available')
     
-    return jsonify({
+    return {
         'protocol': 'MCP v1.1',
         'resources': [
             {
@@ -591,15 +605,15 @@ def list_mcp_resources():
                 'description': 'Company cash flow data'
             }
         ]
-    })
+    }
 
-@app.route('/mcp/tools', methods=['GET'])
-def list_mcp_tools():
+@app.get('/mcp/tools')
+async def list_mcp_tools():
     """List available MCP tools"""
     if not MCP_AVAILABLE:
-        return jsonify({'error': 'MCP SDK not available'}), 503
+        raise HTTPException(status_code=503, detail='MCP SDK not available')
     
-    return jsonify({
+    return {
         'protocol': 'MCP v1.1',
         'tools': [
             {
@@ -615,11 +629,12 @@ def list_mcp_tools():
                 'description': 'Analyze financial health metrics'
             }
         ]
-    })
+    }
 
-@app.route('/health', methods=['GET'])
-def health_check():
-    return jsonify({
+@app.get('/health')
+async def health_check():
+    """Health check endpoint"""
+    return {
         'status': 'healthy',
         'service': 'AI Overview MCP Server',
         'protocol': 'Model Context Protocol (MCP) v1.1',
@@ -632,7 +647,23 @@ def health_check():
             'llm_integration',
             'financial_analysis'
         ]
-    })
+    }
+
+@app.get('/')
+async def root():
+    """Root endpoint with API documentation"""
+    return {
+        'message': 'AI Overview MCP Server',
+        'version': '1.0.0',
+        'protocol': 'MCP v1.1',
+        'endpoints': {
+            'health': '/health',
+            'ai_overview': '/api/ai-overview/{symbol}',
+            'mcp_resources': '/mcp/resources',
+            'mcp_tools': '/mcp/tools',
+            'docs': '/docs'
+        }
+    }
 
 if __name__ == '__main__':
     print("\n" + "="*60)
@@ -658,4 +689,4 @@ if __name__ == '__main__':
         print("  - analyze_financial_health")
     
     print("\n" + "="*60 + "\n")
-    app.run(host='0.0.0.0', port=5001, debug=True)
+    uvicorn.run(app, host='0.0.0.0', port=5001)

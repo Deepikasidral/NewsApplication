@@ -1,5 +1,6 @@
-flask
-flask-cors
+fastapi
+uvicorn[standard]
 requests
 python-dotenv
 openai>=1.0.0
+mcp

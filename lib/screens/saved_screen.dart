@@ -459,48 +459,54 @@ Widget _buildArticleCard(Article a) {
   type: BottomNavigationBarType.fixed,
   selectedItemColor: const Color(0xFFEA6B6B),
   unselectedItemColor: Colors.black54,
- onTap: (index) {
+  onTap: (index) {
   if (index == _bottomIndex) return;
 
   setState(() => _bottomIndex = index);
 
   switch (index) {
     case 0:
-      Navigator.pushReplacement(
+      Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const NewsFeedScreen()),
       );
       break;
 
     case 2:
-      Navigator.pushReplacement(
+      Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const ChatbotScreen()),
       );
       break;
 
     case 3:
-      Navigator.pushReplacement(
+      Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const CompanyScreen()),
       );
       break;
 
     case 4:
-      Navigator.pushReplacement(
+      Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const EventsScreen()),
       );
       break;
+
+    case 5:
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const SavedNewsFeedScreen()),
+      );
+      break;
   }
 },
-
   items: const [
-    BottomNavigationBarItem(icon: Icon(Icons.feed), label: "NEWS"),
-    BottomNavigationBarItem(icon: Icon(Icons.local_fire_department), label: "INDEX"),
-    BottomNavigationBarItem(icon: Icon(Icons.currency_bitcoin), label: "ASK AI"),
-    BottomNavigationBarItem(icon: Icon(Icons.event), label: "COMPANIES"),
-    BottomNavigationBarItem(icon: Icon(Icons.event), label: "EVENTS"),
+    BottomNavigationBarItem(icon: Icon(Icons.newspaper), label: "NEWS"),
+    BottomNavigationBarItem(icon: Icon(Icons.show_chart), label: "INDEX"),
+    BottomNavigationBarItem(icon: Icon(Icons.smart_toy), label: "ASK AI"),
+    BottomNavigationBarItem(icon: Icon(Icons.business), label: "COMPANIES"),
+    BottomNavigationBarItem(icon: Icon(Icons.event_available), label: "EVENTS"),
     BottomNavigationBarItem(icon: Icon(Icons.bookmark), label: "Saved"),
   ],
 ),
