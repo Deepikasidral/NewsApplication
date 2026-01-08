@@ -562,11 +562,11 @@ Future<void> _toggleSaveNews(String newsId) async {
 },
 
   items: const [
-    BottomNavigationBarItem(icon: Icon(Icons.feed), label: "NEWS"),
-    BottomNavigationBarItem(icon: Icon(Icons.local_fire_department), label: "INDEX"),
-    BottomNavigationBarItem(icon: Icon(Icons.currency_bitcoin), label: "ASK AI"),
-    BottomNavigationBarItem(icon: Icon(Icons.event), label: "COMPANIES"),
-    BottomNavigationBarItem(icon: Icon(Icons.event), label: "EVENTS"),
+    BottomNavigationBarItem(icon: Icon(Icons.newspaper), label: "NEWS"),
+    BottomNavigationBarItem(icon: Icon(Icons.show_chart), label: "INDEX"),
+    BottomNavigationBarItem(icon: Icon(Icons.smart_toy), label: "ASK AI"),
+    BottomNavigationBarItem(icon: Icon(Icons.business), label: "COMPANIES"),
+    BottomNavigationBarItem(icon: Icon(Icons.event_available), label: "EVENTS"),
     BottomNavigationBarItem(icon: Icon(Icons.bookmark), label: "Saved"),
   ],
 ),
