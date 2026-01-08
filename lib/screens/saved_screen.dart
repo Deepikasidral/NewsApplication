@@ -24,6 +24,9 @@ class _SavedNewsFeedScreenState extends State<SavedNewsFeedScreen> {
 
   List<Article> _articles = [];
   List<Article> _filtered = [];
+  List<CorporateEvent> _savedEvents = [];
+  List<CorporateEvent> _filteredEvents = [];
+
   bool _isLoading = false;
   String _error = '';
   int _bottomIndex = 5;
@@ -32,7 +35,7 @@ class _SavedNewsFeedScreenState extends State<SavedNewsFeedScreen> {
 
 
 
-  final String baseUrl = "http://10.69.144.93:5000";
+  final String baseUrl = "http://10.244.218.93:5000";
 
  @override
 void initState() {
@@ -64,19 +67,31 @@ Future<void> _loadUserId() async {
  void _applySearch() {
   final q = _searchController.text.trim().toLowerCase();
 
-  if (q.isEmpty) {
-    setState(() => _filtered = List.from(_articles));
-    return;
-  }
+  if (_tabIndex == 0) {
+    if (q.isEmpty) {
+      setState(() => _filtered = List.from(_articles));
+      return;
+    }
 
-  setState(() {
-    _filtered = _articles.where((a) {
-      final hay =
-          '${a.title} ${a.excerpt} ${a.tags.join(" ")}'.toLowerCase();
-      return hay.contains(q);
-    }).toList();
-  });
+    setState(() {
+      _filtered = _articles.where((a) {
+        return '${a.title} ${a.excerpt}'.toLowerCase().contains(q);
+      }).toList();
+    });
+  } else {
+    if (q.isEmpty) {
+      setState(() => _filteredEvents = List.from(_savedEvents));
+      return;
+    }
+
+    setState(() {
+      _filteredEvents = _savedEvents.where((e) {
+        return '${e.title} ${e.description}'.toLowerCase().contains(q);
+      }).toList();
+    });
+  }
 }
+
 
 
   Future<void> _fetchSavedNews() async {
@@ -171,8 +186,35 @@ Future<void> _loadUserId() async {
     ),
   );
 }
-// ------------------------- TAB HANDLER -------------------------
- 
+
+Future<void> _fetchSavedEvents() async {
+  setState(() {
+    _isLoading = true;
+    _error = "";
+  });
+
+  try {
+    final resp = await http.get(
+      Uri.parse("$baseUrl/api/users/$currentUserId/saved-events"),
+    );
+
+    if (resp.statusCode == 200) {
+      final body = jsonDecode(resp.body);
+      final List data = body['data'];
+
+      _savedEvents =
+          data.map((e) => CorporateEvent.fromJson(e)).toList();
+
+      _filteredEvents = List.from(_savedEvents);
+    } else {
+      _error = "Failed to load saved events";
+    }
+  } catch (e) {
+    _error = "Error: $e";
+  }
+
+  setState(() => _isLoading = false);
+}
 
 
 
@@ -216,66 +258,133 @@ Future<void> _loadUserId() async {
     );
   }
 
-  Widget _buildTabsRow() {
-    final tabs = ["NEWS", "COMPANIES", "EVENTS", "NOTES"];
+ Widget _buildTabsRow() {
+  final tabs = ["NEWS", "EVENTS"];
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: SizedBox(
-        height: 46,
-        child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          itemCount: tabs.length,
-          separatorBuilder: (_, __) => const SizedBox(width: 8),
-          itemBuilder: (context, idx) {
-            final selected = idx == _tabIndex;
-           return Container(
-  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-  decoration: BoxDecoration(
-    color: idx == _tabIndex
-        ? const Color(0xFFEDECF0)
-        : Colors.transparent,
-    borderRadius: BorderRadius.circular(20),
-  ),
-  child: Text(
-    tabs[idx],
-    style: TextStyle(
-      fontWeight:
-          idx == _tabIndex ? FontWeight.bold : FontWeight.normal,
-      color: idx == _tabIndex ? Colors.black : Colors.black54,
-    ),
-  ),
-);
+  return Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 12),
+    child: SizedBox(
+      height: 46,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: tabs.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, idx) {
+          final selected = idx == _tabIndex;
 
-          },
-        ),
+          return GestureDetector(
+            onTap: () {
+              setState(() => _tabIndex = idx);
+
+              if (idx == 0) {
+                _fetchSavedNews();
+              } else {
+                _fetchSavedEvents();
+              }
+            },
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: selected
+                    ? const Color(0xFFEDECF0)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                tabs[idx],
+                style: TextStyle(
+                  fontWeight:
+                      selected ? FontWeight.bold : FontWeight.normal,
+                  color: selected ? Colors.black : Colors.black54,
+                ),
+              ),
+            ),
+          );
+        },
       ),
+    ),
+  );
+}
+
+
+ Widget _buildFeed() {
+  if (_isLoading) {
+    return const Expanded(
+      child: Center(child: CircularProgressIndicator()),
     );
   }
 
-  Widget _buildFeed() {
-    if (_isLoading) {
-      return const Expanded(
-        child: Center(child: CircularProgressIndicator()),
-      );
-    }
+  if (_error.isNotEmpty) {
+    return Expanded(child: Center(child: Text(_error)));
+  }
 
-    if (_error.isNotEmpty) {
-      return Expanded(child: Center(child: Text(_error)));
-    }
-
+  // 📰 SAVED NEWS
+  if (_tabIndex == 0) {
     if (_filtered.isEmpty) {
-      return const Expanded(child: Center(child: Text("No articles found")));
+      return const Expanded(child: Center(child: Text("No saved news")));
     }
 
     return Expanded(
       child: ListView.builder(
         itemCount: _filtered.length,
-        padding: const EdgeInsets.only(bottom: 80),
         itemBuilder: (_, i) => _buildArticleCard(_filtered[i]),
       ),
     );
   }
+
+  // 📅 SAVED EVENTS
+  if (_filteredEvents.isEmpty) {
+    return const Expanded(child: Center(child: Text("No saved events")));
+  }
+
+  return Expanded(
+    child: ListView.builder(
+      itemCount: _filteredEvents.length,
+      itemBuilder: (_, i) => _buildSavedEventCard(_filteredEvents[i]),
+    ),
+  );
+}
+Widget _buildSavedEventCard(CorporateEvent event) {
+  final dateFormatted = DateFormat('MMM dd, yyyy').format(event.date);
+  final timeFormatted = DateFormat('hh:mm a').format(event.date);
+
+  return Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+    child: Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.grey.shade200),
+        color: Colors.white,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            event.title,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            "$dateFormatted • $timeFormatted",
+            style: const TextStyle(fontSize: 12, color: Colors.grey),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            event.description,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
 Widget _buildArticleCard(Article a) {
   final dateFormatted = DateFormat.yMMMd().add_jm().format(a.date);
 
@@ -399,3 +508,48 @@ Widget _buildArticleCard(Article a) {
     );
   }
 }
+
+class CorporateEvent {
+  final String id;
+  final String title;
+  final DateTime date;
+  final String description;
+  final String type;
+  final String tags;
+  final String headline;
+
+  CorporateEvent({
+    required this.id,
+    required this.title,
+    required this.date,
+    required this.description,
+    required this.type,
+    required this.tags,
+    required this.headline,
+  });
+
+  factory CorporateEvent.fromJson(Map<String, dynamic> json) {
+    return CorporateEvent(
+      id: json['_id'] ?? json['id'],
+      title: json['title'],
+      date: DateTime.parse(json['date']),
+      description: json['description'],
+      type: json['type'],
+      tags: json['tags'],
+      headline: json['headline'],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'date': date.toIso8601String(),
+      'description': description,
+      'type': type,
+      'tags': tags,
+      'headline': headline,
+    };
+  }
+}
+
