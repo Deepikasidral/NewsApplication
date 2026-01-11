@@ -8,6 +8,8 @@ import '../models/article.dart';
 import 'company_screen.dart';
 import 'events_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_html/flutter_html.dart';
+
 
 
 class NewsFeedScreen extends StatefulWidget {
@@ -35,7 +37,7 @@ late String currentUserId;
 
 
 
-  final String baseUrl = "http://10.244.218.93:5000";
+  final String baseUrl = "http://13.51.242.86:5000";
 
  @override
 void initState() {
@@ -255,6 +257,7 @@ Future<void> _toggleSaveNews(String newsId) async {
 
 
 
+
   // ------------------------- TAB HANDLER -------------------------
   void _onTabChange(int idx) {
   setState(() => _tabIndex = idx);
@@ -276,70 +279,185 @@ Future<void> _toggleSaveNews(String newsId) async {
 }
 
   // ------------------------- SHOW FULL STORY -------------------------
-  Future<void> _showFullStory(Article a) async {
+ Future<void> _showFullStory(Article a) async {
+  Color sentimentColor(String s) {
+    switch (s.toLowerCase()) {
+      case "bullish":
+        return Colors.green;
+      case "bearish":
+        return Colors.red;
+      default:
+        return Colors.orange;
+    }
+  }
+
+  Color impactColor(String i) {
+    switch (i.toLowerCase()) {
+      case "very high":
+        return Colors.red;
+      case "high":
+        return Colors.orange;
+      case "medium":
+        return Colors.blue;
+      default:
+        return Colors.grey;
+    }
+  }
+
   showDialog(
     context: context,
     barrierDismissible: true,
-    builder: (ctx) => AlertDialog(
-      title: Text(a.title),
-      content: SingleChildScrollView(
+    builder: (ctx) => Dialog(
+      backgroundColor:Color.fromARGB(255, 245, 237, 237),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // -------- SUMMARY --------
-            if (a.summary.isNotEmpty) ...[
-              const Text(
-                "📝 Summary",
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              Text(a.summary),
-              const SizedBox(height: 16),
-            ],
 
-            // -------- META INFO --------
-            if (a.sentiment.isNotEmpty)
-              Text("💬 Sentiment: ${a.sentiment}",
-                  style: const TextStyle(fontSize: 13)),
-            if (a.impact.isNotEmpty)
-              Text("🔥 Impact: ${a.impact}",
-                  style: const TextStyle(fontSize: 13)),
-
-            // -------- COMPANIES --------
-            if (a.companies.isNotEmpty) ...[
-              const SizedBox(height: 14),
-              const Text(
-                "🏢 Companies",
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+            /// TITLE
+            Text(
+              a.title,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
               ),
-              const SizedBox(height: 6),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: a.companies
-                    .map(
-                      (company) => Chip(
-                        label: Text(
-                          company,
-                          style: const TextStyle(fontSize: 12),
+            ),
+
+            const SizedBox(height: 12),
+
+            /// FULL STORY
+              if (a.story.isNotEmpty) ...[
+                const Text(
+                  "Full Story",
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                Html(
+                  data: a.story, // 👈 COMPLETE NEWS CONTENT
+                  style: {
+                    "p": Style(
+                      fontSize: FontSize(14.5),
+                      lineHeight: LineHeight.number(1.5),
+                      margin: Margins.only(bottom: 12),
+                    ),
+                  },
+                ),
+
+                const SizedBox(height: 16),
+              ],
+
+
+            /// SENTIMENT + IMPACT (same as card)
+            
+                if (a.sentiment.isNotEmpty)
+                  Text.rich(
+                    TextSpan(
+                      children: [
+                        const TextSpan(
+                          text: "Sentiment: ",
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black,
+                          ),
                         ),
-                        backgroundColor: Colors.blue.shade50,
+                        TextSpan(
+                          text: a.sentiment,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: sentimentColor(a.sentiment),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                const SizedBox(width: 12),
+                if (a.impact.isNotEmpty)
+                  Text.rich(
+                    TextSpan(
+                      children: [
+                        const TextSpan(
+                          text: "Impact: ",
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black,
+                          ),
+                        ),
+                        TextSpan(
+                          text: a.impact,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: impactColor(a.impact),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+             
+
+            /// COMPANIES
+            if (a.companies.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              const Text(
+                "Companies",
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: a.companies.map(
+                  (company) => Chip(
+                    label: Text(
+                      company,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.white,
                       ),
-                    )
-                    .toList(),
+                    ),
+                    backgroundColor: const Color(0xFFEA6B6B),
+                  ),
+                ).toList(),
               ),
             ],
+
+            const SizedBox(height: 20),
+
+            /// CLOSE BUTTON
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text(
+                  "Close",
+                  style: TextStyle(
+                    color: Color(0xFFEA6B6B),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
           ],
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx),
-          child: const Text("Close"),
-        ),
-      ],
     ),
   );
 }
+
 
 
   // ------------------------- UI -------------------------
@@ -443,78 +561,181 @@ Future<void> _toggleSaveNews(String newsId) async {
       ),
     );
   }
+Widget _buildArticleCard(Article a) {
+  final dateFormatted = DateFormat.yMMMd().add_jm().format(a.date);
+ 
 
-  Widget _buildArticleCard(Article a) {
-    final dateFormatted = DateFormat.yMMMd().add_jm().format(a.date);
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.grey.shade200),
-          color: Colors.white,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-                        Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Text(
-                    a.title,
-                    style: const TextStyle(
-                      fontSize: 16.5,
-                      fontWeight: FontWeight.bold,
-                    ),
+  Color sentimentColor(String s) {
+    switch (s.toLowerCase()) {
+      case "bullish":
+        return Colors.green;
+      case "bearish":
+        return Colors.red;
+      default:
+        return Colors.orange;
+    }
+  }
+
+  Color impactColor(String i) {
+    switch (i.toLowerCase()) {
+      case "very high":
+        return Colors.red;
+      case "high":
+        return Colors.orange;
+      case "medium":
+        return Colors.blue;
+      default:
+        return Colors.grey;
+    }
+  }
+return Padding(
+  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+  child: InkWell(
+    borderRadius: BorderRadius.circular(14),
+    onTap: () => _showFullStory(a), // 👈 TAP OPENS DIALOG
+    child: Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black12.withOpacity(0.05),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+
+          /// TITLE + BOOKMARK
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  a.title,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
                   ),
-                ),
-                IconButton(
-                  icon: Icon(
-                    _locallySavedIds.contains(a.id)
-                        ? Icons.bookmark
-                        : Icons.bookmark_border,
-                    color: _locallySavedIds.contains(a.id)
-                        ? Colors.red
-                        : Colors.grey,
-                  ),
-                  onPressed: () => _toggleSaveNews(a.id),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 6),
-            Text(dateFormatted,
-                style: const TextStyle(fontSize: 12, color: Colors.grey)),
-            const SizedBox(height: 8),
-            Text(a.excerpt,
-                maxLines: 4, overflow: TextOverflow.ellipsis),
-            const SizedBox(height: 10),
-            GestureDetector(
-              onTap: () => _showFullStory(a),
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF05151).withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Text(
-                  "READ MORE",
-                  style: TextStyle(
-                      color: Color(0xFFF05151),
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold),
                 ),
               ),
-            )
+              IconButton(
+                icon: Icon(
+                  _locallySavedIds.contains(a.id)
+                      ? Icons.bookmark
+                      : Icons.bookmark_border,
+                  color: _locallySavedIds.contains(a.id)
+                      ? Colors.red
+                      : Colors.grey,
+                ),
+                onPressed: () => _toggleSaveNews(a.id),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 6),
+
+          /// SUMMARY (2–3 lines)
+          Text(
+  a.summary,
+  softWrap: true,
+  style: const TextStyle(
+    fontSize: 14.5,
+    height: 1.4,
+  ),
+),
+
+
+
+
+          const SizedBox(height: 10),
+
+          /// COMPANIES
+          if (a.companies.isNotEmpty)
+            Text(
+              "Companies: ${a.companies.join(', ')}",
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+
+          const SizedBox(height: 6),
+
+          /// SENTIMENT + IMPACT
+          
+            
+                 if (a.sentiment.isNotEmpty)
+      Text.rich(
+        TextSpan(
+          children: [
+            const TextSpan(
+              text: "Sentiment: ",
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: Colors.black,
+              ),
+            ),
+            TextSpan(
+              text: a.sentiment,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: sentimentColor(a.sentiment),
+              ),
+            ),
           ],
         ),
       ),
-    );
-  }
+
+    const SizedBox(width: 12),
+
+    if (a.impact.isNotEmpty)
+      Text.rich(
+        TextSpan(
+          children: [
+            const TextSpan(
+              text: "Impact: ",
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: Colors.black,
+              ),
+            ),
+            TextSpan(
+              text: a.impact,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: impactColor(a.impact),
+              ),
+            ),
+          ],
+        ),
+      ),
+          
+
+          const SizedBox(height: 6),
+
+          /// FOOTER
+          Text(
+            dateFormatted,
+            style: const TextStyle(
+              fontSize: 11,
+              color: Colors.grey,
+            ),
+          ),
+        ],
+      ),
+    ),
+));
+}
 
   // ------------------------- BUILD -------------------------
   @override

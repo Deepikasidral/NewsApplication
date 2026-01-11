@@ -16,6 +16,7 @@ dependencies:
   http: ^1.2.0
   html: ^0.15.0
   firebase_core: ^3.6.0
+  flutter_html: ^3.0.0
 
   firebase_auth: ^5.3.1
   cloud_firestore: ^5.4.4

@@ -13,117 +13,6 @@ from firebase_admin import credentials, messaging
 import re
 
 # ================================
-# 🧪 MOCK PTI ARTICLES (TEMP)
-# ================================
-MOCK_PTI_ARTICLES = [
-    {
-        "FileName": "1710202517DCM64",
-        "Byline": "",
-        "Copyrights": "PTI",
-        "EDNote": "",
-        "Headline": "NHPC begins commercial operations of 300 MW solar project in Rajasthan",
-        "Priority": "PRI",
-        "PublishedAt": "Friday, Oct 17, 2025 16:10:52",
-        "__v": 0,
-        "category": "BUSINESS",
-        "link": "http://www.ptinews.com",
-        "slug": "BIZ--NHPC",
-        "source": "India",
-        "story": (
-            "<p> New Delhi, Oct 17 (PTI) State-owned NHPC on Friday declared commercial operation "
-            "of its 300 MW solar project in Rajasthan.</p>"
-            "<p> The development comes after the successful trial run of the final phase of the "
-            "85.72 MW part capacity of the 300 MW Karnisar Solar Project in Bikaner, which was "
-            "completed last Friday, NHPC said in a stock exchange filing.</p>"
-            "<p> The company also received approval of Punjab State Electricity Regulatory "
-            "Commission (PSERC) on Thursday, it said.</p>"
-            "<p> NHPC Ltd said it has declared the commercial operation of the full 300 MW capacity "
-            "of the Karnisar solar project in Bikaner, Rajasthan with effect from October 16. "
-            "PTI ABI ABI DR DR</p>"
-        ),
-        "subcategory": " COM ECO ESPL"
-    },
-
-    {
-        "FileName": "1710202517DCM65",
-        "Byline": "",
-        "Copyrights": "PTI",
-        "EDNote": "",
-        "Headline": "KPI Green Energy bags orders worth Rs 696.5 cr from SJVN",
-        "Priority": "PRI",
-        "PublishedAt": "Friday, Oct 17, 2025 16:11:21",
-        "__v": 0,
-        "category": "BUSINESS",
-        "link": "http://www.ptinews.com",
-        "slug": "BIZ-KPI GREEN-SJVN",
-        "source": "India",
-        "story": (
-            "<p> New Delhi, Oct 17 (PTI) KPI Green Energy has bagged three letters of award from "
-            "state-owned SJVN for projects worth Rs 696.50 crore.</p>"
-            "<p> The project encompasses a full-scope EPC (Engineering, Procurement, and "
-            "Construction) package followed by a long-term operation & maintenance (O&M) "
-            "contract, KPI Green Energy said in a regulatory filing.</p>"
-            "<p> \"...KPI Green Energy Limited has received three distinct Letters of Award (LOAs) "
-            "from SJVN Limited (a Government of India enterprise) for a major 200 MW (AC) solar "
-            "power project at the GIPCL Renewable Energy Park, Khavda, Gujarat,\" it said. "
-            "PTI ABI ABI SHW</p>"
-        ),
-        "subcategory": " COM ECO ESPL"
-    },
-
-    {
-        "FileName": "1710202517DCM70",
-        "Byline": "",
-        "Copyrights": "PTI",
-        "EDNote": "",
-        "Headline": "CAI maintains cotton output estimates at 312.40 lakh bales for 2024-25 season",
-        "Priority": "PRI",
-        "PublishedAt": "Friday, Oct 17, 2025 16:28:46",
-        "__v": 0,
-        "category": "BUSINESS",
-        "link": "http://www.ptinews.com",
-        "slug": "BIZ-COTTON-CAI",
-        "source": "India",
-        "story": (
-            "<p> Mumbai, Oct 17 (PTI) The Cotton Association of India (CAI) on Friday maintained "
-            "its cotton production estimate for 2024-25 season at 312.40 lakh bales, amid "
-            "report of crop loss due to rains in Maharashtra.</p>"
-            "<p> CAI president Atul Ganatra said late crop arrival may help offset losses.</p>"
-            "<p> Total cotton supply till September 30, 2025, was estimated at 392.59 lakh "
-            "bales including imports and opening stock.</p>"
-            "<p> Export shipments are estimated at 18 lakh bales for the season. "
-            "PTI SM DRR</p>"
-        ),
-        "subcategory": " COM ECO ESPL"
-    },
-
-    {
-        "FileName": "1710202517DCM72",
-        "Byline": "",
-        "Copyrights": "PTI",
-        "EDNote": "",
-        "Headline": "AU Small Finance Bank Q2 net dips 2 pc at Rs 561 cr",
-        "Priority": "PRI",
-        "PublishedAt": "Friday, Oct 17, 2025 16:33:48",
-        "__v": 0,
-        "category": "BUSINESS",
-        "link": "http://www.ptinews.com",
-        "slug": "BIZ-RESULTS-AU SMALL BANK",
-        "source": "India",
-        "story": (
-            "<p> New Delhi, Oct 17 (PTI) AU Small Finance Bank on Friday reported a 2 per cent "
-            "dip in net profit at Rs 561 crore for the second quarter ended September 30.</p>"
-            "<p> Net total income rose 9 per cent to Rs 2,857 crore, while provisioning rose "
-            "29 per cent year-on-year.</p>"
-            "<p> Total deposits grew 21 per cent YoY to over Rs 1.32 lakh crore.</p>"
-            "<p> Shares closed at Rs 793.75 on BSE. PTI JD JD DR DR</p>"
-        ),
-        "subcategory": " COM ECO ESPL"
-    }
-]
-
-
-# ================================
 # 🔧 CONFIGURATION
 # ================================
 load_dotenv(dotenv_path="../.env")
@@ -186,9 +75,7 @@ def save_last_run_time(dt):
 # ================================
 # 🌐 FETCH PTI NEWS
 # ================================
-def fetch_mock_pti_news():
-    print("🧪 Running pipeline with MOCK PTI data")
-    return MOCK_PTI_ARTICLES
+
 
 def fetch_pti_news():
     start_time = get_last_run_time()
@@ -637,8 +524,8 @@ def process_agent3(agent2_data):
 # 🚀 PIPELINE RUNNER
 # ================================
 def run_pipeline():
-    articles = fetch_mock_pti_news()   # TEMP
-    # articles = fetch_pti_news()      # REAL (enable later)
+    #articles = fetch_mock_pti_news()   # TEMP
+    articles = fetch_pti_news()      # REAL (enable later)
 
 
     for article in articles:
@@ -664,12 +551,12 @@ def run_pipeline():
         if not agent3:
             continue
 
-        # notify = (
-        #     agent3["impact"] == "Very High" or
-        #     agent3["sentiment"] in ["Very Bullish", "Very Bearish"]
-        # )
+        notify = (
+            agent3["impact"] == "Very High" or
+            agent3["sentiment"] in ["Very Bullish", "Very Bearish"]
+        )
 
-        notify = agent3["impact"] in ["High", "Very High"]
+        # notify = agent3["impact"] in ["High", "Very High"]
 
 
         if notify:

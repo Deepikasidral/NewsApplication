@@ -488,7 +488,7 @@ class _CompanyNewsScreenState extends State<CompanyNewsScreen> with SingleTicker
     try {
       final encodedName = Uri.encodeComponent(widget.companyName);
       final resp = await http.get(Uri.parse(
-          "http://192.168.1.102:5000/api/filtered-news/company/$encodedName"));
+          "http://13.51.242.86:5000/api/filtered-news/company/$encodedName"));
 
       if (resp.statusCode == 200) {
         final data = json.decode(resp.body);
@@ -525,7 +525,7 @@ class _CompanyNewsScreenState extends State<CompanyNewsScreen> with SingleTicker
 
       final encodedName = Uri.encodeComponent(widget.companyName);
       final url = Uri.parse(
-        'http://192.168.1.102:5001/api/ai-overview/$symbol'
+        'http://13.51.242.86:5001/api/ai-overview/$symbol'
       ).replace(queryParameters: {
         'company_name': widget.companyName
       });

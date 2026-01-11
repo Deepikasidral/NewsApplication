@@ -45,7 +45,7 @@ Future<void> _loadUserId() async {
 
 Future<void> _loadSavedEventIds() async {
   final resp = await http.get(
-    Uri.parse("http://10.244.218.93:5000/api/users/$currentUserId/saved-events"),
+    Uri.parse("http://13.51.242.86:5000/api/users/$currentUserId/saved-events"),
   );
 
   if (resp.statusCode == 200) {
@@ -65,7 +65,7 @@ Future<void> _loadSavedEventIds() async {
 
     try {
       final response = await http.get(
-        Uri.parse('http://10.244.218.93:5000/api/events'),
+        Uri.parse('http://13.51.242.86:5000/api/events'),
         headers: {'Content-Type': 'application/json'},
       );
 
@@ -119,7 +119,7 @@ Future<void> _toggleSaveEvent(CorporateEvent event) async {
 
   try {
     final resp = await http.post(
-      Uri.parse("http://10.244.218.93:5000/api/users/save-event"),
+      Uri.parse("http://13.51.242.86:5000/api/users/save-event"),
       headers: {"Content-Type": "application/json"},
       body: jsonEncode({
         "userId": currentUserId,

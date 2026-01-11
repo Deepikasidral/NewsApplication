@@ -5,6 +5,7 @@
 
     <application
         android:label="Rupee Letter"
+        android:usesCleartextTraffic="true"
         android:name="androidx.multidex.MultiDexApplication"
         android:icon="@mipmap/ic_launcher">
         <activity
