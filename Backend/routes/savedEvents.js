@@ -50,4 +50,16 @@ router.get("/:userId/saved-events", async (req, res) => {
   });
 });
 
+// DELETE ALL SAVED EVENTS
+router.delete("/:userId/saved-events", async (req, res) => {
+  const user = await User.findById(req.params.userId);
+  if (!user) return res.status(404).json({ message: "User not found" });
+
+  user.saved_events = [];
+  await user.save();
+
+  res.json({ success: true });
+});
+
+
 module.exports = router;
