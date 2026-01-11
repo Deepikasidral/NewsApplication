@@ -28,12 +28,15 @@ class _CompanyNewsScreenState extends State<CompanyNewsScreen> with SingleTicker
   List<Map<String, dynamic>> _news = [];
   Map<String, dynamic>? _stockData;
   Map<String, dynamic>? _aiOverview;
+  Map<String, dynamic>? _aiInsight;
   bool _isLoading = false;
   bool _isLoadingStock = false;
   bool _isLoadingAI = false;
+  bool _isLoadingInsight = false;
   String _error = '';
   String _stockError = '';
   String _aiError = '';
+  String _insightError = '';
   
   late TabController _tabController;
   int _selectedTabIndex = 0;
@@ -75,6 +78,7 @@ class _CompanyNewsScreenState extends State<CompanyNewsScreen> with SingleTicker
     _fetchStockData();
     _fetchCompanyNews();
     _fetchAIOverview();
+    _fetchAIInsight();
     _fetchChartData('1M');
   }
 
@@ -438,6 +442,195 @@ class _CompanyNewsScreenState extends State<CompanyNewsScreen> with SingleTicker
         print('Stack: $stack');
       }
 
+      // 4. GET /basic-financials - Balance Sheet
+      String? totalAssets;
+      String? totalLiabilities;
+      String? longTermDebt;
+      String? shareholdersEquity;
+      String? cashEquivalents;
+
+      try {
+        print('\n--- Fetching Balance Sheet ---');
+        await Future.delayed(const Duration(milliseconds: 500));
+        
+        final bsUrl = Uri.parse(
+          "https://data.finedgeapi.com/api/v1/basic-financials/$symbol"
+        ).replace(queryParameters: {
+          'token': _finedgeApiToken,
+          'statement_type': 's',
+          'statement_code': 'bs',
+        });
+
+        final bsResponse = await http.get(
+          bsUrl,
+          headers: {'Accept': 'application/json'}
+        ).timeout(const Duration(seconds: 10));
+
+        print('Balance Sheet Status: ${bsResponse.statusCode}');
+
+        if (bsResponse.statusCode == 200 && bsResponse.body.isNotEmpty) {
+          final bsData = json.decode(bsResponse.body);
+          
+          dynamic bsList = bsData['ratios'];
+          
+          if (bsList != null && bsList is List && bsList.isNotEmpty) {
+            final latest = bsList.first;
+            print('Balance Sheet keys: ${latest.keys.toList()}');
+            
+            // Total Assets
+            final assets = latest['totalAssets'];
+            if (assets != null) {
+              totalAssets = (double.parse(assets.toString()) / 10000000).toStringAsFixed(2);
+              print('✓ Found Total Assets: $totalAssets Cr');
+            }
+            
+            // Total Liabilities
+            final liabilities = latest['totalLiabilities'];
+            if (liabilities != null) {
+              totalLiabilities = (double.parse(liabilities.toString()) / 10000000).toStringAsFixed(2);
+              print('✓ Found Total Liabilities: $totalLiabilities Cr');
+            }
+            
+            // Long-term Debt
+            final debt = latest['longTermBorrowings'] ?? latest['totalDebt'];
+            if (debt != null) {
+              longTermDebt = (double.parse(debt.toString()) / 10000000).toStringAsFixed(2);
+              print('✓ Found Long-Term Debt: $longTermDebt Cr');
+            }
+            
+            // Shareholders' Equity
+            final equity = latest['totalEquity'];
+            if (equity != null) {
+              shareholdersEquity = (double.parse(equity.toString()) / 10000000).toStringAsFixed(2);
+              print('✓ Found Shareholders Equity: $shareholdersEquity Cr');
+            }
+            
+            // Cash & Equivalents
+            final cash = latest['totalCash'];
+            if (cash != null) {
+              cashEquivalents = (double.parse(cash.toString()) / 10000000).toStringAsFixed(2);
+              print('✓ Found Cash & Equivalents: $cashEquivalents Cr');
+            }
+          }
+        }
+      } catch (e) {
+        print('ERROR fetching balance sheet: $e');
+      }
+
+      // 5. GET /basic-financials - Cash Flow
+      String? operatingCashFlow;
+      String? investingCashFlow;
+      String? financingCashFlow;
+
+      try {
+        print('\n--- Fetching Cash Flow ---');
+        await Future.delayed(const Duration(milliseconds: 500));
+        
+        final cfUrl = Uri.parse(
+          "https://data.finedgeapi.com/api/v1/basic-financials/$symbol"
+        ).replace(queryParameters: {
+          'token': _finedgeApiToken,
+          'statement_type': 's',
+          'statement_code': 'cf',
+        });
+
+        final cfResponse = await http.get(
+          cfUrl,
+          headers: {'Accept': 'application/json'}
+        ).timeout(const Duration(seconds: 10));
+
+        print('Cash Flow Status: ${cfResponse.statusCode}');
+
+        if (cfResponse.statusCode == 200 && cfResponse.body.isNotEmpty) {
+          final cfData = json.decode(cfResponse.body);
+          
+          dynamic cfList = cfData['ratios'];
+          
+          if (cfList != null && cfList is List && cfList.isNotEmpty) {
+            final latest = cfList.first;
+            print('Cash Flow keys: ${latest.keys.toList()}');
+            
+            // Operating Cash Flow
+            final opCF = latest['operatingCashFlow'];
+            if (opCF != null) {
+              operatingCashFlow = (double.parse(opCF.toString()) / 10000000).toStringAsFixed(2);
+              print('✓ Found Operating Cash Flow: $operatingCashFlow Cr');
+            }
+            
+            // Investing Cash Flow
+            final invCF = latest['investingCashFlow'];
+            if (invCF != null) {
+              investingCashFlow = (double.parse(invCF.toString()) / 10000000).toStringAsFixed(2);
+              print('✓ Found Investing Cash Flow: $investingCashFlow Cr');
+            }
+            
+            // Financing Cash Flow
+            final finCF = latest['financingCashFlow'];
+            if (finCF != null) {
+              financingCashFlow = (double.parse(finCF.toString()) / 10000000).toStringAsFixed(2);
+              print('✓ Found Financing Cash Flow: $financingCashFlow Cr');
+            }
+          }
+        }
+      } catch (e) {
+        print('ERROR fetching cash flow: $e');
+      }
+
+      // 6. Fetch additional ratios (P/B, P/S, Market Cap)
+      String? pbRatio;
+      String? psRatio;
+      String? marketCap;
+
+      try {
+        print('\n--- Fetching Additional Ratios ---');
+        await Future.delayed(const Duration(milliseconds: 500));
+        
+        final ratiosUrl = Uri.parse(
+          "https://data.finedgeapi.com/api/v1/annual-price-ratios/$symbol"
+        ).replace(queryParameters: {
+          'token': _finedgeApiToken,
+          'statement_type': 's',
+        });
+
+        final ratiosResp = await http.get(
+          ratiosUrl,
+          headers: {'Accept': 'application/json'}
+        ).timeout(const Duration(seconds: 10));
+
+        if (ratiosResp.statusCode == 200 && ratiosResp.body.isNotEmpty) {
+          final ratiosData = json.decode(ratiosResp.body);
+          dynamic ratiosList = ratiosData['price_ratios'];
+          
+          if (ratiosList != null && ratiosList is List && ratiosList.isNotEmpty) {
+            final latest = ratiosList.first;
+            print('Ratios keys: ${latest.keys.toList()}');
+            
+            // P/B Ratio
+            final pb = latest['pb'] ?? latest['priceToBook'] ?? latest['pbRatio'];
+            if (pb != null) {
+              pbRatio = double.parse(pb.toString()).toStringAsFixed(2);
+              print('✓ Found P/B: $pbRatio');
+            }
+            
+            // P/S Ratio
+            final ps = latest['ps'] ?? latest['priceToSales'] ?? latest['psRatio'];
+            if (ps != null) {
+              psRatio = double.parse(ps.toString()).toStringAsFixed(2);
+              print('✓ Found P/S: $psRatio');
+            }
+            
+            // Market Cap
+            final mktCap = latest['marketCap'] ?? latest['market_cap'];
+            if (mktCap != null) {
+              marketCap = (double.parse(mktCap.toString()) / 10000000).toStringAsFixed(2);
+              print('✓ Found Market Cap: $marketCap Cr');
+            }
+          }
+        }
+      } catch (e) {
+        print('ERROR fetching additional ratios: $e');
+      }
+
       print('\n=== FINAL EXTRACTED VALUES ===');
       print('Revenue: $revenue');
       print('EBITDA: $ebitda');
@@ -445,6 +638,17 @@ class _CompanyNewsScreenState extends State<CompanyNewsScreen> with SingleTicker
       print('Net Profit: $netProfit');
       print('EPS: $eps');
       print('P/E Ratio: $peRatio');
+      print('Total Assets: $totalAssets');
+      print('Total Liabilities: $totalLiabilities');
+      print('Long-Term Debt: $longTermDebt');
+      print('Shareholders Equity: $shareholdersEquity');
+      print('Operating Cash Flow: $operatingCashFlow');
+      print('Investing Cash Flow: $investingCashFlow');
+      print('Financing Cash Flow: $financingCashFlow');
+      print('Cash & Equivalents: $cashEquivalents');
+      print('P/B Ratio: $pbRatio');
+      print('P/S Ratio: $psRatio');
+      print('Market Cap: $marketCap');
       print('================================\n');
       
       setState(() {
@@ -458,12 +662,27 @@ class _CompanyNewsScreenState extends State<CompanyNewsScreen> with SingleTicker
           'Change Value': changeValue?.toStringAsFixed(2) ?? 'N/A',
           'Change Percent': changePct?.toStringAsFixed(2) ?? 'N/A',
           'Volume': volume?.toString() ?? 'N/A',
+          // Income Statement
           'Revenue': revenue ?? 'N/A',
           'EBITDA': ebitda ?? 'N/A',
           'EBIT': ebit ?? 'N/A',
           'Net Profit': netProfit ?? 'N/A',
           'EPS': eps ?? 'N/A',
           'Stock P/E': peRatio ?? 'N/A',
+          // Balance Sheet
+          'Total Assets': totalAssets ?? 'N/A',
+          'Total Liabilities': totalLiabilities ?? 'N/A',
+          'Long-Term Debt': longTermDebt ?? 'N/A',
+          'Shareholders Equity': shareholdersEquity ?? 'N/A',
+          // Cash Flow
+          'Operating Cash Flow': operatingCashFlow ?? 'N/A',
+          'Investing Cash Flow': investingCashFlow ?? 'N/A',
+          'Financing Cash Flow': financingCashFlow ?? 'N/A',
+          'Cash & Equivalents': cashEquivalents ?? 'N/A',
+          // Valuation
+          'P/B Ratio': pbRatio ?? 'N/A',
+          'P/S Ratio': psRatio ?? 'N/A',
+          'Market Cap': marketCap ?? 'N/A',
         };
         _stockError = '';
       });
@@ -488,7 +707,7 @@ class _CompanyNewsScreenState extends State<CompanyNewsScreen> with SingleTicker
     try {
       final encodedName = Uri.encodeComponent(widget.companyName);
       final resp = await http.get(Uri.parse(
-          "http://13.51.242.86:5000/api/filtered-news/company/$encodedName"));
+          "http://192.168.1.105:5000/api/filtered-news/company/$encodedName"));
 
       if (resp.statusCode == 200) {
         final data = json.decode(resp.body);
@@ -525,7 +744,7 @@ class _CompanyNewsScreenState extends State<CompanyNewsScreen> with SingleTicker
 
       final encodedName = Uri.encodeComponent(widget.companyName);
       final url = Uri.parse(
-        'http://13.51.242.86:5001/api/ai-overview/$symbol'
+        'http://192.168.1.105:5001/api/ai-overview/$symbol'
       ).replace(queryParameters: {
         'company_name': widget.companyName
       });
@@ -559,7 +778,6 @@ class _CompanyNewsScreenState extends State<CompanyNewsScreen> with SingleTicker
       print('AI overview fetch error: $e');
       setState(() {
         _aiError = "AI overview unavailable. Using fallback content.";
-        // Fallback to generic overview
         _aiOverview = {
           'overview': '${widget.companyName} is a prominent player in its sector with established market presence. The company demonstrates consistent operational performance and maintains a balanced approach to growth and profitability. Financial health indicators suggest stable fundamentals with recurring revenue streams.',
         };
@@ -567,6 +785,57 @@ class _CompanyNewsScreenState extends State<CompanyNewsScreen> with SingleTicker
     }
 
     setState(() => _isLoadingAI = false);
+  }
+
+  Future<void> _fetchAIInsight() async {
+    setState(() {
+      _isLoadingInsight = true;
+      _insightError = '';
+    });
+
+    try {
+      var symbol = widget.companySymbol.toUpperCase();
+      if (symbol.endsWith('.NSE') || symbol.endsWith('.BSE')) {
+        symbol = symbol.split('.').first;
+      }
+
+      final url = Uri.parse(
+        'http://192.168.1.105:5001/api/ai-insight/$symbol'
+      ).replace(queryParameters: {
+        'company_name': widget.companyName
+      });
+
+      print('Fetching AI insight from: $url');
+      
+      final resp = await http.get(url).timeout(const Duration(seconds: 30));
+
+      if (resp.statusCode == 200) {
+        final data = json.decode(resp.body);
+        if (data['success'] == true) {
+          setState(() {
+            _aiInsight = {
+              'insight': data['insight'],
+              'generated_at': data['generated_at'],
+            };
+          });
+        } else {
+          setState(() {
+            _insightError = data['error'] ?? "Failed to generate AI insight";
+          });
+        }
+      } else {
+        setState(() {
+          _insightError = "Failed to fetch AI insight (${resp.statusCode})";
+        });
+      }
+    } catch (e) {
+      print('AI insight fetch error: $e');
+      setState(() {
+        _insightError = "AI insight unavailable.";
+      });
+    }
+
+    setState(() => _isLoadingInsight = false);
   }
 
   Future<void> _fetchChartData(String timeframe) async {
@@ -1053,13 +1322,67 @@ class _CompanyNewsScreenState extends State<CompanyNewsScreen> with SingleTicker
   }
 
   Widget _buildFinancialsTab() {
+    if (_isLoadingStock) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(20),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    if (_stockError.isNotEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Text(
+            _stockError,
+            style: const TextStyle(color: Colors.red),
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
+    }
+
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Fundamental Data Section
+          // 1. Income Statement
+          _buildFinancialSection(
+            title: 'INCOME STATEMENT (ANNUAL)',
+            subtitle: 'Scale, profitability, and earnings strength',
+            rows: [
+              _buildFundamentalRow('Revenue', _stockData?['Revenue'] ?? 'N/A', 'EBITDA', _stockData?['EBITDA'] ?? 'N/A'),
+              _buildFundamentalRow('EBIT', _stockData?['EBIT'] ?? 'N/A', 'Net Profit', _stockData?['Net Profit'] ?? 'N/A'),
+              _buildFundamentalRow('EPS', _stockData?['EPS'] ?? 'N/A', 'P/E Ratio', _stockData?['Stock P/E'] ?? 'N/A'),
+            ],
+          ),
+
+          // 2. Balance Sheet
+          _buildFinancialSection(
+            title: 'BALANCE SHEET (LATEST ANNUAL)',
+            subtitle: 'Snapshot of financial position',
+            rows: [
+              _buildFundamentalRow('Total Assets', _stockData?['Total Assets'] ?? 'N/A', 'Total Liabilities', _stockData?['Total Liabilities'] ?? 'N/A'),
+              _buildFundamentalRow('Long-Term Debt', _stockData?['Long-Term Debt'] ?? 'N/A', 'Cash & Equivalents', _stockData?['Cash & Equivalents'] ?? 'N/A'),
+              _buildFundamentalRow('Shareholders\' Equity', _stockData?['Shareholders Equity'] ?? 'N/A', '', ''),
+            ],
+          ),
+
+          // 3. Cash Flow Statement
+          _buildFinancialSection(
+            title: 'CASH FLOW STATEMENT (ANNUAL)',
+            subtitle: 'Cash generation and sustainability',
+            rows: [
+              _buildFundamentalRow('Operating Cash Flow', _stockData?['Operating Cash Flow'] ?? 'N/A', 'Investing Cash Flow', _stockData?['Investing Cash Flow'] ?? 'N/A'),
+              _buildFundamentalRow('Financing Cash Flow', _stockData?['Financing Cash Flow'] ?? 'N/A', 'Free Cash Flow', 'N/A'),
+            ],
+          ),
+
+          // 4. Valuation & Returns
           Container(
-            margin: const EdgeInsets.all(16),
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: Colors.white,
@@ -1070,83 +1393,37 @@ class _CompanyNewsScreenState extends State<CompanyNewsScreen> with SingleTicker
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'FUNDAMENTAL DATA',
+                  'VALUATION & RETURNS',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 0.5,
                   ),
                 ),
+                const SizedBox(height: 4),
+                Text(
+                  'Is the stock reasonably valued?',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
                 const SizedBox(height: 16),
-                
-                // Income Statement Header
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
                   children: [
-                    const Text(
-                      'INCOME STATEMENT',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    Text(
-                      _formatMarketCap(),
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                    _buildValuationChip('P/E', _stockData?['Stock P/E'] ?? 'N/A'),
+                    _buildValuationChip('P/B', _stockData?['P/B Ratio'] ?? 'N/A'),
+                    _buildValuationChip('P/S', _stockData?['P/S Ratio'] ?? 'N/A'),
+                    _buildValuationChip('Market Cap', _formatMarketCap()),
                   ],
                 ),
-                const SizedBox(height: 12),
-                
-                // Data Grid - Using actual fetched data
-                _isLoadingStock
-                    ? const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(20),
-                          child: CircularProgressIndicator(),
-                        ),
-                      )
-                    : _stockError.isNotEmpty
-                        ? Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Text(
-                              _stockError,
-                              style: const TextStyle(color: Colors.red),
-                              textAlign: TextAlign.center,
-                            ),
-                          )
-                        : Column(
-                            children: [
-                              _buildFundamentalRow(
-                                'Revenue', 
-                                _stockData?['Revenue'] ?? 'N/A',
-                                'EBITDA', 
-                                _stockData?['EBITDA'] ?? 'N/A'
-                              ),
-                              const SizedBox(height: 8),
-                              _buildFundamentalRow(
-                                'EBIT', 
-                                _stockData?['EBIT'] ?? 'N/A',
-                                'Net Profit', 
-                                _stockData?['Net Profit'] ?? 'N/A'
-                              ),
-                              const SizedBox(height: 8),
-                              _buildFundamentalRow(
-                                'EPS', 
-                                _stockData?['EPS'] ?? 'N/A',
-                                'P/E Ratio', 
-                                _stockData?['Stock P/E'] ?? 'N/A'
-                              ),
-                            ],
-                          ),
               ],
             ),
           ),
 
-          // AI Insight Section
+          // 5. AI Insight Section (at the bottom)
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             padding: const EdgeInsets.all(16),
@@ -1173,13 +1450,13 @@ class _CompanyNewsScreenState extends State<CompanyNewsScreen> with SingleTicker
                   ],
                 ),
                 const SizedBox(height: 12),
-                _isLoadingAI
+                _isLoadingInsight
                     ? const Center(child: CircularProgressIndicator())
-                    : _aiError.isNotEmpty && _aiOverview == null
-                        ? Text(_aiError, style: const TextStyle(color: Colors.red))
+                    : _insightError.isNotEmpty && _aiInsight == null
+                        ? Text(_insightError, style: TextStyle(color: Colors.grey.shade600, fontSize: 13))
                         : Text(
-                            _aiOverview?['overview'] ?? 
-                            'AI-powered financial insights are being generated. Please check back shortly.',
+                            _aiInsight?['insight'] ?? 
+                            'AI insight is limited due to incomplete financial data availability.',
                             style: TextStyle(
                               fontSize: 13,
                               height: 1.6,
@@ -1190,6 +1467,81 @@ class _CompanyNewsScreenState extends State<CompanyNewsScreen> with SingleTicker
             ),
           ),
           const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFinancialSection({
+    required String title,
+    required String subtitle,
+    required List<Widget> rows,
+  }) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.5,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            subtitle,
+            style: TextStyle(
+              fontSize: 11,
+              color: Colors.grey.shade600,
+            ),
+          ),
+          const SizedBox(height: 16),
+          ...rows.map((row) => Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: row,
+          )).toList(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildValuationChip(String label, String value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              color: Colors.grey.shade600,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF2D3748),
+            ),
+          ),
         ],
       ),
     );
@@ -1225,7 +1577,7 @@ class _CompanyNewsScreenState extends State<CompanyNewsScreen> with SingleTicker
     // Format value1
     String formattedValue1;
     if (label1 == 'EPS' || label1 == 'P/E Ratio') {
-      formattedValue1 = value1 == 'N/A' ? value1 : '₹${value1}';
+      formattedValue1 = value1 == 'N/A' ? value1 : '₹$value1';
     } else {
       formattedValue1 = formatValue(value1);
     }
@@ -1236,6 +1588,30 @@ class _CompanyNewsScreenState extends State<CompanyNewsScreen> with SingleTicker
       formattedValue2 = value2 == 'N/A' ? value2 : value2.endsWith('x') ? value2 : '${value2}x';
     } else {
       formattedValue2 = formatValue(value2);
+    }
+
+    // If label2 is empty, show only one column
+    if (label2.isEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label1,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey.shade600,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            formattedValue1,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      );
     }
 
     return Row(
