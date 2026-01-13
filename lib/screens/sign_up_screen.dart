@@ -25,13 +25,14 @@ class _SignUpScreenState extends State<SignUpScreen> {
     scopes: ['email', 'profile'],
   );
   
-  Future<void> _saveUserSession(Map<String, dynamic> user) async {
+  Future<void> _saveUserSession(Map<String, dynamic> user, String token) async {
   final prefs = await SharedPreferences.getInstance();
 
-  await prefs.setString("userId", user["_id"]); // 🔑 MongoDB _id
+  await prefs.setString("userId", user["_id"]);
   await prefs.setString("userName", user["name"] ?? "");
   await prefs.setString("userEmail", user["email"] ?? "");
   await prefs.setString("loginType", user["loginType"] ?? "");
+  await prefs.setString("authToken", token);
   await prefs.setBool("isLoggedIn", true);
 }
 
@@ -65,7 +66,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
       final data = jsonDecode(response.body);
 
        if (response.statusCode == 200) {
-  await _saveUserSession(data["user"]); // ✅ ADD THIS
+  final data = jsonDecode(response.body);
+  await _saveUserSession(data["user"], data["token"]);
 
   ScaffoldMessenger.of(context).showSnackBar(
     const SnackBar(content: Text("Account Created successfully")),
@@ -148,8 +150,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
         if (response.statusCode == 200 || response.statusCode == 201) {
   final data = jsonDecode(response.body);
 
-  if (data["user"] != null) {
-    await _saveUserSession(data["user"]); // ✅ STORE MongoDB _id
+  if (data["user"] != null && data["token"] != null) {
+    await _saveUserSession(data["user"], data["token"]);
   }
 
   print("✅ User saved in MongoDB & session stored");

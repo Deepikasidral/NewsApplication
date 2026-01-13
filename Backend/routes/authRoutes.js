@@ -1,7 +1,17 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
 const User = require("../models/user");
+const { verifyToken } = require("../middleware/authMiddleware");
 const router = express.Router();
+
+const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key-change-in-production";
+const JWT_EXPIRY = "30d"; // 30 days like Instagram
+
+// Generate JWT token
+const generateToken = (userId) => {
+  return jwt.sign({ userId }, JWT_SECRET, { expiresIn: JWT_EXPIRY });
+};
 
 // SIGN UP (Email)
 router.post("/signup", async (req, res) => {
@@ -29,10 +39,13 @@ router.post("/signup", async (req, res) => {
 
     await user.save();
 
+    const token = generateToken(user._id);
+
    res.status(201).json({
   message: "User registered successfully",
+  token,
   user: {
-    _id: user._id,          // ✅ CHANGE HERE
+    _id: user._id,
     name: user.name,
     email: user.email,
     loginType: user.loginType,
@@ -67,13 +80,13 @@ router.post("/signin", async (req, res) => {
     user.lastLogin = new Date();
     await user.save();
 
-    user.lastLogin = new Date();
-    await user.save();
+    const token = generateToken(user._id);
 
   res.json({
   message: "Sign in successful",
+  token,
   user: {
-    _id: user._id,          // ✅ CHANGE HERE
+    _id: user._id,
     name: user.name,
     email: user.email,
     loginType: user.loginType,
@@ -113,10 +126,13 @@ router.post("/google-login", async (req, res) => {
       });
       await user.save();
       
+      const token = generateToken(user._id);
+      
      return res.status(201).json({
   message: "Google account created successfully",
+  token,
   user: {
-    _id: user._id,          // ✅ CHANGE HERE
+    _id: user._id,
     name: user.name,
     email: user.email,
     loginType: user.loginType,
@@ -139,10 +155,13 @@ router.post("/google-login", async (req, res) => {
     
     await user.save();
 
+    const token = generateToken(user._id);
+
     res.json({
   message: "Google login successful",
+  token,
   user: {
-    _id: user._id,          // ✅ CHANGE HERE
+    _id: user._id,
     name: user.name,
     email: user.email,
     loginType: user.loginType,
@@ -164,6 +183,83 @@ router.post("/google-login", async (req, res) => {
       error: error.message,
     });
   }
+});
+
+// VERIFY TOKEN (check if session is still valid)
+router.post("/verify-token", async (req, res) => {
+  try {
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(401).json({ message: "No token provided", valid: false });
+    }
+
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const user = await User.findById(decoded.userId).select("-password");
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found", valid: false });
+    }
+
+    res.json({
+      valid: true,
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        loginType: user.loginType,
+      },
+    });
+  } catch (error) {
+    if (error.name === "TokenExpiredError") {
+      return res.status(401).json({ message: "Token expired", valid: false });
+    }
+    res.status(401).json({ message: "Invalid token", valid: false });
+  }
+});
+
+// REFRESH TOKEN (get new token before expiry)
+router.post("/refresh-token", async (req, res) => {
+  try {
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(401).json({ message: "No token provided" });
+    }
+
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const user = await User.findById(decoded.userId);
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const newToken = generateToken(user._id);
+
+    res.json({
+      message: "Token refreshed",
+      token: newToken,
+    });
+  } catch (error) {
+    res.status(401).json({ message: "Invalid or expired token" });
+  }
+});
+
+// LOGOUT (optional - client-side token deletion is enough)
+router.post("/logout", verifyToken, async (req, res) => {
+  res.json({ message: "Logged out successfully" });
+});
+
+// GET CURRENT USER (protected route example)
+router.get("/me", verifyToken, async (req, res) => {
+  res.json({
+    user: {
+      _id: req.user._id,
+      name: req.user.name,
+      email: req.user.email,
+      loginType: req.user.loginType,
+    },
+  });
 });
 
 module.exports = router;

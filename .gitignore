@@ -59,3 +59,7 @@ __pycache__/
 *.pyc
 
 Backend/firebase_admin_key.json
+
+SESSION_MANAGEMENT.md
+README.md
+INTERVIEW_GUIDE.md

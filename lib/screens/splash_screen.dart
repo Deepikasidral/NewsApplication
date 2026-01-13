@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'sign_in_screen.dart';
+import 'home_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -12,12 +16,60 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    Future.delayed(const Duration(seconds: 2), () {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const SignInScreen()),
-      );
-    });
+    _checkSession();
+  }
+
+  Future<void> _checkSession() async {
+    await Future.delayed(const Duration(seconds: 2));
+
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString("authToken");
+    final isLoggedIn = prefs.getBool("isLoggedIn") ?? false;
+
+    if (!isLoggedIn || token == null) {
+      _navigateToSignIn();
+      return;
+    }
+
+    // Verify token with backend
+    try {
+      final response = await http.post(
+        Uri.parse("http://13.51.242.86:5000/api/auth/verify-token"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"token": token}),
+      ).timeout(const Duration(seconds: 5));
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && data["valid"] == true) {
+        // Token is valid, go to home
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const NewsFeedScreen()),
+        );
+      } else {
+        // Token expired or invalid
+        await _clearSession();
+        _navigateToSignIn();
+      }
+    } catch (e) {
+      print("Session check failed: $e");
+      _navigateToSignIn();
+    }
+  }
+
+  Future<void> _clearSession() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+  }
+
+  void _navigateToSignIn() {
+    if (!mounted) return;
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const SignInScreen()),
+    );
   }
 
   @override
