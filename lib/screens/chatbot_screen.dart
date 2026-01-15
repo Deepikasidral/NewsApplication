@@ -35,7 +35,7 @@ void dispose() {
 
 
   // 🔹 Chatbot API URL (same as service)
-  static const String _baseUrl = "http://13.51.242.86:8000/chat";
+  static const String _baseUrl = "http://10.244.218.93:8000/chat";
   // 👉 If testing on real phone, replace with your LAN IP
 
   // 🔹 SAME LOGIC as ChatbotService.askQuestion()

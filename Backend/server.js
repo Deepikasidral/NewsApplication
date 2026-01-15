@@ -14,6 +14,7 @@ const globalNewsRoutes = require("./routes/globalNews");
 const commoditiesNewsRoutes = require("./routes/commoditiesNews");
 const savedNewsRoutes=require('./routes/savedNews');
 const savedEventsRoutes = require("./routes/savedEvents");
+const fetchingcompanyRoute = require("./routes/fetchingCompanyData");
 
 
 //const summarizerRoutes = require("./routes/summarizer");
@@ -37,6 +38,7 @@ app.use("/api/global-news", globalNewsRoutes);
 app.use("/api/commodities-news", commoditiesNewsRoutes);
 app.use("/api/users",savedNewsRoutes);
 app.use("/api/users", savedEventsRoutes);
+app.use("/api/company-lookup", fetchingcompanyRoute);
 
 
 // Test route to verify server is running

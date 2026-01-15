@@ -13,6 +13,16 @@ from mcp_server.tools import (
     get_news_by_impact,
 )
 
+
+# ============================
+# TEMP 1-TURN CHAT MEMORY
+# ============================
+# ============================
+# MULTI-TURN CHAT MEMORY
+# ============================
+CHAT_HISTORY = []
+
+
 # ============================
 # 🔐 FINAL SYSTEM PROMPT
 # ============================
@@ -27,15 +37,23 @@ Follow these rules:
 - If information is available, blend it naturally into your response.
 - If information is missing, answer confidently using your general financial knowledge.
 - Keep the tone professional, clear, and easy to understand.
-- Never say something like "A tool is not required to answer your question". 
+- Never say something like "A tool is not required to answer your question".
+
+IMPORTANT:
+- After completing the main answer, ALWAYS add a section titled:
+  "💡 You may also ask:"
+- Under it, suggest 2–3 short, relevant follow-up questions a user might naturally ask next.
+- The follow-up questions should be conversational and useful.
 """
 
 
-client = AzureOpenAI(
-    api_key=AZURE_OPENAI_KEY,
-    azure_endpoint=AZURE_OPENAI_ENDPOINT,
-    api_version="2024-02-01",
-)
+
+def get_azure_client():
+    return AzureOpenAI(
+        api_key=AZURE_OPENAI_KEY,
+        azure_endpoint=AZURE_OPENAI_ENDPOINT,
+        api_version="2024-02-01",
+    )
 
 TOOLS = [
     {
@@ -114,18 +132,33 @@ TOOL_MAP = {
 
 
 def ask_llm(question: str) -> str:
-    # Step 1: Decide tool usage (INTERNAL ONLY)
+    global CHAT_HISTORY
+
+    client = get_azure_client()
+
+    # ============================
+    # BUILD CONTEXT FROM MEMORY
+    # ============================
+    messages_for_tool_decision = []
+
+    for msg in CHAT_HISTORY:
+        messages_for_tool_decision.append(msg)
+
+    messages_for_tool_decision.append(
+        {"role": "user", "content": question}
+    )
+
+    # ============================
+    # STEP 1: TOOL DECISION
+    # ============================
     response = client.chat.completions.create(
         model=AZURE_DEPLOYMENT,
         messages=[
             {
                 "role": "system",
-                "content": (
-                    "Decide whether a tool is required. "
-                    "Do NOT explain your decision."
-                ),
+                "content": "Decide whether a tool is required. Do NOT explain your decision."
             },
-            {"role": "user", "content": question},
+            *messages_for_tool_decision
         ],
         tools=TOOLS,
         tool_choice="auto",
@@ -135,7 +168,7 @@ def ask_llm(question: str) -> str:
     msg = response.choices[0].message
 
     # ============================
-    # TOOL PATH
+    # TOOL PATH (UNCHANGED)
     # ============================
     if msg.tool_calls:
         tool_call = msg.tool_calls[0]
@@ -150,39 +183,54 @@ def ask_llm(question: str) -> str:
                 model=AZURE_DEPLOYMENT,
                 messages=[
                     {"role": "system", "content": SYSTEM_FINAL_PROMPT},
+                    *CHAT_HISTORY,
                     {"role": "user", "content": question},
                 ],
                 temperature=0.6,
             )
-            return final.choices[0].message.content
 
-        # Tool has data → reason silently
+            answer = final.choices[0].message.content
+
+        else:
+            # Tool has data → reason silently
+            final = client.chat.completions.create(
+                model=AZURE_DEPLOYMENT,
+                messages=[
+                    {"role": "system", "content": SYSTEM_FINAL_PROMPT},
+                    *CHAT_HISTORY,
+                    {
+                        "role": "user",
+                        "content": (
+                            f"{question}\n\n"
+                            f"Information:\n{json.dumps(tool_result)}"
+                        ),
+                    },
+                ],
+                temperature=0.4,
+            )
+
+            answer = final.choices[0].message.content
+
+    # ============================
+    # NO TOOL NEEDED (UNCHANGED)
+    # ============================
+    else:
         final = client.chat.completions.create(
             model=AZURE_DEPLOYMENT,
             messages=[
                 {"role": "system", "content": SYSTEM_FINAL_PROMPT},
-                {
-                    "role": "user",
-                    "content": (
-                        f"{question}\n\n"
-                        f"Information:\n{json.dumps(tool_result)}"
-                    ),
-                },
+                *CHAT_HISTORY,
+                {"role": "user", "content": question},
             ],
-            temperature=0.4,
+            temperature=0.6,
         )
-        return final.choices[0].message.content
+
+        answer = final.choices[0].message.content
 
     # ============================
-    # NO TOOL NEEDED (FIXED)
+    # SAVE TO MEMORY (NEW)
     # ============================
-    final = client.chat.completions.create(
-        model=AZURE_DEPLOYMENT,
-        messages=[
-            {"role": "system", "content": SYSTEM_FINAL_PROMPT},
-            {"role": "user", "content": question},
-        ],
-        temperature=0.6,
-    )
+    CHAT_HISTORY.append({"role": "user", "content": question})
+    CHAT_HISTORY.append({"role": "assistant", "content": answer})
 
-    return final.choices[0].message.content
+    return answer

@@ -9,6 +9,9 @@ import 'company_screen.dart';
 import 'events_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_html/flutter_html.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:google_fonts/google_fonts.dart';
+
 
 
 
@@ -37,7 +40,7 @@ late String currentUserId;
 
 
 
-  final String baseUrl = "http://13.51.242.86:5000";
+  final String baseUrl = "http://10.244.218.93:5000";
 
  @override
 void initState() {
@@ -104,6 +107,68 @@ Future<void> _init() async {
 
     _stopLoading();
   }
+  Future<List<Map<String, dynamic>>> _fetchCompanyDetails(
+    List<String> companyNames) async {
+
+  final names = companyNames.join(",");
+  final url =
+      "$baseUrl/api/company-lookup/by-names?names=$names";
+
+  debugPrint("TradingView API URL: $url");
+
+  final resp = await http.get(Uri.parse(url));
+
+  debugPrint("TradingView API status: ${resp.statusCode}");
+  debugPrint("TradingView API body: ${resp.body}");
+
+  if (resp.statusCode != 200) {
+    throw Exception("Failed to fetch company details");
+  }
+
+  final body = jsonDecode(resp.body);
+  return List<Map<String, dynamic>>.from(body["data"]);
+}
+
+Future<void> _openTradingView(String symbol) async {
+  final url =
+      "https://www.tradingview.com/chart/?symbol=NSE:$symbol";
+
+  final uri = Uri.parse(url);
+
+  if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+    await launchUrl(uri, mode: LaunchMode.inAppWebView);
+  }
+}
+void _showCompanySelector(List<Map<String, dynamic>> companies) {
+  showModalBottomSheet(
+    context: context,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (_) => Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Padding(
+          padding: EdgeInsets.all(16),
+          child: Text(
+            "View chart on TradingView",
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+        ),
+        ...companies.map(
+          (c) => ListTile(
+            title: Text(c["name"]),
+            subtitle: Text("NSE:${c["symbol"]}"),
+            onTap: () {
+              Navigator.pop(context);
+              _openTradingView(c["symbol"]);
+            },
+          ),
+        ),
+      ],
+    ),
+  );
+}
 
   // ------------------------- FETCH TRENDING -------------------------
   Future<void> _fetchTrendingNews() async {
@@ -282,23 +347,31 @@ Future<void> _toggleSaveNews(String newsId) async {
  Future<void> _showFullStory(Article a) async {
   Color sentimentColor(String s) {
     switch (s.toLowerCase()) {
+      case "very bullish":
+        return const Color(0xFF0F9D58);
       case "bullish":
-        return Colors.green;
+        return const Color(0xFF5AD079);
+      case "neutral":
+        return const Color(0xFFA6A49A);
       case "bearish":
-        return Colors.red;
+        return const Color(0xFFEB6969);
+      case "very bearish":
+        return const Color(0xFFD93025);
       default:
-        return Colors.orange;
+        return Colors.grey;
     }
   }
 
   Color impactColor(String i) {
     switch (i.toLowerCase()) {
       case "very high":
-        return Colors.red;
+        return const Color(0xFFFFB000);
       case "high":
-        return Colors.orange;
-      case "medium":
-        return Colors.blue;
+        return const Color(0xFFFF9B5B);
+      case "mild":
+        return const Color(0xFFFFCD79);
+      case "negligible":
+        return const Color(0xFFFFCEAF);
       default:
         return Colors.grey;
     }
@@ -308,7 +381,7 @@ Future<void> _toggleSaveNews(String newsId) async {
     context: context,
     barrierDismissible: true,
     builder: (ctx) => Dialog(
-      backgroundColor:Color.fromARGB(255, 245, 237, 237),
+      backgroundColor: const Color(0xFFF5EDED),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
       ),
@@ -318,105 +391,103 @@ Future<void> _toggleSaveNews(String newsId) async {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
 
-            /// TITLE
+            /// ---------------- TITLE ----------------
             Text(
               a.title,
-              style: const TextStyle(
+              style: GoogleFonts.poppins(
                 fontSize: 18,
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w700,
               ),
             ),
 
             const SizedBox(height: 12),
 
-            /// FULL STORY
-              if (a.story.isNotEmpty) ...[
-                const Text(
-                  "Full Story",
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
+            /// ---------------- FULL STORY ----------------
+            if (a.story.isNotEmpty) ...[
+              
+              const SizedBox(height: 8),
+
+              Html(
+                data: a.story,
+                style: {
+                  "p": Style(
+                    fontFamily: GoogleFonts.poppins().fontFamily,
+                    fontSize: FontSize(14.5),
+                    lineHeight: LineHeight.number(1.5),
+                    margin: Margins.only(bottom: 12),
                   ),
-                ),
-                const SizedBox(height: 8),
+                },
+              ),
 
-                Html(
-                  data: a.story, // 👈 COMPLETE NEWS CONTENT
-                  style: {
-                    "p": Style(
-                      fontSize: FontSize(14.5),
-                      lineHeight: LineHeight.number(1.5),
-                      margin: Margins.only(bottom: 12),
-                    ),
-                  },
-                ),
-
-                const SizedBox(height: 16),
-              ],
-
-
-            /// SENTIMENT + IMPACT (same as card)
-            
-                if (a.sentiment.isNotEmpty)
-                  Text.rich(
-                    TextSpan(
-                      children: [
-                        const TextSpan(
-                          text: "Sentiment: ",
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black,
-                          ),
-                        ),
-                        TextSpan(
-                          text: a.sentiment,
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: sentimentColor(a.sentiment),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                const SizedBox(width: 12),
-                if (a.impact.isNotEmpty)
-                  Text.rich(
-                    TextSpan(
-                      children: [
-                        const TextSpan(
-                          text: "Impact: ",
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black,
-                          ),
-                        ),
-                        TextSpan(
-                          text: a.impact,
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: impactColor(a.impact),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-             
-
-            /// COMPANIES
-            if (a.companies.isNotEmpty) ...[
               const SizedBox(height: 16),
-              const Text(
-                "Companies",
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13,
+            ],
+
+            /// ---------------- SENTIMENT ----------------
+            if (a.sentiment.isNotEmpty)
+              Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: "Sentiment: ",
+                      style: GoogleFonts.poppins(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.black,
+                      ),
+                    ),
+                    TextSpan(
+                      text: a.sentiment,
+                      style: GoogleFonts.poppins(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: sentimentColor(a.sentiment),
+                      ),
+                    ),
+                  ],
                 ),
               ),
+
+            const SizedBox(height: 6),
+
+            /// ---------------- IMPACT ----------------
+            if (a.impact.isNotEmpty)
+              Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: "Impact: ",
+                      style: GoogleFonts.poppins(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.black,
+                      ),
+                    ),
+                    TextSpan(
+                      text: a.impact,
+                      style: GoogleFonts.poppins(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: impactColor(a.impact),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+            /// ---------------- COMPANIES ----------------
+            if (a.companies.isNotEmpty) ...[
+              const SizedBox(height: 16),
+
+              Text(
+                "Companies",
+                style: GoogleFonts.poppins(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+
               const SizedBox(height: 8),
+
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
@@ -424,8 +495,9 @@ Future<void> _toggleSaveNews(String newsId) async {
                   (company) => Chip(
                     label: Text(
                       company,
-                      style: const TextStyle(
+                      style: GoogleFonts.poppins(
                         fontSize: 12,
+                        fontWeight: FontWeight.w600,
                         color: Colors.white,
                       ),
                     ),
@@ -437,16 +509,16 @@ Future<void> _toggleSaveNews(String newsId) async {
 
             const SizedBox(height: 20),
 
-            /// CLOSE BUTTON
+            /// ---------------- CLOSE ----------------
             Align(
               alignment: Alignment.centerRight,
               child: TextButton(
                 onPressed: () => Navigator.pop(ctx),
-                child: const Text(
+                child: Text(
                   "Close",
-                  style: TextStyle(
-                    color: Color(0xFFEA6B6B),
-                    fontWeight: FontWeight.bold,
+                  style: GoogleFonts.poppins(
+                    color: const Color(0xFFEA6B6B),
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
@@ -563,178 +635,227 @@ Future<void> _toggleSaveNews(String newsId) async {
   }
 Widget _buildArticleCard(Article a) {
   final dateFormatted = DateFormat.yMMMd().add_jm().format(a.date);
- 
-
 
   Color sentimentColor(String s) {
     switch (s.toLowerCase()) {
+      case "very bullish":
+        return const Color(0xFF0F9D58);
       case "bullish":
-        return Colors.green;
+        return const Color(0xFF5AD079);
+      case "neutral":
+        return const Color(0xFFA6A49A);
       case "bearish":
-        return Colors.red;
+        return const Color(0xFFEB6969);
+      case "very bearish":
+        return const Color(0xFFD93025);
       default:
-        return Colors.orange;
+        return Colors.grey;
     }
   }
 
   Color impactColor(String i) {
     switch (i.toLowerCase()) {
       case "very high":
-        return Colors.red;
+        return const Color(0xFFFFB000);
       case "high":
-        return Colors.orange;
-      case "medium":
-        return Colors.blue;
+        return const Color(0xFFFF9B5B);
+      case "mild":
+        return const Color(0xFFFFCD79);
+      case "negligible":
+        return const Color(0xFFFFCEAF);
       default:
         return Colors.grey;
     }
   }
-return Padding(
-  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-  child: InkWell(
-    borderRadius: BorderRadius.circular(14),
-    onTap: () => _showFullStory(a), // 👈 TAP OPENS DIALOG
-    child: Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(14),
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black12.withOpacity(0.05),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
 
-          /// TITLE + BOOKMARK
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Text(
-                  a.title,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              IconButton(
-                icon: Icon(
-                  _locallySavedIds.contains(a.id)
-                      ? Icons.bookmark
-                      : Icons.bookmark_border,
-                  color: _locallySavedIds.contains(a.id)
-                      ? Colors.red
-                      : Colors.grey,
-                ),
-                onPressed: () => _toggleSaveNews(a.id),
-              ),
-            ],
-          ),
+  return Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+    child: InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: () => _showFullStory(a),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black12.withOpacity(0.05),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
 
-          const SizedBox(height: 6),
-
-          /// SUMMARY (2–3 lines)
-          Text(
-  a.summary,
-  softWrap: true,
-  style: const TextStyle(
-    fontSize: 14.5,
-    height: 1.4,
-  ),
-),
-
-
-
-
-          const SizedBox(height: 10),
-
-          /// COMPANIES
-          if (a.companies.isNotEmpty)
+            /// ---------------- TITLE ----------------
             Text(
-              "Companies: ${a.companies.join(', ')}",
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
+              a.title,
+              style: GoogleFonts.poppins(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
               ),
             ),
 
-          const SizedBox(height: 6),
+            const SizedBox(height: 8),
 
-          /// SENTIMENT + IMPACT
-          
-            
-                 if (a.sentiment.isNotEmpty)
-      Text.rich(
-        TextSpan(
-          children: [
-            const TextSpan(
-              text: "Sentiment: ",
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-                color: Colors.black,
+            /// ---------------- SUMMARY ----------------
+            Text(
+              a.summary,
+              softWrap: true,
+              style: GoogleFonts.poppins(
+                fontSize: 14.5,
+                height: 1.4,
+                fontWeight: FontWeight.w400,
               ),
             ),
-            TextSpan(
-              text: a.sentiment,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-                color: sentimentColor(a.sentiment),
+
+            const SizedBox(height: 12),
+
+            /// ---------------- COMPANIES ----------------
+            if (a.companies.isNotEmpty)
+              Text(
+                "Companies: ${a.companies.join(', ')}",
+                style: GoogleFonts.poppins(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
-          ],
-        ),
-      ),
 
-    const SizedBox(width: 12),
+            const SizedBox(height: 8),
 
-    if (a.impact.isNotEmpty)
-      Text.rich(
-        TextSpan(
-          children: [
-            const TextSpan(
-              text: "Impact: ",
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-                color: Colors.black,
+            /// ---------------- SENTIMENT ----------------
+            if (a.sentiment.isNotEmpty)
+              Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: "Sentiment: ",
+                      style: GoogleFonts.poppins(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.black,
+                      ),
+                    ),
+                    TextSpan(
+                      text: a.sentiment,
+                      style: GoogleFonts.poppins(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: sentimentColor(a.sentiment),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            TextSpan(
-              text: a.impact,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-                color: impactColor(a.impact),
+
+            const SizedBox(height: 4),
+
+            /// ---------------- IMPACT ----------------
+            if (a.impact.isNotEmpty)
+              Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: "Impact: ",
+                      style: GoogleFonts.poppins(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.black,
+                      ),
+                    ),
+                    TextSpan(
+                      text: a.impact,
+                      style: GoogleFonts.poppins(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: impactColor(a.impact),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
-        ),
-      ),
-          
 
-          const SizedBox(height: 6),
+            const SizedBox(height: 10),
 
-          /// FOOTER
-          Text(
-            dateFormatted,
-            style: const TextStyle(
-              fontSize: 11,
-              color: Colors.grey,
-            ),
-          ),
-        ],
+            /// ---------------- FOOTER ----------------
+           /// ---------------- FOOTER ----------------
+Row(
+  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  children: [
+
+    /// DATE
+    Text(
+      dateFormatted,
+      style: GoogleFonts.poppins(
+        fontSize: 11,
+        color: Colors.grey,
       ),
     ),
-));
+
+    /// ACTIONS
+    Row(
+      children: [
+
+        /// 📈 TradingView
+        if (a.companies.isNotEmpty)
+          IconButton(
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+            icon: Image.asset(
+              "assets/tradingview.png",
+              height: 36, // ⬆ increased
+              width: 36,
+            ),
+            tooltip: "View chart on TradingView",
+            onPressed: () async {
+              try {
+                final companies =
+                    await _fetchCompanyDetails(a.companies);
+
+                if (companies.isEmpty) return;
+
+                if (companies.length == 1) {
+                  _openTradingView(
+                      companies.first["symbol"]);
+                } else {
+                  _showCompanySelector(companies);
+                }
+              } catch (e) {
+                debugPrint("TradingView error: $e");
+              }
+            },
+          ),
+
+        const SizedBox(width: 0),
+
+        /// 🔖 SAVE
+        IconButton(
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(),
+          icon: Icon(
+            _locallySavedIds.contains(a.id)
+                ? Icons.bookmark
+                : Icons.bookmark_border,
+            size: 36, // ⬆ increased
+            color: _locallySavedIds.contains(a.id)
+                ? Colors.red
+                : Colors.grey,
+          ),
+          onPressed: () => _toggleSaveNews(a.id),
+        ),
+      ],
+    ),
+  ],
+),
+
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
   // ------------------------- BUILD -------------------------
