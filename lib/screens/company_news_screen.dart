@@ -747,7 +747,7 @@ class _CompanyNewsScreenState extends State<CompanyNewsScreen> with SingleTicker
       final encodedName = Uri.encodeComponent(widget.companyName);
       final url = Uri.parse(
 
-        'http://13.51.242.86:5001/api/ai-overview/$symbol'
+        'http://13.51.242.86:8001/api/ai-overview/$symbol'
 
       ).replace(queryParameters: {
         'company_name': widget.companyName
@@ -805,7 +805,7 @@ class _CompanyNewsScreenState extends State<CompanyNewsScreen> with SingleTicker
 
       final url = Uri.parse(
 
-        'http://13.51.242.86:5001/api/ai-insight/$symbol'
+        'http://13.51.242.86:8001/api/ai-insight/$symbol'
       ).replace(queryParameters: {
         'company_name': widget.companyName
       });
@@ -1790,7 +1790,7 @@ class _CompanyNewsScreenState extends State<CompanyNewsScreen> with SingleTicker
 
   @override
   Widget build(BuildContext context) {
-    final currentPrice = _stockData?['Current Price']?.toString() ?? '504';
+    final currentPrice = _stockData?['Current Price']?.toString() ?? '0.00';
     final changeValue = _stockData?['Change Value']?.toString() ?? '0';
     final changePct = _stockData?['Change Percent']?.toString() ?? '0';
     

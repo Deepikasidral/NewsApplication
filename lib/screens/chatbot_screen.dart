@@ -35,14 +35,18 @@ void dispose() {
 
 
   // 🔹 Chatbot API URL (same as service)
-  static const String _baseUrl = "http://10.244.218.93:8000/chat";
-  // 👉 If testing on real phone, replace with your LAN IP
+  static const String _baseUrl = "http://13.51.242.86:8000/api/chat";
+  // 👉 Changed from /chat to /api/chat - verify your actual backend route
 
   // 🔹 SAME LOGIC as ChatbotService.askQuestion()
  Future<String> _askQuestion(String question) async {
   try {
     final prefs = await SharedPreferences.getInstance();
     final userId = prefs.getString("userId");
+
+    debugPrint('🔍 Sending request to: $_baseUrl');
+    debugPrint('🔍 User ID: $userId');
+    debugPrint('🔍 Question: $question');
 
     final response = await http.post(
       Uri.parse(_baseUrl),
@@ -51,7 +55,10 @@ void dispose() {
         "X-User-Id": userId ?? "",
       },
       body: jsonEncode({"question": question}),
-    );
+    ).timeout(const Duration(seconds: 30));
+
+    debugPrint('✅ Response status: ${response.statusCode}');
+    debugPrint('✅ Response body: ${response.body}');
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
@@ -65,7 +72,7 @@ void dispose() {
       });
 
       return "🚫 **Daily limit reached**\n\n"
-             "You’ve used all **5 questions for today**.\n"
+             "You've used all **5 questions for today**.\n"
              "Please try again **tomorrow** ⏳";
     }
 
@@ -73,10 +80,15 @@ void dispose() {
       return "❌ Session expired. Please login again.";
     }
 
-    return "⚠️ Server error. Please try again.";
+    // 🔴 Better error message with full response
+    return "⚠️ Server error (${response.statusCode})\n\n"
+           "Response: ${response.body.length > 200 ? response.body.substring(0, 200) + '...' : response.body}";
 
   } catch (e) {
-    return "❌ Connection failed. Please check your internet.";
+    debugPrint('❌ Error: $e');
+    return "❌ Connection failed: $e\n\n"
+           "Check if backend is running:\n"
+           "sudo systemctl status mcp-server";
   }
 }
 

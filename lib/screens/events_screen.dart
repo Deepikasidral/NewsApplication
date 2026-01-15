@@ -45,7 +45,7 @@ Future<void> _loadUserId() async {
 
 Future<void> _loadSavedEventIds() async {
   final resp = await http.get(
-    Uri.parse("http://10.244.218.93:5000/api/users/$currentUserId/saved-events"),
+    Uri.parse("http://13.51.242.86:5000/api/users/$currentUserId/saved-events"),
   );
 
   if (resp.statusCode == 200) {
@@ -64,22 +64,38 @@ Future<void> _loadSavedEventIds() async {
     });
 
     try {
+      debugPrint('Fetching events from: http://13.51.242.86:5000/api/events');
+      
       final response = await http.get(
-        Uri.parse('http://10.244.218.93:5000/api/events'),
+        Uri.parse('http://13.51.242.86:5000/api/events'),
         headers: {'Content-Type': 'application/json'},
-      );
+      ).timeout(const Duration(seconds: 10));
+
+      debugPrint('Response status: ${response.statusCode}');
+      debugPrint('Response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
+        
+        if (data['events'] == null || (data['events'] as List).isEmpty) {
+          debugPrint('No events found in response');
+          setState(() {
+            _todayEvents = [];
+            _upcomingEvents = [];
+            _isLoading = false;
+          });
+          return;
+        }
+        
         final now = DateTime.now();
         final today = DateTime(now.year, now.month, now.day);
         
-        // Parse events from backend
         final List<CorporateEvent> allEvents = (data['events'] as List)
             .map((event) => CorporateEvent.fromJson(event))
             .toList();
 
-        // Separate into today and upcoming
+        debugPrint('Total events fetched: ${allEvents.length}');
+
         _todayEvents = allEvents.where((event) {
           final eventDate = DateTime(event.date.year, event.date.month, event.date.day);
           return eventDate.isAtSameMomentAs(today);
@@ -90,18 +106,34 @@ Future<void> _loadSavedEventIds() async {
           return eventDate.isAfter(today);
         }).toList();
 
+        debugPrint('Today events: ${_todayEvents.length}');
+        debugPrint('Upcoming events: ${_upcomingEvents.length}');
+
         setState(() {
           _isLoading = false;
         });
       } else {
-        throw Exception('Failed to load events');
+        throw Exception('Failed to load events: ${response.statusCode}');
       }
     } catch (e) {
+      debugPrint('Error fetching events: $e');
       setState(() {
         _isLoading = false;
       });
-      // Handle error - you might want to show a snackbar
-      print('Error fetching events: $e');
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading events: $e'),
+            backgroundColor: Colors.red,
+            action: SnackBarAction(
+              label: 'Retry',
+              textColor: Colors.white,
+              onPressed: _fetchEvents,
+            ),
+          ),
+        );
+      }
     }
   }
 
@@ -119,7 +151,7 @@ Future<void> _toggleSaveEvent(CorporateEvent event) async {
 
   try {
     final resp = await http.post(
-      Uri.parse("http://10.244.218.93:5000/api/users/save-event"),
+      Uri.parse("http://13.51.242.86:5000/api/users/save-event"),
       headers: {"Content-Type": "application/json"},
       body: jsonEncode({
         "userId": currentUserId,
@@ -656,13 +688,13 @@ class CorporateEvent {
 
   factory CorporateEvent.fromJson(Map<String, dynamic> json) {
     return CorporateEvent(
-      id: json['_id'] ?? json['id'],
-      title: json['title'],
-      date: DateTime.parse(json['date']),
-      description: json['description'],
-      type: json['type'],
-      tags: json['tags'],
-      headline: json['headline'],
+      id: json['_id'] ?? json['id'] ?? '',
+      title: json['title'] ?? 'Untitled Event',
+      date: DateTime.parse(json['date'] ?? DateTime.now().toIso8601String()),
+      description: json['description'] ?? '',
+      type: json['type'] ?? 'Event',
+      tags: json['tags'] ?? '',
+      headline: json['headline'] ?? '',
     );
   }
 

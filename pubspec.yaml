@@ -30,16 +30,25 @@ dependencies:
   firebase_messaging: ^15.2.10
   flutter_markdown: ^0.6.18
   shared_preferences: ^2.2.2
+  # google_fonts: ^6.1.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.13.1
 
 flutter:
   uses-material-design: true
   assets:
     - assets/tradingview.png
+    - LOGO 1024x1024.png
+    - UI branding with tg.png
     - .env
- 
-    
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "LOGO 1024x1024.png"
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "LOGO 1024x1024.png"

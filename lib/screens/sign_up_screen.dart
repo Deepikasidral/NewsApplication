@@ -53,7 +53,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     
     try {
       final response = await http.post(
-        Uri.parse("http://10.244.218.93:5000/api/auth/signup"), // backend unchanged
+        Uri.parse("http://13.51.242.86:5000/api/auth/signup"), // backend unchanged
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({
           "name": name,
@@ -142,7 +142,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
       print("💾 Saving to MongoDB...");
       try {
         final response = await http.post(
-          Uri.parse("http://10.244.218.93:5000/api/auth/google-login"),
+          Uri.parse("http://13.51.242.86:5000/api/auth/google-login"),
           headers: {"Content-Type": "application/json"},
           body: jsonEncode(userData),
         ).timeout(const Duration(seconds: 10));

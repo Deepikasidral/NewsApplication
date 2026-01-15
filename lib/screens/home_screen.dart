@@ -9,9 +9,8 @@ import 'company_screen.dart';
 import 'events_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_html/flutter_html.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:google_fonts/google_fonts.dart';
-
+import 'package:url_launcher/url_launcher.dart';
 
 
 
@@ -40,7 +39,7 @@ late String currentUserId;
 
 
 
-  final String baseUrl = "http://10.244.218.93:5000";
+  final String baseUrl = "http://13.51.242.86:5000";
 
  @override
 void initState() {
@@ -394,9 +393,9 @@ Future<void> _toggleSaveNews(String newsId) async {
             /// ---------------- TITLE ----------------
             Text(
               a.title,
-              style: GoogleFonts.poppins(
+              style: GoogleFonts.playfairDisplay(
                 fontSize: 18,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.bold,
               ),
             ),
 
@@ -538,6 +537,12 @@ Future<void> _toggleSaveNews(String newsId) async {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
         children: [
+          Image.asset(
+            'LOGO 1024x1024.png',
+            height: 40,
+            width: 40,
+          ),
+          const SizedBox(width: 12),
           Expanded(
             child: Container(
               height: 48,
@@ -597,7 +602,7 @@ Future<void> _toggleSaveNews(String newsId) async {
                 ),
                 child: Text(
                   tabs[idx],
-                  style: TextStyle(
+                  style: GoogleFonts.poppins(
                     fontWeight:
                         selected ? FontWeight.bold : FontWeight.normal,
                   ),
@@ -690,16 +695,34 @@ Widget _buildArticleCard(Article a) {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
 
-            /// ---------------- TITLE ----------------
-            Text(
-              a.title,
-              style: GoogleFonts.poppins(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
+          /// TITLE + BOOKMARK
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  a.title,
+                  style: GoogleFonts.playfairDisplay(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
-            ),
+              IconButton(
+                icon: Icon(
+                  _locallySavedIds.contains(a.id)
+                      ? Icons.bookmark
+                      : Icons.bookmark_border,
+                  color: _locallySavedIds.contains(a.id)
+                      ? Colors.red
+                      : Colors.grey,
+                ),
+                onPressed: () => _toggleSaveNews(a.id),
+              ),
+            ],
+          ),
 
-            const SizedBox(height: 8),
+          const SizedBox(height: 6),
 
             /// ---------------- SUMMARY ----------------
             Text(
@@ -878,6 +901,8 @@ Row(
   type: BottomNavigationBarType.fixed,
   selectedItemColor: const Color(0xFFEA6B6B),
   unselectedItemColor: Colors.black54,
+  selectedLabelStyle: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+  unselectedLabelStyle: GoogleFonts.poppins(),
   onTap: (index) {
   if (index == _bottomIndex) return;
 

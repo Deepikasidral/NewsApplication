@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'sign_in_screen.dart';
 import 'home_screen.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -80,39 +81,42 @@ class _SplashScreenState extends State<SplashScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // "₹upee Letter" logo text
+            Image.asset(
+              'LOGO 1024x1024.png',
+              height: 120,
+              width: 120,
+            ),
+            const SizedBox(height: 20),
             RichText(
               text: TextSpan(
                 children: [
-                  const TextSpan(
+                  TextSpan(
                     text: '₹',
-                    style: TextStyle(
+                    style: GoogleFonts.playfairDisplay(
                       color: Colors.red,
                       fontSize: 45,
-                      fontWeight: FontWeight.w600,
-                      fontFamily: 'Times New Roman',
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const TextSpan(
+                  TextSpan(
                     text: 'upee Letter',
-                    style: TextStyle(
+                    style: GoogleFonts.playfairDisplay(
                       color: Colors.black,
                       fontSize: 38,
-                      fontWeight: FontWeight.w500,
-                      fontFamily: 'Times New Roman',
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 15),
-            const Text(
+            Text(
               'Your one-stop solution for fast\nand clear '
               'financial news!',
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: GoogleFonts.poppins(
                 fontSize: 16,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.bold,
                 color: Colors.black87,
                 height: 1.4,
               ),
