@@ -9,8 +9,9 @@ import 'company_screen.dart';
 import 'events_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_html/flutter_html.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:google_fonts/google_fonts.dart';
+
 
 
 
@@ -24,7 +25,8 @@ class NewsFeedScreen extends StatefulWidget {
   State<NewsFeedScreen> createState() => _NewsFeedScreenState();
 }
 
-class _NewsFeedScreenState extends State<NewsFeedScreen> {
+class _NewsFeedScreenState extends State<NewsFeedScreen> 
+with WidgetsBindingObserver{
   final TextEditingController _searchController = TextEditingController();
 
   List<Article> _articles = [];
@@ -35,6 +37,8 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
   int _tabIndex = 0;
  Set<String> _locallySavedIds = {};
 late String currentUserId;
+bool _hasLoadedOnce = false;
+
 
 
 
@@ -44,10 +48,12 @@ late String currentUserId;
  @override
 void initState() {
   super.initState();
-  _searchController.addListener(_applySearch);
+  WidgetsBinding.instance.addObserver(this);
 
+  _searchController.addListener(_applySearch);
   _init();
 }
+
 
 Future<void> _init() async {
   await _loadUserId();
@@ -57,11 +63,21 @@ Future<void> _init() async {
 
 
   @override
-  void dispose() {
-    _searchController.removeListener(_applySearch);
-    _searchController.dispose();
-    super.dispose();
+void dispose() {
+  WidgetsBinding.instance.removeObserver(this);
+  _searchController.removeListener(_applySearch);
+  _searchController.dispose();
+  super.dispose();
+}
+@override
+void didChangeAppLifecycleState(AppLifecycleState state) {
+  if (state == AppLifecycleState.resumed && _hasLoadedOnce) {
+    _fetchLatestNews(soft: true);
   }
+}
+
+
+
 
   // ------------------------- SEARCH -------------------------
   Future<void> _loadUserId() async {
@@ -86,8 +102,8 @@ Future<void> _init() async {
   }
 
   // ------------------------- FETCH LATEST -------------------------
-  Future<void> _fetchLatestNews() async {
-    _startLoading();
+  Future<void> _fetchLatestNews({bool soft = false}) async {
+  _startLoading(soft: soft);
 
     try {
       final resp = await http.get(Uri.parse("$baseUrl/api/news"));
@@ -103,9 +119,11 @@ Future<void> _init() async {
     } catch (e) {
       _error = "Error: $e";
     }
+_stopLoading();
+_hasLoadedOnce = true;
 
-    _stopLoading();
   }
+
   Future<List<Map<String, dynamic>>> _fetchCompanyDetails(
     List<String> companyNames) async {
 
@@ -194,14 +212,17 @@ void _showCompanySelector(List<Map<String, dynamic>> companies) {
     _stopLoading();
   }
 
-  void _startLoading() {
-    setState(() {
+  void _startLoading({bool soft = false}) {
+  setState(() {
+    if (!soft) {
       _isLoading = true;
-      _error = '';
       _articles = [];
       _filtered = [];
-    });
-  }
+    }
+    _error = '';
+  });
+}
+
 
   void _stopLoading() {
     setState(() => _isLoading = false);
@@ -393,9 +414,9 @@ Future<void> _toggleSaveNews(String newsId) async {
             /// ---------------- TITLE ----------------
             Text(
               a.title,
-              style: GoogleFonts.playfairDisplay(
+              style: GoogleFonts.poppins(
                 fontSize: 18,
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w700,
               ),
             ),
 
@@ -537,12 +558,6 @@ Future<void> _toggleSaveNews(String newsId) async {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
         children: [
-          Image.asset(
-            'LOGO 1024x1024.png',
-            height: 40,
-            width: 40,
-          ),
-          const SizedBox(width: 12),
           Expanded(
             child: Container(
               height: 48,
@@ -602,7 +617,7 @@ Future<void> _toggleSaveNews(String newsId) async {
                 ),
                 child: Text(
                   tabs[idx],
-                  style: GoogleFonts.poppins(
+                  style: TextStyle(
                     fontWeight:
                         selected ? FontWeight.bold : FontWeight.normal,
                   ),
@@ -630,13 +645,17 @@ Future<void> _toggleSaveNews(String newsId) async {
       return const Expanded(child: Center(child: Text("No articles found")));
     }
 
-    return Expanded(
-      child: ListView.builder(
-        itemCount: _filtered.length,
-        padding: const EdgeInsets.only(bottom: 80),
-        itemBuilder: (_, i) => _buildArticleCard(_filtered[i]),
-      ),
-    );
+   return Expanded(
+  child: RefreshIndicator(
+    onRefresh: _fetchLatestNews,
+    child: ListView.builder(
+      itemCount: _filtered.length,
+      padding: const EdgeInsets.only(bottom: 80),
+      itemBuilder: (_, i) => _buildArticleCard(_filtered[i]),
+    ),
+  ),
+);
+
   }
 Widget _buildArticleCard(Article a) {
   final dateFormatted = DateFormat.yMMMd().add_jm().format(a.date);
@@ -695,34 +714,16 @@ Widget _buildArticleCard(Article a) {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
 
-          /// TITLE + BOOKMARK
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Text(
-                  a.title,
-                  style: GoogleFonts.playfairDisplay(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+            /// ---------------- TITLE ----------------
+            Text(
+              a.title,
+              style: GoogleFonts.poppins(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
               ),
-              IconButton(
-                icon: Icon(
-                  _locallySavedIds.contains(a.id)
-                      ? Icons.bookmark
-                      : Icons.bookmark_border,
-                  color: _locallySavedIds.contains(a.id)
-                      ? Colors.red
-                      : Colors.grey,
-                ),
-                onPressed: () => _toggleSaveNews(a.id),
-              ),
-            ],
-          ),
+            ),
 
-          const SizedBox(height: 6),
+            const SizedBox(height: 8),
 
             /// ---------------- SUMMARY ----------------
             Text(
@@ -901,8 +902,6 @@ Row(
   type: BottomNavigationBarType.fixed,
   selectedItemColor: const Color(0xFFEA6B6B),
   unselectedItemColor: Colors.black54,
-  selectedLabelStyle: GoogleFonts.poppins(fontWeight: FontWeight.bold),
-  unselectedLabelStyle: GoogleFonts.poppins(),
   onTap: (index) {
   if (index == _bottomIndex) return;
 
