@@ -5,7 +5,8 @@ const News = require("../models/news");
 // ✔ Fetch all news sorted by PublishedAt
 router.get("/", async (req, res) => {
   try {
-    const items = await News.find().sort({ PublishedAt: -1 });
+    const items = await News.find().sort({ ingested_at: -1 });
+;
     res.json(items);
   } catch (err) {
     console.error("🔥 Error fetching news:", err);
