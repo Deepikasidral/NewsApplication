@@ -34,9 +34,8 @@ void dispose() {
 }
 
 
-  // 🔹 Chatbot API URL (same as service)
-  static const String _baseUrl = "http://13.51.242.86:8000/api/chat";
-  // 👉 Changed from /chat to /api/chat - verify your actual backend route
+  // 🔹 Chatbot API URL
+  static const String _baseUrl = "http://13.51.242.86:8000/chat";
 
   // 🔹 SAME LOGIC as ChatbotService.askQuestion()
  Future<String> _askQuestion(String question) async {

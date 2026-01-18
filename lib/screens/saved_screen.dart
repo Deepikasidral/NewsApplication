@@ -9,6 +9,8 @@ import 'company_screen.dart';
 import 'events_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_html/flutter_html.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class SavedNewsFeedScreen extends StatefulWidget {
   final String? openFileName;
@@ -33,6 +35,55 @@ class _SavedNewsFeedScreenState extends State<SavedNewsFeedScreen> {
   int _bottomIndex = 5;
   int _tabIndex = 0;
   late String currentUserId;
+
+  Future<List<Map<String, dynamic>>> _fetchCompanyDetails(
+    List<String> companyNames) async {
+  final names = companyNames.join(",");
+  final url = "$baseUrl/api/company-lookup/by-names?names=$names";
+  final resp = await http.get(Uri.parse(url));
+  if (resp.statusCode != 200) throw Exception("Failed to fetch company details");
+  final body = jsonDecode(resp.body);
+  return List<Map<String, dynamic>>.from(body["data"]);
+}
+
+Future<void> _openTradingView(String symbol) async {
+  final url = "https://www.tradingview.com/chart/?symbol=NSE:$symbol";
+  final uri = Uri.parse(url);
+  if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+    await launchUrl(uri, mode: LaunchMode.inAppWebView);
+  }
+}
+
+void _showCompanySelector(List<Map<String, dynamic>> companies) {
+  showModalBottomSheet(
+    context: context,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (_) => Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Padding(
+          padding: EdgeInsets.all(16),
+          child: Text(
+            "View chart on TradingView",
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+        ),
+        ...companies.map(
+          (c) => ListTile(
+            title: Text(c["name"]),
+            subtitle: Text("NSE:${c["symbol"]}"),
+            onTap: () {
+              Navigator.pop(context);
+              _openTradingView(c["symbol"]);
+            },
+          ),
+        ),
+      ],
+    ),
+  );
+}
 
 
 
@@ -603,25 +654,22 @@ Widget _buildArticleCard(Article a) {
 
   Color sentimentColor(String s) {
     switch (s.toLowerCase()) {
-      case "bullish":
-        return Colors.green;
-      case "bearish":
-        return Colors.red;
-      default:
-        return Colors.orange;
+      case "very bullish": return const Color(0xFF0F9D58);
+      case "bullish": return const Color(0xFF5AD079);
+      case "neutral": return const Color(0xFFA6A49A);
+      case "bearish": return const Color(0xFFEB6969);
+      case "very bearish": return const Color(0xFFD93025);
+      default: return Colors.grey;
     }
   }
 
   Color impactColor(String i) {
     switch (i.toLowerCase()) {
-      case "very high":
-        return Colors.red;
-      case "high":
-        return Colors.orange;
-      case "medium":
-        return Colors.blue;
-      default:
-        return Colors.grey;
+      case "very high": return const Color(0xFFFFB000);
+      case "high": return const Color(0xFFFF9B5B);
+      case "mild": return const Color(0xFFFFCD79);
+      case "negligible": return const Color(0xFFFFCEAF);
+      default: return Colors.grey;
     }
   }
 
@@ -629,12 +677,12 @@ Widget _buildArticleCard(Article a) {
     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
     child: InkWell(
       borderRadius: BorderRadius.circular(14),
-      onTap: () => _showFullStory(a), // 👈 SAME DIALOG
+      onTap: () => _showFullStory(a),
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(14),
           color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
           boxShadow: [
             BoxShadow(
               color: Colors.black12.withOpacity(0.05),
@@ -646,112 +694,131 @@ Widget _buildArticleCard(Article a) {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-
-            /// TITLE + UNSAVE ICON
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Text(
-                    a.title,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.bookmark, color: Colors.red),
-                  onPressed: () => _unsaveNews(a.id), // 👈 UNSAVE
-                ),
-              ],
+            Text(
+              a.title,
+              style: GoogleFonts.playfairDisplay(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
             ),
-
             const SizedBox(height: 6),
-
-            /// SUMMARY
             Text(
               a.summary,
               softWrap: true,
-              style: const TextStyle(
+              style: GoogleFonts.poppins(
                 fontSize: 14.5,
                 height: 1.4,
+                fontWeight: FontWeight.w400,
               ),
             ),
-
-            const SizedBox(height: 10),
-
-            /// COMPANIES
+            const SizedBox(height: 12),
             if (a.companies.isNotEmpty)
               Text(
                 "Companies: ${a.companies.join(', ')}",
-                style: const TextStyle(
+                style: GoogleFonts.poppins(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
               ),
-
-            const SizedBox(height: 6),
-
-            /// SENTIMENT
+            const SizedBox(height: 8),
             if (a.sentiment.isNotEmpty)
               Text.rich(
                 TextSpan(
                   children: [
-                    const TextSpan(
+                    TextSpan(
                       text: "Sentiment: ",
-                      style: TextStyle(
+                      style: GoogleFonts.poppins(
                         fontSize: 13,
-                        fontWeight: FontWeight.bold,
+                        fontWeight: FontWeight.w700,
                         color: Colors.black,
                       ),
                     ),
                     TextSpan(
                       text: a.sentiment,
-                      style: TextStyle(
+                      style: GoogleFonts.poppins(
                         fontSize: 13,
-                        fontWeight: FontWeight.bold,
+                        fontWeight: FontWeight.w700,
                         color: sentimentColor(a.sentiment),
                       ),
                     ),
                   ],
                 ),
               ),
-
-            /// IMPACT
+            const SizedBox(height: 4),
             if (a.impact.isNotEmpty)
               Text.rich(
                 TextSpan(
                   children: [
-                    const TextSpan(
+                    TextSpan(
                       text: "Impact: ",
-                      style: TextStyle(
+                      style: GoogleFonts.poppins(
                         fontSize: 13,
-                        fontWeight: FontWeight.bold,
+                        fontWeight: FontWeight.w700,
                         color: Colors.black,
                       ),
                     ),
                     TextSpan(
                       text: a.impact,
-                      style: TextStyle(
+                      style: GoogleFonts.poppins(
                         fontSize: 13,
-                        fontWeight: FontWeight.bold,
+                        fontWeight: FontWeight.w700,
                         color: impactColor(a.impact),
                       ),
                     ),
                   ],
                 ),
               ),
-
-            const SizedBox(height: 6),
-
-            /// DATE
-            Text(
-              dateFormatted,
-              style: const TextStyle(
-                fontSize: 11,
-                color: Colors.grey,
-              ),
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  dateFormatted,
+                  style: GoogleFonts.poppins(
+                    fontSize: 11,
+                    color: Colors.grey,
+                  ),
+                ),
+                Row(
+                  children: [
+                    if (a.companies.isNotEmpty)
+                      IconButton(
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        icon: Image.asset(
+                          "assets/tradingview.png",
+                          height: 36,
+                          width: 36,
+                        ),
+                        tooltip: "View chart on TradingView",
+                        onPressed: () async {
+                          try {
+                            final companies = await _fetchCompanyDetails(a.companies);
+                            if (companies.isEmpty) return;
+                            if (companies.length == 1) {
+                              _openTradingView(companies.first["symbol"]);
+                            } else {
+                              _showCompanySelector(companies);
+                            }
+                          } catch (e) {
+                            debugPrint("TradingView error: $e");
+                          }
+                        },
+                      ),
+                    const SizedBox(width: 0),
+                    IconButton(
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      icon: const Icon(
+                        Icons.bookmark,
+                        size: 36,
+                        color: Colors.red,
+                      ),
+                      onPressed: () => _unsaveNews(a.id),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ],
         ),
@@ -860,13 +927,13 @@ class CorporateEvent {
 
   factory CorporateEvent.fromJson(Map<String, dynamic> json) {
     return CorporateEvent(
-      id: json['_id'] ?? json['id'],
-      title: json['title'],
-      date: DateTime.parse(json['date']),
-      description: json['description'],
-      type: json['type'],
-      tags: json['tags'],
-      headline: json['headline'],
+      id: json['_id'] ?? json['id'] ?? '',
+      title: json['title'] ?? 'Untitled Event',
+      date: DateTime.parse(json['date'] ?? DateTime.now().toIso8601String()),
+      description: json['description'] ?? '',
+      type: json['type'] ?? 'Event',
+      tags: json['tags'] ?? '',
+      headline: json['headline'] ?? '',
     );
   }
 

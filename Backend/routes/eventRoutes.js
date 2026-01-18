@@ -21,6 +21,38 @@ router.get('/', async (req, res) => { // Changed from '/api/events' to '/'
   }
 });
 
+// GET events by company name
+router.get('/company/:companyName', async (req, res) => {
+  try {
+    const companyName = decodeURIComponent(req.params.companyName);
+    console.log(`🎉 Fetching events for company: "${companyName}"`);
+    
+    const normalizedSearchName = companyName.trim().toLowerCase();
+    
+    const events = await Event.find().sort({ date: 1 });
+    
+    const filteredEvents = events.filter(event => {
+      const title = (event.title || '').toLowerCase();
+      const description = (event.description || '').toLowerCase();
+      const tags = (event.tags || '').toLowerCase();
+      
+      return title.includes(normalizedSearchName) || 
+             description.includes(normalizedSearchName) ||
+             tags.includes(normalizedSearchName);
+    });
+    
+    console.log(`✅ Found ${filteredEvents.length} events for "${companyName}"`);
+    res.json(filteredEvents);
+  } catch (error) {
+    console.error('🔥 Error fetching company events:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching company events',
+      error: error.message
+    });
+  }
+});
+
 // GET event by ID
 router.get('/:id', async (req, res) => { // Changed from '/api/events/:id' to '/:id'
   try {

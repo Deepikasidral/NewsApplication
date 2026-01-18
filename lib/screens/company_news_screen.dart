@@ -29,14 +29,17 @@ class _CompanyNewsScreenState extends State<CompanyNewsScreen> with SingleTicker
   Map<String, dynamic>? _stockData;
   Map<String, dynamic>? _aiOverview;
   Map<String, dynamic>? _aiInsight;
+  List<Map<String, dynamic>> _companyEvents = [];
   bool _isLoading = false;
   bool _isLoadingStock = false;
   bool _isLoadingAI = false;
   bool _isLoadingInsight = false;
+  bool _isLoadingEvents = false;
   String _error = '';
   String _stockError = '';
   String _aiError = '';
   String _insightError = '';
+  String _eventsError = '';
   
   late TabController _tabController;
   int _selectedTabIndex = 0;
@@ -80,6 +83,7 @@ class _CompanyNewsScreenState extends State<CompanyNewsScreen> with SingleTicker
     _fetchAIOverview();
     _fetchAIInsight();
     _fetchChartData('1M');
+    _fetchCompanyEvents();
   }
 
   @override
@@ -706,24 +710,41 @@ class _CompanyNewsScreenState extends State<CompanyNewsScreen> with SingleTicker
 
     try {
       final encodedName = Uri.encodeComponent(widget.companyName);
-      final resp = await http.get(Uri.parse(
-
-          "http://13.51.242.86:5000/api/filtered-news/company/$encodedName"));
-
+      final url = "http://13.51.242.86:5000/api/filtered-news/company/$encodedName";
+      
+      print('📰📰📰 Fetching news for: ${widget.companyName}');
+      print('📰📰📰 URL: $url');
+      
+      final resp = await http.get(Uri.parse(url));
+      
+      print('📰📰📰 News Response Status: ${resp.statusCode}');
+      print('📰📰📰 News Response Body Length: ${resp.body.length}');
 
       if (resp.statusCode == 200) {
         final data = json.decode(resp.body);
+        print('📰📰📰 News data type: ${data.runtimeType}');
+        print('📰📰📰 News count: ${data is List ? data.length : 0}');
+        
         setState(() {
           _news = (data as List).cast<Map<String, dynamic>>();
         });
+        
+        if (_news.isEmpty) {
+          print('⚠️ No news found for ${widget.companyName}');
+        } else {
+          print('✅ Loaded ${_news.length} news articles');
+        }
       } else {
         final errorBody = resp.body;
         setState(() {
           _error =
               "Failed to fetch news\nStatus: ${resp.statusCode}\nError: $errorBody";
         });
+        print('❌ News fetch failed: ${resp.statusCode}');
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      print('❌❌❌ Exception in _fetchCompanyNews: $e');
+      print('Stack trace: $stackTrace');
       setState(() {
         _error = "DB fetch failed: $e";
       });
@@ -744,18 +765,19 @@ class _CompanyNewsScreenState extends State<CompanyNewsScreen> with SingleTicker
         symbol = symbol.split('.').first;
       }
 
-      final encodedName = Uri.encodeComponent(widget.companyName);
       final url = Uri.parse(
-
-        'http://13.51.242.86:8001/api/ai-overview/$symbol'
-
+        'http://13.51.242.86:5001/api/ai-overview/$symbol'
       ).replace(queryParameters: {
-        'company_name': widget.companyName
+        'company_name': widget.companyName,
+        'v': '5'
       });
 
-      print('Fetching AI overview from: $url');
+      print('🔥🔥🔥 CALLING AI OVERVIEW: $url');
       
-      final resp = await http.get(url).timeout(const Duration(seconds: 30));
+      final resp = await http.get(url).timeout(const Duration(seconds: 150));
+      
+      print('🔥🔥🔥 RESPONSE STATUS: ${resp.statusCode}');
+      print('🔥🔥🔥 RESPONSE BODY: ${resp.body.substring(0, resp.body.length > 200 ? 200 : resp.body.length)}');
 
       if (resp.statusCode == 200) {
         final data = json.decode(resp.body);
@@ -768,23 +790,25 @@ class _CompanyNewsScreenState extends State<CompanyNewsScreen> with SingleTicker
               'symbol': data['symbol'],
             };
           });
+          print('✅ AI Overview loaded successfully');
         } else {
           setState(() {
             _aiError = data['error'] ?? "Failed to generate AI overview";
           });
+          print('❌ API returned success=false: ${data['error']}');
         }
       } else {
         setState(() {
           _aiError = "Failed to fetch AI overview (${resp.statusCode})";
         });
+        print('❌ HTTP Error: ${resp.statusCode}');
       }
-    } catch (e) {
-      print('AI overview fetch error: $e');
+    } catch (e, stackTrace) {
+      print('❌❌❌ EXCEPTION in _fetchAIOverview: $e');
+      print('Stack trace: $stackTrace');
       setState(() {
-        _aiError = "AI overview unavailable. Using fallback content.";
-        _aiOverview = {
-          'overview': '${widget.companyName} is a prominent player in its sector with established market presence. The company demonstrates consistent operational performance and maintains a balanced approach to growth and profitability. Financial health indicators suggest stable fundamentals with recurring revenue streams.',
-        };
+        _aiError = "Connection failed: $e";
+        _aiOverview = null;
       });
     }
 
@@ -804,15 +828,18 @@ class _CompanyNewsScreenState extends State<CompanyNewsScreen> with SingleTicker
       }
 
       final url = Uri.parse(
-
-        'http://13.51.242.86:8001/api/ai-insight/$symbol'
+        'http://13.51.242.86:5001/api/ai-insight/$symbol'
       ).replace(queryParameters: {
-        'company_name': widget.companyName
+        'company_name': widget.companyName,
+        'v': '5'
       });
 
-      print('Fetching AI insight from: $url');
+      print('🔥🔥🔥 CALLING AI INSIGHT: $url');
       
-      final resp = await http.get(url).timeout(const Duration(seconds: 30));
+      final resp = await http.get(url).timeout(const Duration(seconds: 150));
+      
+      print('🔥🔥🔥 INSIGHT RESPONSE STATUS: ${resp.statusCode}');
+      print('🔥🔥🔥 INSIGHT RESPONSE BODY: ${resp.body}');
 
       if (resp.statusCode == 200) {
         final data = json.decode(resp.body);
@@ -823,24 +850,65 @@ class _CompanyNewsScreenState extends State<CompanyNewsScreen> with SingleTicker
               'generated_at': data['generated_at'],
             };
           });
+          print('✅ AI Insight loaded successfully');
         } else {
           setState(() {
             _insightError = data['error'] ?? "Failed to generate AI insight";
           });
+          print('❌ Insight API returned success=false');
         }
       } else {
         setState(() {
           _insightError = "Failed to fetch AI insight (${resp.statusCode})";
         });
+        print('❌ Insight HTTP Error: ${resp.statusCode}');
       }
-    } catch (e) {
-      print('AI insight fetch error: $e');
+    } catch (e, stackTrace) {
+      print('❌❌❌ EXCEPTION in _fetchAIInsight: $e');
+      print('Stack trace: $stackTrace');
       setState(() {
-        _insightError = "AI insight unavailable.";
+        _insightError = "Connection failed: $e";
       });
     }
 
     setState(() => _isLoadingInsight = false);
+  }
+
+  Future<void> _fetchCompanyEvents() async {
+    setState(() {
+      _isLoadingEvents = true;
+      _eventsError = '';
+    });
+
+    try {
+      final encodedName = Uri.encodeComponent(widget.companyName);
+      final url = "http://13.51.242.86:5000/api/events/company/$encodedName";
+      
+      print('🎉🎉🎉 Fetching events for: ${widget.companyName}');
+      
+      final resp = await http.get(Uri.parse(url));
+      
+      print('🎉🎉🎉 Events Response Status: ${resp.statusCode}');
+
+      if (resp.statusCode == 200) {
+        final data = json.decode(resp.body);
+        setState(() {
+          _companyEvents = (data as List).cast<Map<String, dynamic>>();
+        });
+        print('✅ Loaded ${_companyEvents.length} events');
+      } else {
+        setState(() {
+          _eventsError = "Failed to fetch events (${resp.statusCode})";
+        });
+      }
+    } catch (e) {
+      print('❌ Exception in _fetchCompanyEvents: $e');
+      setState(() {
+        _eventsError = "Failed to load events: $e";
+      });
+    }
+
+    setState(() => _isLoadingEvents = false);
   }
 
   Future<void> _fetchChartData(String timeframe) async {
@@ -1897,7 +1965,7 @@ class _CompanyNewsScreenState extends State<CompanyNewsScreen> with SingleTicker
           _buildOverviewTab(),
           _buildFinancialsTab(),
           _buildNewsTab(),
-          Center(child: Text('Events Coming Soon', style: TextStyle(color: Colors.grey.shade600))),
+          _buildEventsTab(),
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(
@@ -1954,6 +2022,117 @@ class _CompanyNewsScreenState extends State<CompanyNewsScreen> with SingleTicker
           BottomNavigationBarItem(icon: Icon(Icons.business), label: "COMPANIES"),
           BottomNavigationBarItem(icon: Icon(Icons.event_available), label: "EVENTS"),
           BottomNavigationBarItem(icon: Icon(Icons.bookmark), label: "Saved"),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEventsTab() {
+    if (_isLoadingEvents) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_eventsError.isNotEmpty) {
+      return Center(child: Text(_eventsError, style: const TextStyle(color: Colors.red)));
+    }
+    if (_companyEvents.isEmpty) {
+      return const Center(child: Text('No events available for this company'));
+    }
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: _companyEvents.length,
+      itemBuilder: (context, index) => _buildEventItem(_companyEvents[index]),
+    );
+  }
+
+  Widget _buildEventItem(Map<String, dynamic> event) {
+    final title = event["title"] ?? "No title";
+    final date = event["date"] ?? "";
+    final description = event["description"] ?? "";
+    final type = event["type"] ?? "Event";
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.06),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade50,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(14),
+                topRight: Radius.circular(14),
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF05151).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    type,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFFF05151),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Icon(Icons.calendar_today, size: 14, color: Colors.grey.shade600),
+                const SizedBox(width: 6),
+                Text(
+                  _formatDate(date),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF2D3748),
+                  ),
+                ),
+                if (description.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    description,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey.shade800,
+                      height: 1.5,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
         ],
       ),
     );

@@ -19,6 +19,7 @@ class SignInScreen extends StatefulWidget {
 class _SignInScreenState extends State<SignInScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  bool _isGoogleSignInLoading = false;
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     scopes: ['email', 'profile'],
     // Removed explicit clientId - will use from google-services.json
@@ -92,6 +93,10 @@ class _SignInScreenState extends State<SignInScreen> {
   // GOOGLE SIGN-IN (Fixed with proper error handling)
   // ===========================
   Future<void> _handleGoogleSignIn() async {
+    if (_isGoogleSignInLoading) return;
+    
+    setState(() => _isGoogleSignInLoading = true);
+    
     print("🚀 Starting Google Sign-In...");
     try {
       await _googleSignIn.signOut();
@@ -249,6 +254,10 @@ class _SignInScreenState extends State<SignInScreen> {
           duration: const Duration(seconds: 5),
         ),
       );
+    } finally {
+      if (mounted) {
+        setState(() => _isGoogleSignInLoading = false);
+      }
     }
   }
 
@@ -425,13 +434,23 @@ class _SignInScreenState extends State<SignInScreen> {
                         width: double.infinity,
                         height: 48,
                         child: ElevatedButton(
-                          onPressed: _handleGoogleSignIn,
+                          onPressed: _isGoogleSignInLoading ? null : _handleGoogleSignIn,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFFF8C5C5),
                             elevation: 0,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            disabledBackgroundColor: Colors.grey.shade300,
                           ),
-                          child: Row(
+                          child: _isGoogleSignInLoading
+                              ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.black54),
+                                  ),
+                                )
+                              : Row(
                             mainAxisAlignment: MainAxisAlignment.start,
                             children: [
                               Container(
