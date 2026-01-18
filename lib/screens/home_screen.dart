@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:news_application/screens/saved_screen.dart';
+import 'package:news_application/screens/profile_screen.dart';
+
 import 'chatbot_screen.dart';
 import '../models/article.dart';
 import 'company_screen.dart';
@@ -583,10 +585,19 @@ Future<void> _toggleSaveNews(String newsId) async {
             ),
           ),
           const SizedBox(width: 12),
-          const CircleAvatar(
-            radius: 22,
-            backgroundImage: NetworkImage('https://i.pravatar.cc/300'),
-          ),
+         GestureDetector(
+  onTap: () {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const ProfileScreen()),
+    );
+  },
+  child: const CircleAvatar(
+    radius: 22,
+    backgroundImage: NetworkImage('https://i.pravatar.cc/300'),
+  ),
+),
+
         ],
       ),
     );

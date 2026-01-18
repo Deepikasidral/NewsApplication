@@ -7,6 +7,8 @@ import 'package:http/http.dart' as http;
 import 'sign_up_screen.dart';
 import 'home_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+
 
 
 class SignInScreen extends StatefulWidget {
@@ -35,7 +37,19 @@ class _SignInScreenState extends State<SignInScreen> {
   await prefs.setString("authToken", token); // Store JWT token
   await prefs.setBool("isLoggedIn", true);
 }
+Future<void> saveFcmTokenToBackend(String userId) async {
+  final token = await FirebaseMessaging.instance.getToken();
+  if (token == null) return;
 
+  await http.post(
+    Uri.parse("http://13.51.242.86:5000/api/users/save-fcm"),
+    headers: {"Content-Type": "application/json"},
+    body: jsonEncode({
+      "userId": userId,
+      "fcmToken": token,
+    }),
+  );
+}
   // ===========================
   // EMAIL SIGN-IN (Backend commented)
   // ===========================
@@ -64,6 +78,8 @@ class _SignInScreenState extends State<SignInScreen> {
      if (response.statusCode == 200) {
   final data = jsonDecode(response.body);
   await _saveUserSession(data["user"], data["token"]);
+  await saveFcmTokenToBackend(data["user"]["_id"]);
+
 
   ScaffoldMessenger.of(context).showSnackBar(
     const SnackBar(content: Text("Signed in successfully")),

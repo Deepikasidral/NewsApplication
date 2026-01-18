@@ -7,6 +7,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'sign_in_screen.dart';
 import 'home_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -35,6 +37,20 @@ class _SignUpScreenState extends State<SignUpScreen> {
   await prefs.setString("authToken", token);
   await prefs.setBool("isLoggedIn", true);
 }
+Future<void> saveFcmTokenToBackend(String userId) async {
+  final token = await FirebaseMessaging.instance.getToken();
+  if (token == null) return;
+
+  await http.post(
+    Uri.parse("http://13.51.242.86:5000/api/users/save-fcm"),
+    headers: {"Content-Type": "application/json"},
+    body: jsonEncode({
+      "userId": userId,
+      "fcmToken": token,
+    }),
+  );
+}
+
 
   Future<void> _handleSignUp() async {
     final name = _nameController.text.trim();
@@ -68,6 +84,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
        if (response.statusCode == 200) {
   final data = jsonDecode(response.body);
   await _saveUserSession(data["user"], data["token"]);
+  await saveFcmTokenToBackend(data["user"]["_id"]);
+
 
   ScaffoldMessenger.of(context).showSnackBar(
     const SnackBar(content: Text("Account Created successfully")),
