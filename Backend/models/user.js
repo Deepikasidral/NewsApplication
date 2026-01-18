@@ -52,6 +52,15 @@ const userSchema = new mongoose.Schema(
       type: [savedEventSchema],
       default: [],
     },
+    notifications: {
+        type: Boolean,
+        default: true
+      },
+      fcmToken: {
+  type: String,
+  default: ""
+},
+
 
 
     createdAt: { type: Date, default: Date.now },

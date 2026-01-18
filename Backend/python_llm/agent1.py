@@ -7,11 +7,14 @@ from urllib.parse import quote
 from dotenv import load_dotenv
 from pymongo import MongoClient
 from openai import AzureOpenAI
+from pytz import timezone as pytz_timezone
 
 import firebase_admin
 from firebase_admin import credentials, messaging
 
 import re
+
+IST = pytz_timezone("Asia/Kolkata")
 
 
 
@@ -68,14 +71,11 @@ def get_last_run_time():
     if os.path.exists(LAST_RUN_FILE):
         with open(LAST_RUN_FILE, "r") as f:
             last_time_str = f.read().strip()
-            # Parse and ensure it has timezone info
             last_time = datetime.fromisoformat(last_time_str)
             if last_time.tzinfo is None:
-                # Assume UTC if no timezone
-                last_time = last_time.replace(tzinfo=timezone.utc)
-            return last_time
-    # Default to 5 minutes ago
-    return datetime.now(timezone.utc) - timedelta(minutes=5)
+                last_time = last_time.replace(tzinfo=IST)
+            return last_time.astimezone(IST)
+    return datetime.now(IST) - timedelta(minutes=30)
 
 def save_last_run_time(dt):
     with open(LAST_RUN_FILE, "w") as f:
@@ -88,7 +88,7 @@ def save_last_run_time(dt):
 
 def fetch_pti_news():
     start_time = get_last_run_time()
-    end_time = datetime.now(timezone.utc)
+    end_time = datetime.now(IST)
 
     from_time = quote(start_time.strftime("%Y/%m/%d %H:%M:%S"))
     to_time = quote(end_time.strftime("%Y/%m/%d %H:%M:%S"))
@@ -99,19 +99,16 @@ def fetch_pti_news():
         f"&FromTime={from_time}"
         f"&EndTime={to_time}"
     )
-    
 
-    print(f"⏱ Fetching PTI news: {start_time} → {end_time}")
+    print(f"⏱ Fetching PTI news (IST): {start_time} → {end_time}")
 
     try:
         headers = {
-        "User-Agent": "Mozilla/5.0",
-        "Accept": "application/json,text/plain,*/*",
-        "Connection": "keep-alive",
-}
-
+            "User-Agent": "Mozilla/5.0",
+            "Accept": "application/json,text/plain,*/*",
+            "Connection": "keep-alive",
+        }
         response = requests.get(url, headers=headers, timeout=30)
-
     except Exception as e:
         print("❌ PTI request failed:", e)
         return []
@@ -129,7 +126,6 @@ def fetch_pti_news():
         print(response.text[:300])
         return []
 
-    # PTI may return dict or list
     if isinstance(data, dict):
         articles = data.get("Table", [])
     elif isinstance(data, list):
@@ -137,7 +133,6 @@ def fetch_pti_news():
     else:
         articles = []
 
-    save_last_run_time(end_time)
     return articles
 
 # ================================
@@ -162,35 +157,76 @@ def get_llm_response(system_prompt, user_input):
 # ⚙️ notification CALL HELPER
 # ================================
 
+# def send_push_notification(article, agent2, agent3):
+#     title = "🚨 High Impact Market News"
+
+#     body = (
+#         f"{article.get('Headline')}\n"
+#         f"Sentiment: {agent3['sentiment']} | Impact: {agent3['impact']}"
+#     )
+
+#     message = messaging.Message(
+#         notification=messaging.Notification(
+#             title=title,
+#             body=body,
+#         ),
+#        data={
+#             "FileName": article.get("FileName", ""),
+#             "headline": article.get("Headline", ""),
+#             "sentiment": agent3["sentiment"],
+#             "impact": agent3["impact"]
+#         },
+
+#         topic="market_alerts"
+#     )
+
+#     try:
+#         messaging.send(message)
+#         print("🔔 Push notification sent")
+#     except Exception as e:
+#         print("❌ Push notification failed:", e)
+
 def send_push_notification(article, agent2, agent3):
     title = "🚨 High Impact Market News"
-
     body = (
         f"{article.get('Headline')}\n"
         f"Sentiment: {agent3['sentiment']} | Impact: {agent3['impact']}"
     )
 
-    message = messaging.Message(
+    # 🔥 ONLY USERS WHO ENABLED NOTIFICATIONS
+    users = db["Users"].find(
+        {
+            "notifications": True,
+            "fcmToken": {"$exists": True, "$ne": ""}
+        },
+        {"fcmToken": 1}
+    )
+
+    tokens = [u["fcmToken"] for u in users]
+
+    if not tokens:
+        print("🔕 No users eligible for notifications")
+        return
+
+    message = messaging.MulticastMessage(
         notification=messaging.Notification(
             title=title,
             body=body,
         ),
-       data={
+        data={
             "FileName": article.get("FileName", ""),
             "headline": article.get("Headline", ""),
             "sentiment": agent3["sentiment"],
             "impact": agent3["impact"]
         },
-
-        topic="market_alerts"
+        tokens=tokens
     )
 
     try:
-        messaging.send(message)
-        print("🔔 Push notification sent")
+        response = messaging.send_multicast(message)
+        print(f"🔔 Sent to {response.success_count} users")
     except Exception as e:
         print("❌ Push notification failed:", e)
-
 
 # ================================
 # 🧠 AGENT 1: NEWS FILTER
@@ -532,27 +568,40 @@ def process_agent3(agent2_data):
         return None
     return json.loads(result)
 
+def parse_pti_time(pti_time_str):
+    try:
+        dt = datetime.strptime(pti_time_str, "%A, %b %d, %Y %H:%M:%S")
+        return dt.replace(tzinfo=IST)
+    except Exception:
+        return None
+
 # ================================
 # 🚀 PIPELINE RUNNER
 # ================================
 def run_pipeline():
-    #articles = fetch_mock_pti_news()   # TEMP
-    articles = fetch_pti_news()      # REAL (enable later)
-
+    articles = fetch_pti_news()
+    
+    fetched_count = len(articles)
+    stored_count = 0
+    filtered_count = 0
+    
+    print(f"📊 Fetched: {fetched_count} articles")
 
     for article in articles:
         file_name = article.get("FileName")
         if not file_name:
             continue
 
-        # Skip if already processed
         if filtered_news.find_one({"FileName": file_name}):
+            print(f"⏩ Duplicate skipped: {file_name}")
             continue
 
         print(f"\n📰 Processing: {article.get('Headline','')[:80]}")
 
         agent1 = process_agent1(article)
         if not agent1 or agent1["decision"] != "keep":
+            print(f"🗑 Agent1 discarded: {article.get('Headline','')[:80]}")
+            filtered_count += 1
             continue
 
         agent2 = process_agent2(article)
@@ -568,43 +617,36 @@ def run_pipeline():
             agent3["sentiment"] in ["Very Bullish", "Very Bearish"]
         )
 
-        # notify = agent3["impact"] in ["High", "Very High"]
-
-
         if notify:
             send_push_notification(article, agent2, agent3)
 
-
         final_doc = {
-            **article,  # ALL PTI API FIELDS
-
-            # Agent 1
+            **article,
             "decision": agent1["decision"],
             "filter_reason": agent1.get("reason"),
-
-            # Agent 2
-          
             "summary": agent2["summary"],
             "sector": agent2["sector"],
             "companies": agent2["companies"],
             "global": agent2["global"],
             "commodities": agent2["commodities"],
-
-
-            # Agent 3
             "sentiment": agent3["sentiment"],
             "impact": agent3["impact"],
             "impact_rationale": agent3.get("rationale"),
-
-            # System
             "ingested_at": datetime.now(timezone.utc)
-
         }
 
         filtered_news.insert_one(final_doc)
+        stored_count += 1
         print("✅ Stored enriched PTI article")
+        
+        pti_time = parse_pti_time(article.get("PublishedAt", ""))
+        if pti_time:
+            save_last_run_time(pti_time)
 
-    print("\n🎯 Pipeline complete.")
+    print(f"\n🎯 Pipeline complete: Fetched={fetched_count}, Filtered={filtered_count}, Stored={stored_count}")
+    
+    if stored_count == 0 and fetched_count > 0:
+        save_last_run_time(datetime.now(IST))
 
 # ================================
 # 🏁 ENTRY POINT
