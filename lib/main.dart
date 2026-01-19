@@ -4,6 +4,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:news_application/screens/splash_screen.dart';
 import 'package:news_application/screens/home_screen.dart';
+import 'package:news_application/services/analytics_service.dart';
 
 final GlobalKey<NavigatorState> navigatorKey =
     GlobalKey<NavigatorState>();
@@ -53,8 +54,35 @@ void _handleNotification(Map<String, dynamic> data) {
   );
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    AnalyticsService.startSession();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.detached) {
+      AnalyticsService.endSession();
+    } else if (state == AppLifecycleState.resumed) {
+      AnalyticsService.startSession();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

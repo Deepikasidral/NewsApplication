@@ -452,7 +452,7 @@ Future<void> _toggleSaveNews(String newsId) async {
                     TextSpan(
                       text: "Sentiment: ",
                       style: GoogleFonts.poppins(
-                        fontSize: 13,
+                        fontSize: 16,
                         fontWeight: FontWeight.w700,
                         color: Colors.black,
                       ),
@@ -460,7 +460,7 @@ Future<void> _toggleSaveNews(String newsId) async {
                     TextSpan(
                       text: a.sentiment,
                       style: GoogleFonts.poppins(
-                        fontSize: 13,
+                        fontSize: 16,
                         fontWeight: FontWeight.w700,
                         color: sentimentColor(a.sentiment),
                       ),
@@ -479,7 +479,7 @@ Future<void> _toggleSaveNews(String newsId) async {
                     TextSpan(
                       text: "Impact: ",
                       style: GoogleFonts.poppins(
-                        fontSize: 13,
+                        fontSize: 16,
                         fontWeight: FontWeight.w700,
                         color: Colors.black,
                       ),
@@ -487,7 +487,7 @@ Future<void> _toggleSaveNews(String newsId) async {
                     TextSpan(
                       text: a.impact,
                       style: GoogleFonts.poppins(
-                        fontSize: 13,
+                        fontSize: 16,
                         fontWeight: FontWeight.w700,
                         color: impactColor(a.impact),
                       ),
@@ -769,7 +769,7 @@ Widget _buildArticleCard(Article a) {
                     TextSpan(
                       text: "Sentiment: ",
                       style: GoogleFonts.poppins(
-                        fontSize: 13,
+                        fontSize: 16,
                         fontWeight: FontWeight.w700,
                         color: Colors.black,
                       ),
@@ -777,7 +777,7 @@ Widget _buildArticleCard(Article a) {
                     TextSpan(
                       text: a.sentiment,
                       style: GoogleFonts.poppins(
-                        fontSize: 13,
+                        fontSize: 16,
                         fontWeight: FontWeight.w700,
                         color: sentimentColor(a.sentiment),
                       ),
@@ -786,7 +786,7 @@ Widget _buildArticleCard(Article a) {
                 ),
               ),
 
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
 
             /// ---------------- IMPACT ----------------
             if (a.impact.isNotEmpty)
@@ -796,7 +796,7 @@ Widget _buildArticleCard(Article a) {
                     TextSpan(
                       text: "Impact: ",
                       style: GoogleFonts.poppins(
-                        fontSize: 13,
+                        fontSize: 16,
                         fontWeight: FontWeight.w700,
                         color: Colors.black,
                       ),
@@ -804,7 +804,7 @@ Widget _buildArticleCard(Article a) {
                     TextSpan(
                       text: a.impact,
                       style: GoogleFonts.poppins(
-                        fontSize: 13,
+                        fontSize: 16,
                         fontWeight: FontWeight.w700,
                         color: impactColor(a.impact),
                       ),
@@ -916,26 +916,30 @@ Row(
   onTap: (index) {
   if (index == _bottomIndex) return;
 
-  setState(() => _bottomIndex = index);
-
+  Widget destination;
   switch (index) {
+    case 0:
+      return;
     case 2:
-      Navigator.push(context,
-          MaterialPageRoute(builder: (_) => const ChatbotScreen()));
+      destination = const ChatbotScreen();
       break;
     case 3:
-      Navigator.push(context,
-          MaterialPageRoute(builder: (_) => const CompanyScreen()));
+      destination = const CompanyScreen();
       break;
     case 4:
-      Navigator.push(context,
-          MaterialPageRoute(builder: (_) => const EventsScreen()));
+      destination = const EventsScreen();
       break;
     case 5:
-      Navigator.push(context,
-          MaterialPageRoute(builder: (_) => const SavedNewsFeedScreen()));
+      destination = const SavedNewsFeedScreen();
       break;
+    default:
+      return;
   }
+  
+  Navigator.pushReplacement(
+    context,
+    MaterialPageRoute(builder: (_) => destination),
+  );
 },
 
   items: const [

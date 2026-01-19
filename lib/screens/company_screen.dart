@@ -6,6 +6,7 @@ import 'home_screen.dart';
 import 'chatbot_screen.dart';
 import 'events_screen.dart';
 import 'saved_screen.dart';
+import 'profile_screen.dart';
 
 class CompanyScreen extends StatefulWidget {
   const CompanyScreen({super.key});
@@ -90,6 +91,15 @@ class _CompanyScreenState extends State<CompanyScreen> {
         title: const Text("Companies"),
         backgroundColor: const Color(0xFFEA6B6B),
         foregroundColor: Colors.white,
+        actions: [
+          GestureDetector(
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen())),
+            child: const Padding(
+              padding: EdgeInsets.only(right: 16),
+              child: CircleAvatar(radius: 18, backgroundImage: NetworkImage('https://i.pravatar.cc/300')),
+            ),
+          ),
+        ],
       ),
       body: SafeArea(
         child: Column(
@@ -234,44 +244,30 @@ class _CompanyScreenState extends State<CompanyScreen> {
         onTap: (index) {
           if (index == _bottomIndex) return;
 
-          setState(() => _bottomIndex = index);
-
+          Widget destination;
           switch (index) {
             case 0:
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const NewsFeedScreen()),
-              );
+              destination = const NewsFeedScreen();
               break;
-
             case 2:
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ChatbotScreen()),
-              );
+              destination = const ChatbotScreen();
               break;
-
             case 3:
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const CompanyScreen()),
-              );
-              break;
-
+              return;
             case 4:
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const EventsScreen()),
-              );
+              destination = const EventsScreen();
               break;
-
             case 5:
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const SavedNewsFeedScreen()),
-              );
+              destination = const SavedNewsFeedScreen();
               break;
+            default:
+              return;
           }
+          
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => destination),
+          );
         },
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.newspaper), label: "NEWS"),

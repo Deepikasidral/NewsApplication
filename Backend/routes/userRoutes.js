@@ -42,6 +42,48 @@ router.post("/notifications", async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
+
+/// 📊 GET ANALYTICS DASHBOARD (must be before POST /analytics)
+router.get("/analytics/dashboard", async (req, res) => {
+  try {
+    const users = await User.find({}, "name email totalTimeSpent sessions");
+    
+    const analytics = users.map(u => ({
+      name: u.name,
+      email: u.email,
+      totalMinutes: Math.round((u.totalTimeSpent || 0) / 60),
+      sessionCount: u.sessions?.length || 0,
+      avgSessionMinutes: u.sessions?.length 
+        ? Math.round((u.totalTimeSpent || 0) / u.sessions.length / 60) 
+        : 0,
+    }));
+
+    res.json({ success: true, analytics });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/// 📊 ANALYTICS - TRACK SESSION
+router.post("/analytics", async (req, res) => {
+  try {
+    const { userId, sessionDuration, timestamp } = req.body;
+
+    await User.findByIdAndUpdate(userId, {
+      $inc: { totalTimeSpent: sessionDuration },
+      $push: {
+        sessions: {
+          duration: sessionDuration,
+          timestamp: new Date(timestamp),
+        },
+      },
+    });
+
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 router.post("/save-fcm", async (req, res) => {
   try {
     const { userId, fcmToken } = req.body;

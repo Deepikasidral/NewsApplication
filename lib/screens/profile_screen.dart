@@ -37,27 +37,47 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final prefs = await SharedPreferences.getInstance();
     final userId = prefs.getString("userId");
 
-    if (userId == null) return;
+    debugPrint("📍 Fetching profile for userId: $userId");
+
+    if (userId == null) {
+      debugPrint("❌ No userId found in SharedPreferences");
+      setState(() {
+        loading = false;
+      });
+      return;
+    }
 
     try {
+      debugPrint("🌐 Calling API: $baseUrl/api/users/profile");
       final response = await http.post(
         Uri.parse("$baseUrl/api/users/profile"),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({"userId": userId}),
       );
 
+      debugPrint("📡 Response status: ${response.statusCode}");
+      debugPrint("📦 Response body: ${response.body}");
+
+      if (response.statusCode != 200) {
+        throw Exception("API returned ${response.statusCode}");
+      }
+
       final data = jsonDecode(response.body);
       final user = data['user'];
 
-      setState(() {
-  name = user['name'] ?? "";
-  email = user['email'] ?? "";
-  notificationsEnabled = user['notifications'] ?? true;
-  loading = false;
-});
+      debugPrint("✅ User data received: $user");
 
+      setState(() {
+        name = user['name'] ?? "";
+        email = user['email'] ?? "";
+        notificationsEnabled = user['notifications'] ?? true;
+        loading = false;
+      });
     } catch (e) {
-      loading = false;
+      debugPrint("❌ Profile fetch error: $e");
+      setState(() {
+        loading = false;
+      });
     }
   }
 
@@ -149,7 +169,7 @@ Widget build(BuildContext context) {
             ),
             const SizedBox(height: 4),
             Text(
-              name,
+              name.isEmpty ? "No name" : name,
               style: GoogleFonts.poppins(
                 fontSize: 16,
                 fontWeight: FontWeight.w500,
@@ -168,7 +188,7 @@ Widget build(BuildContext context) {
             ),
             const SizedBox(height: 4),
             Text(
-              email,
+              email.isEmpty ? "No email" : email,
               style: GoogleFonts.poppins(
                 fontSize: 16,
                 fontWeight: FontWeight.w500,

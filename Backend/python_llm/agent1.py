@@ -635,13 +635,19 @@ def run_pipeline():
             "ingested_at": datetime.now(timezone.utc)
         }
 
-        filtered_news.insert_one(final_doc)
-        stored_count += 1
-        print("✅ Stored enriched PTI article")
-        
-        pti_time = parse_pti_time(article.get("PublishedAt", ""))
-        if pti_time:
-            save_last_run_time(pti_time)
+        try:
+            filtered_news.insert_one(final_doc)
+            stored_count += 1
+            print("✅ Stored enriched PTI article")
+            
+            pti_time = parse_pti_time(article.get("PublishedAt", ""))
+            if pti_time:
+                save_last_run_time(pti_time)
+        except Exception as e:
+            if "duplicate key" in str(e).lower():
+                print(f"⏩ Duplicate insert race condition: {file_name}")
+            else:
+                print(f"❌ Insert failed: {e}")
 
     print(f"\n🎯 Pipeline complete: Fetched={fetched_count}, Filtered={filtered_count}, Stored={stored_count}")
     

@@ -7,6 +7,7 @@ import 'home_screen.dart';
 import 'company_screen.dart';
 import 'saved_screen.dart';
 import 'events_screen.dart';
+import 'profile_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 
@@ -206,6 +207,15 @@ Widget build(BuildContext context) {
     appBar: AppBar(
       title: const Text("Ask AI"),
       backgroundColor: const Color(0xFFF05151),
+      actions: [
+        GestureDetector(
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen())),
+          child: const Padding(
+            padding: EdgeInsets.only(right: 16),
+            child: CircleAvatar(radius: 18, backgroundImage: NetworkImage('https://i.pravatar.cc/300')),
+          ),
+        ),
+      ],
     ),
     body: Column(
   children: [
@@ -250,37 +260,30 @@ Widget build(BuildContext context) {
       onTap: (index) {
         if (index == _bottomIndex) return;
 
-        setState(() => _bottomIndex = index);
-
+        Widget destination;
         switch (index) {
           case 0:
-            Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const NewsFeedScreen()));
+            destination = const NewsFeedScreen();
             break;
-
-          case 1:
-            // INDEX screen (if exists)
-            break;
-
           case 2:
-            // ASK AI → already here
-            break;
-
+            return;
           case 3:
-            Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const CompanyScreen()));
+            destination = const CompanyScreen();
             break;
-
           case 4:
-            Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const EventsScreen()));
+            destination = const EventsScreen();
             break;
-
           case 5:
-            Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const SavedNewsFeedScreen()));
+            destination = const SavedNewsFeedScreen();
             break;
+          default:
+            return;
         }
+        
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => destination),
+        );
       },
       items: const [
         BottomNavigationBarItem(icon: Icon(Icons.newspaper), label: "NEWS"),

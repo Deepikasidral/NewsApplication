@@ -7,6 +7,7 @@ import 'chatbot_screen.dart';
 import '../models/article.dart';
 import 'company_screen.dart';
 import 'events_screen.dart';
+import 'profile_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_html/flutter_html.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -260,7 +261,7 @@ Future<void> _loadUserId() async {
                         const TextSpan(
                           text: "Sentiment: ",
                           style: TextStyle(
-                            fontSize: 13,
+                            fontSize: 16,
                             fontWeight: FontWeight.bold,
                             color: Colors.black,
                           ),
@@ -268,7 +269,7 @@ Future<void> _loadUserId() async {
                         TextSpan(
                           text: a.sentiment,
                           style: TextStyle(
-                            fontSize: 13,
+                            fontSize: 16,
                             fontWeight: FontWeight.bold,
                             color: sentimentColor(a.sentiment),
                           ),
@@ -284,7 +285,7 @@ Future<void> _loadUserId() async {
                         const TextSpan(
                           text: "Impact: ",
                           style: TextStyle(
-                            fontSize: 13,
+                            fontSize: 16,
                             fontWeight: FontWeight.bold,
                             color: Colors.black,
                           ),
@@ -292,7 +293,7 @@ Future<void> _loadUserId() async {
                         TextSpan(
                           text: a.impact,
                           style: TextStyle(
-                            fontSize: 13,
+                            fontSize: 16,
                             fontWeight: FontWeight.bold,
                             color: impactColor(a.impact),
                           ),
@@ -479,9 +480,12 @@ Future<void> _unsaveEvent(String eventId) async {
             ),
           ),
           const SizedBox(width: 12),
-          const CircleAvatar(
-            radius: 22,
-            backgroundImage: NetworkImage('https://i.pravatar.cc/300'),
+          GestureDetector(
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen())),
+            child: const CircleAvatar(
+              radius: 22,
+              backgroundImage: NetworkImage('https://i.pravatar.cc/300'),
+            ),
           ),
         ],
       ),
@@ -728,7 +732,7 @@ Widget _buildArticleCard(Article a) {
                     TextSpan(
                       text: "Sentiment: ",
                       style: GoogleFonts.poppins(
-                        fontSize: 13,
+                        fontSize: 16,
                         fontWeight: FontWeight.w700,
                         color: Colors.black,
                       ),
@@ -736,7 +740,7 @@ Widget _buildArticleCard(Article a) {
                     TextSpan(
                       text: a.sentiment,
                       style: GoogleFonts.poppins(
-                        fontSize: 13,
+                        fontSize: 16,
                         fontWeight: FontWeight.w700,
                         color: sentimentColor(a.sentiment),
                       ),
@@ -744,7 +748,7 @@ Widget _buildArticleCard(Article a) {
                   ],
                 ),
               ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
             if (a.impact.isNotEmpty)
               Text.rich(
                 TextSpan(
@@ -752,7 +756,7 @@ Widget _buildArticleCard(Article a) {
                     TextSpan(
                       text: "Impact: ",
                       style: GoogleFonts.poppins(
-                        fontSize: 13,
+                        fontSize: 16,
                         fontWeight: FontWeight.w700,
                         color: Colors.black,
                       ),
@@ -760,7 +764,7 @@ Widget _buildArticleCard(Article a) {
                     TextSpan(
                       text: a.impact,
                       style: GoogleFonts.poppins(
-                        fontSize: 13,
+                        fontSize: 16,
                         fontWeight: FontWeight.w700,
                         color: impactColor(a.impact),
                       ),
@@ -853,44 +857,30 @@ Widget _buildArticleCard(Article a) {
   onTap: (index) {
   if (index == _bottomIndex) return;
 
-  setState(() => _bottomIndex = index);
-
+  Widget destination;
   switch (index) {
     case 0:
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const NewsFeedScreen()),
-      );
+      destination = const NewsFeedScreen();
       break;
-
     case 2:
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const ChatbotScreen()),
-      );
+      destination = const ChatbotScreen();
       break;
-
     case 3:
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const CompanyScreen()),
-      );
+      destination = const CompanyScreen();
       break;
-
     case 4:
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const EventsScreen()),
-      );
+      destination = const EventsScreen();
       break;
-
     case 5:
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const SavedNewsFeedScreen()),
-      );
-      break;
+      return;
+    default:
+      return;
   }
+  
+  Navigator.pushReplacement(
+    context,
+    MaterialPageRoute(builder: (_) => destination),
+  );
 },
   items: const [
     BottomNavigationBarItem(icon: Icon(Icons.newspaper), label: "NEWS"),
