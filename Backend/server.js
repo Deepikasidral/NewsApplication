@@ -41,7 +41,7 @@ app.use("/api/commodities-news", commoditiesNewsRoutes);
 app.use("/api/users",savedNewsRoutes);
 app.use("/api/users", savedEventsRoutes);
 app.use("/api/company-lookup", fetchingcompanyRoute);
-app.use("/api/users", userProfileRoutes);
+app.use("/api/users/profile", userProfileRoutes);
 
 
 

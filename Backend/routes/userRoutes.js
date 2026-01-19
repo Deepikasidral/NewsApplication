@@ -3,7 +3,7 @@ const User = require("../models/user");
 const router = express.Router();
 
 /// FETCH PROFILE
-router.post("/profile", async (req, res) => {
+router.post("/", async (req, res) => {
   try {
     const { userId } = req.body;
 

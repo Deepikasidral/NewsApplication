@@ -74,7 +74,20 @@ void dispose() {
 @override
 void didChangeAppLifecycleState(AppLifecycleState state) {
   if (state == AppLifecycleState.resumed && _hasLoadedOnce) {
-    _fetchLatestNews(soft: true);
+    switch (_tabIndex) {
+      case 0:
+        _fetchLatestNews(soft: true);
+        break;
+      case 1:
+        _fetchTrendingNews();
+        break;
+      case 2:
+        _fetchGlobalNews();
+        break;
+      case 3:
+        _fetchCommoditiesNews();
+        break;
+    }
   }
 }
 
@@ -115,6 +128,7 @@ void didChangeAppLifecycleState(AppLifecycleState state) {
         _articles = (data as List).map((e) => Article.fromJson(e)).toList();
         _articles.sort((a, b) => b.date.compareTo(a.date));
         _filtered = List.from(_articles);
+        
       } else {
         _error = "Failed to load latest news";
       }
@@ -203,7 +217,8 @@ void _showCompanySelector(List<Map<String, dynamic>> companies) {
             .map((e) => Article.fromJson(e))
             .toList();
 
-        _filtered = List.from(_articles);
+        
+        _sortByLatest();
       } else {
         _error = "Failed to load trending news";
       }
@@ -243,7 +258,8 @@ Future<void> _fetchGlobalNews() async {
           .map((e) => Article.fromJson(e))
           .toList();
 
-      _filtered = List.from(_articles);
+      
+      _sortByLatest();
     } else {
       _error = "Failed to load global news";
     }
@@ -268,7 +284,8 @@ Future<void> _fetchCommoditiesNews() async {
           .map((e) => Article.fromJson(e))
           .toList();
 
-      _filtered = List.from(_articles);
+      
+      _sortByLatest();
     } else {
       _error = "Failed to load commodities news";
     }
@@ -364,6 +381,11 @@ Future<void> _toggleSaveNews(String newsId) async {
       break;
   }
 }
+void _sortByLatest() {
+  _articles.sort((a, b) => b.date.compareTo(a.date));
+  _filtered = List.from(_articles);
+}
+
 
   // ------------------------- SHOW FULL STORY -------------------------
  Future<void> _showFullStory(Article a) async {
@@ -658,7 +680,21 @@ Future<void> _toggleSaveNews(String newsId) async {
 
    return Expanded(
   child: RefreshIndicator(
-    onRefresh: _fetchLatestNews,
+    onRefresh: () {
+  switch (_tabIndex) {
+    case 0:
+      return _fetchLatestNews();
+    case 1:
+      return _fetchTrendingNews();
+    case 2:
+      return _fetchGlobalNews();
+    case 3:
+      return _fetchCommoditiesNews();
+    default:
+      return _fetchLatestNews();
+  }
+},
+
     child: ListView.builder(
       itemCount: _filtered.length,
       padding: const EdgeInsets.only(bottom: 80),
