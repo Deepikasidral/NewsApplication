@@ -1,10 +1,8 @@
 import json
-from openai import AzureOpenAI
-from mcp_server.config import (
-    AZURE_OPENAI_ENDPOINT,
-    AZURE_OPENAI_KEY,
-    AZURE_DEPLOYMENT
-)
+from openai import OpenAI
+
+from mcp_server.config import OPENAI_API_KEY
+
 from mcp_server.tools import (
     search_news,
     get_latest_news,
@@ -48,12 +46,11 @@ IMPORTANT:
 
 
 
-def get_azure_client():
-    return AzureOpenAI(
-        api_key=AZURE_OPENAI_KEY,
-        azure_endpoint=AZURE_OPENAI_ENDPOINT,
-        api_version="2024-02-01",
+def get_openai_client():
+    return OpenAI(
+        api_key=OPENAI_API_KEY
     )
+
 
 TOOLS = [
     {
@@ -134,7 +131,7 @@ TOOL_MAP = {
 def ask_llm(question: str) -> str:
     global CHAT_HISTORY
 
-    client = get_azure_client()
+    client = get_openai_client()
 
     # ============================
     # BUILD CONTEXT FROM MEMORY
@@ -152,7 +149,7 @@ def ask_llm(question: str) -> str:
     # STEP 1: TOOL DECISION
     # ============================
     response = client.chat.completions.create(
-        model=AZURE_DEPLOYMENT,
+        model="gpt-4o-mini",
         messages=[
             {
                 "role": "system",
@@ -180,7 +177,7 @@ def ask_llm(question: str) -> str:
         # Tool returned nothing → fallback to LLM
         if not tool_result:
             final = client.chat.completions.create(
-                model=AZURE_DEPLOYMENT,
+                model="gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": SYSTEM_FINAL_PROMPT},
                     *CHAT_HISTORY,
@@ -194,7 +191,7 @@ def ask_llm(question: str) -> str:
         else:
             # Tool has data → reason silently
             final = client.chat.completions.create(
-                model=AZURE_DEPLOYMENT,
+                model="gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": SYSTEM_FINAL_PROMPT},
                     *CHAT_HISTORY,
@@ -216,7 +213,7 @@ def ask_llm(question: str) -> str:
     # ============================
     else:
         final = client.chat.completions.create(
-            model=AZURE_DEPLOYMENT,
+            model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": SYSTEM_FINAL_PROMPT},
                 *CHAT_HISTORY,

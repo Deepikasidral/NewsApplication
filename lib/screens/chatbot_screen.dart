@@ -181,8 +181,8 @@ void dispose() {
         const SizedBox(height: 32),
 
         _buildSuggestion("Help me understand today's market trend"),
-        _buildSuggestion("Summarize latest business news"),
-        _buildSuggestion("Explain impact of RBI decisions"),
+        _buildSuggestion("Ask about 10 top volatile stocks today"),
+        _buildSuggestion("Ask about best funds to start sip in"),
 
         const Spacer(flex: 3),
       ],

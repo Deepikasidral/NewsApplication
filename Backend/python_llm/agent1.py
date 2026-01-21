@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from urllib.parse import quote
 from dotenv import load_dotenv
 from pymongo import MongoClient
-from openai import AzureOpenAI
+from openai import OpenAI
 from pytz import timezone as pytz_timezone
 import hashlib
 
@@ -50,13 +50,10 @@ companies_col = db["Company_data"]
 
 
 
-azure_client = AzureOpenAI(
-    api_key=os.getenv("AZURE_OPENAI_KEY"),
-    azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
-    api_version=os.getenv("AZURE_OPENAI_API_VERSION")
+openai_client = OpenAI(
+    api_key=os.getenv("OPENAI_API_KEY")
 )
 
-AZURE_DEPLOYMENT = os.getenv("AZURE_DEPLOYMENT")
 
 
 
@@ -161,17 +158,19 @@ def fetch_pti_news():
 # ================================
 def get_llm_response(system_prompt, user_input):
     try:
-        response = azure_client.chat.completions.create(
-            model=AZURE_DEPLOYMENT,  # deployment name
+        response = openai_client.chat.completions.create(
+            model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_input},
             ],
             temperature=0.0,
         )
+
         return response.choices[0].message.content.strip()
+
     except Exception as e:
-        print("❌ Azure OpenAI Error:", str(e))
+        print("❌ OpenAI Error:", e)
         return None
 
 # ================================
