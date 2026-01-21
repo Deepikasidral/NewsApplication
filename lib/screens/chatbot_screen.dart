@@ -350,7 +350,15 @@ Widget build(BuildContext context) {
           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen())),
           child: const Padding(
             padding: EdgeInsets.only(right: 16),
-            child: CircleAvatar(radius: 18, backgroundImage: NetworkImage('https://i.pravatar.cc/300')),
+            child: CircleAvatar(
+  radius: 18,
+  backgroundColor: Color(0xFFE0E0E0),
+  child: Icon(
+    Icons.person,
+    size: 18,
+    color: Color(0xFF757575),
+  ),
+),
           ),
         ),
       ],

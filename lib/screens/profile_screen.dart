@@ -276,18 +276,17 @@ Widget build(BuildContext context) {
             const SizedBox(height: 20),
 
             /// 🔴 PROFILE IMAGE
-            Center(
-              child: CircleAvatar(
-                radius: 55,
-                backgroundColor: Colors.red,
-                child: const CircleAvatar(
-                  radius: 52,
-                  backgroundImage: NetworkImage(
-                    "https://i.pravatar.cc/300",
-                  ),
-                ),
+           Center(
+            child: CircleAvatar(
+              radius: 55,
+              backgroundColor: Colors.grey.shade300,
+              child: Icon(
+                Icons.person,
+                size: 50,
+                color: Colors.grey.shade600,
               ),
             ),
+          ),
 
             const SizedBox(height: 30),
 

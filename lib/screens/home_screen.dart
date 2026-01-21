@@ -629,10 +629,15 @@ void _sortByLatest() {
       MaterialPageRoute(builder: (_) => const ProfileScreen()),
     );
   },
-  child: const CircleAvatar(
-    radius: 22,
-    backgroundImage: NetworkImage('https://i.pravatar.cc/300'),
+  child: CircleAvatar(
+  radius: 18,
+  backgroundColor: Color(0xFFE0E0E0),
+  child: Icon(
+    Icons.person,
+    size: 18,
+    color: Color(0xFF757575),
   ),
+),
 ),
 
         ],

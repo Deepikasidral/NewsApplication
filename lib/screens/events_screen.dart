@@ -289,10 +289,15 @@ Future<void> _toggleSaveEvent(CorporateEvent event) async {
                   ),
                   GestureDetector(
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen())),
-                    child: const CircleAvatar(
-                      radius: 20,
-                      backgroundImage: NetworkImage('https://i.pravatar.cc/300'),
-                    ),
+                    child: CircleAvatar(
+  radius: 18,
+  backgroundColor: Color(0xFFE0E0E0),
+  child: Icon(
+    Icons.person,
+    size: 18,
+    color: Color(0xFF757575),
+  ),
+),
                   ),
                 ],
               ),
@@ -644,7 +649,7 @@ Future<void> _toggleSaveEvent(CorporateEvent event) async {
 
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 2),
           Text(
             event.title,
             style: const TextStyle(
@@ -660,7 +665,7 @@ Future<void> _toggleSaveEvent(CorporateEvent event) async {
               color: Colors.grey.shade700,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 2),
           Row(
             children: [
               Icon(
@@ -690,15 +695,7 @@ Future<void> _toggleSaveEvent(CorporateEvent event) async {
                   color: Colors.grey.shade600,
                 ),
               ),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF05151).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-               
-              ),
+              
             ],
           ),
         ],
