@@ -7,6 +7,7 @@ import 'chatbot_screen.dart';
 import 'events_screen.dart';
 import 'saved_screen.dart';
 import 'profile_screen.dart';
+import '../services/stock_price_service.dart';
 
 class CompanyScreen extends StatefulWidget {
   const CompanyScreen({super.key});
@@ -164,70 +165,9 @@ class _CompanyScreenState extends State<CompanyScreen> {
                                   final companyName = company["Company Name"] ?? "Unknown";
                                   final symbol = company["Symbol"] ?? "";
 
-                                  return Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 14.0, vertical: 8),
-                                    child: InkWell(
-                                      onTap: () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) => CompanyNewsScreen(
-                                              companyName: companyName,
-                                              companySymbol: symbol,
-                                            ),
-                                          ),
-                                        );
-                                      },
-                                      borderRadius: BorderRadius.circular(14),
-                                      child: Container(
-                                        padding: const EdgeInsets.all(16),
-                                        decoration: BoxDecoration(
-                                          color: Colors.white,
-                                          borderRadius: BorderRadius.circular(14),
-                                          border: Border.all(color: Colors.grey.shade200),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: Colors.grey.withOpacity(0.06),
-                                              blurRadius: 8,
-                                            ),
-                                          ],
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(
-                                                    companyName,
-                                                    style: const TextStyle(
-                                                      fontSize: 16.5,
-                                                      fontWeight: FontWeight.bold,
-                                                    ),
-                                                  ),
-                                                  if (symbol.isNotEmpty) ...[
-                                                    const SizedBox(height: 6),
-                                                    Text(
-                                                      "Symbol: $symbol",
-                                                      style: TextStyle(
-                                                        fontSize: 14,
-                                                        color: Colors.grey.shade600,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ],
-                                              ),
-                                            ),
-                                            Icon(
-                                              Icons.arrow_forward_ios,
-                                              size: 16,
-                                              color: Colors.grey.shade400,
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
+                                  return CompanyListItem(
+                                    companyName: companyName,
+                                    symbol: symbol,
                                   );
                                 },
                               ),
@@ -277,6 +217,118 @@ class _CompanyScreenState extends State<CompanyScreen> {
           BottomNavigationBarItem(icon: Icon(Icons.event_available), label: "EVENTS"),
           BottomNavigationBarItem(icon: Icon(Icons.bookmark), label: "Saved"),
         ],
+      ),
+    );
+  }
+}
+
+
+class CompanyListItem extends StatefulWidget {
+  final String companyName;
+  final String symbol;
+
+  const CompanyListItem({
+    super.key,
+    required this.companyName,
+    required this.symbol,
+  });
+
+  @override
+  State<CompanyListItem> createState() => _CompanyListItemState();
+}
+
+class _CompanyListItemState extends State<CompanyListItem> {
+  Map<String, dynamic>? stockData;
+  bool loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchStockPrice();
+  }
+
+  Future<void> _fetchStockPrice() async {
+    if (widget.symbol.isEmpty) {
+      setState(() => loading = false);
+      return;
+    }
+
+    final data = await StockPriceService.getStockPrice(widget.symbol);
+    setState(() {
+      stockData = data;
+      loading = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 4),
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => CompanyNewsScreen(
+                companyName: widget.companyName,
+                companySymbol: widget.symbol,
+              ),
+            ),
+          );
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border(
+              bottom: BorderSide(color: Colors.grey.shade200, width: 1),
+            ),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  widget.companyName,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              if (loading)
+                const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else if (stockData != null) ...[
+                const SizedBox(
+                  height: 30,
+                  child: VerticalDivider(color: Colors.grey, thickness: 1),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  stockData!['price'],
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  stockData!['changePercent'],
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: double.parse(stockData!['changePercent']) >= 0
+                        ? Colors.green
+                        : Colors.red,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }
