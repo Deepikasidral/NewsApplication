@@ -33,15 +33,26 @@ router.post("/notifications", async (req, res) => {
   try {
     const { userId, enabled } = req.body;
 
-    await User.findByIdAndUpdate(userId, {
-      notifications: enabled,
+    console.log("🔔 Notification toggle request:", {
+      userId,
+      enabled
     });
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { notifications: enabled },
+      { new: true }
+    );
+
+    console.log("✅ Updated user:", updatedUser);
 
     res.json({ success: true });
   } catch (err) {
+    console.error("❌ Notification update failed:", err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
+
 
 /// 📊 GET ANALYTICS DASHBOARD (must be before POST /analytics)
 router.get("/analytics/dashboard", async (req, res) => {
@@ -88,9 +99,28 @@ router.post("/save-fcm", async (req, res) => {
   try {
     const { userId, fcmToken } = req.body;
 
-    await User.findByIdAndUpdate(userId, { fcmToken });
+    console.log("📩 save-fcm called:", { userId, fcmToken });
+
+    if (!userId || !fcmToken) {
+      return res.status(400).json({ success: false, reason: "Missing data" });
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { $set: { fcmToken } },
+      { new: true }
+    );
+
+    if (!updatedUser) {
+      console.error("❌ User not found for FCM save");
+      return res.status(404).json({ success: false });
+    }
+
+    console.log("✅ FCM token stored for user:", updatedUser.email);
+
     res.json({ success: true });
   } catch (err) {
+    console.error("❌ save-fcm error:", err);
     res.status(500).json({ success: false });
   }
 });

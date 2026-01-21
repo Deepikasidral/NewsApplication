@@ -10,6 +10,8 @@ import 'chatbot_screen.dart';
 import 'company_screen.dart';
 import 'saved_screen.dart';
 import 'profile_screen.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class EventsScreen extends StatefulWidget {
   const EventsScreen({super.key});
@@ -28,7 +30,7 @@ class _EventsScreenState extends State<EventsScreen> {
   List<CorporateEvent> _upcomingEvents = [];
   Set<String> _locallySavedEventIds = {};
   late String currentUserId;
-  int _bottomIndex = 4;
+  int _bottomIndex = 3;
 
 
   @override
@@ -217,6 +219,23 @@ Future<void> _toggleSaveEvent(CorporateEvent event) async {
   }
 }
 
+  BottomNavigationBarItem _navItem({
+  required String label,
+  required String active,
+  required String inactive,
+  required int index,
+}) {
+  final bool selected = _bottomIndex == index;
+
+  return BottomNavigationBarItem(
+    icon: SvgPicture.asset(
+      selected ? active : inactive,
+      height: 22,
+    ),
+    label: label,
+    tooltip: label,
+  );
+}
 
   @override
   Widget build(BuildContext context) {
@@ -270,10 +289,15 @@ Future<void> _toggleSaveEvent(CorporateEvent event) async {
                   ),
                   GestureDetector(
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen())),
-                    child: const CircleAvatar(
-                      radius: 20,
-                      backgroundImage: NetworkImage('https://i.pravatar.cc/300'),
-                    ),
+                    child: CircleAvatar(
+  radius: 18,
+  backgroundColor: Color(0xFFE0E0E0),
+  child: Icon(
+    Icons.person,
+    size: 18,
+    color: Color(0xFF757575),
+  ),
+),
                   ),
                 ],
               ),
@@ -329,48 +353,107 @@ Future<void> _toggleSaveEvent(CorporateEvent event) async {
           ],
         ),
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _bottomIndex,
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: const Color(0xFFEA6B6B),
-        unselectedItemColor: Colors.black54,
-        onTap: (index) {
-          if (index == _bottomIndex) return;
+      bottomNavigationBar: Container(
+  decoration: const BoxDecoration(
+    color: Colors.white,
+    border: Border(
+      top: BorderSide(color: Color(0xFFE0E0E0), width: 0.8),
+    ),
+  ),
+  child: BottomNavigationBar(
+  currentIndex: _bottomIndex,
+  type: BottomNavigationBarType.fixed,
+  backgroundColor: Colors.white,
+  elevation: 0,
 
-          Widget destination;
-          switch (index) {
-            case 0:
-              destination = const NewsFeedScreen();
-              break;
-            case 2:
-              destination = const ChatbotScreen();
-              break;
-            case 3:
-              destination = const CompanyScreen();
-              break;
-            case 4:
-              return;
-            case 5:
-              destination = const SavedNewsFeedScreen();
-              break;
-            default:
-              return;
-          }
-          
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => destination),
-          );
-        },
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.newspaper), label: "NEWS"),
-          BottomNavigationBarItem(icon: Icon(Icons.show_chart), label: "INDEX"),
-          BottomNavigationBarItem(icon: Icon(Icons.smart_toy), label: "ASK AI"),
-          BottomNavigationBarItem(icon: Icon(Icons.business), label: "COMPANIES"),
-          BottomNavigationBarItem(icon: Icon(Icons.event_available), label: "EVENTS"),
-          BottomNavigationBarItem(icon: Icon(Icons.bookmark), label: "Saved"),
-        ],
-      ),
+  // 🔥 THIS FIXES BLUE TEXT
+  selectedItemColor: const Color(0xFFEA6B6B),
+  unselectedItemColor: Colors.black54,
+
+  showUnselectedLabels: true,
+
+  selectedLabelStyle: GoogleFonts.poppins(
+    fontSize: 13,
+    fontWeight: FontWeight.w600,
+    height: 1.2,
+  ),
+  unselectedLabelStyle: GoogleFonts.poppins(
+    fontSize: 13,
+    fontWeight: FontWeight.w400,
+    height: 1.2,
+  ),
+ onTap: (index) {
+  if (index == _bottomIndex) return;
+
+  Widget? destination;
+
+  switch (index) {
+    case 0:
+      destination=const NewsFeedScreen();
+      break;
+
+    case 1:
+      destination = const ChatbotScreen();
+      break;
+
+    case 2:
+      destination = const CompanyScreen();
+      break;
+
+    case 3:
+      destination = const EventsScreen();
+      break;
+
+    case 4:
+      destination = const SavedNewsFeedScreen();
+      break;
+
+    default:
+      return;
+  }
+
+  Navigator.pushReplacement(
+    context,
+    MaterialPageRoute(builder: (_) => destination!),
+  );
+},
+
+
+  items: [
+    _navItem(
+      label: "NEWS",
+      active: 'assets/icons/News Red.svg',
+      inactive: 'assets/icons/News.svg',
+      index: 0,
+    ),
+    _navItem(
+      label: "ASK AI",
+      active: 'assets/icons/Ask AI Red.svg',
+      inactive: 'assets/icons/Ask AI.svg',
+      index: 1,
+    ),
+    _navItem(
+      label: "COMPANIES",
+      active: 'assets/icons/Graph Red.svg',
+      inactive: 'assets/icons/Graph.svg',
+      index: 2,
+    ),
+    _navItem(
+      label: "EVENTS",
+      active: 'assets/icons/Calender Red.svg',
+      inactive: 'assets/icons/Calender.svg',
+      index: 3,
+    ),
+    _navItem(
+      label: "SAVED",
+      active: 'assets/icons/Save red.svg',
+      inactive: 'assets/icons/Save.svg',
+      index: 4,
+    ),
+  ],
+),
+
+),
     );
   }
 
@@ -566,7 +649,7 @@ Future<void> _toggleSaveEvent(CorporateEvent event) async {
 
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 2),
           Text(
             event.title,
             style: const TextStyle(
@@ -582,7 +665,7 @@ Future<void> _toggleSaveEvent(CorporateEvent event) async {
               color: Colors.grey.shade700,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 2),
           Row(
             children: [
               Icon(
@@ -612,15 +695,7 @@ Future<void> _toggleSaveEvent(CorporateEvent event) async {
                   color: Colors.grey.shade600,
                 ),
               ),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF05151).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-               
-              ),
+              
             ],
           ),
         ],

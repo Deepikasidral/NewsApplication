@@ -13,6 +13,7 @@ dependencies:
     sdk: flutter
   
   google_sign_in: ^6.2.1
+  flutter_svg: ^2.0.10
   google_fonts: ^6.1.0
   cupertino_icons: ^1.0.8
   http: ^1.2.0
@@ -41,6 +42,7 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
+    - assets/icons/
     - assets/tradingview.png
     - LOGO 1024x1024.png
     - UI branding with tg.png

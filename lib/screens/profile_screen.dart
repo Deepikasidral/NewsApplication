@@ -5,8 +5,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:news_application/screens/sign_in_screen.dart';
 
-
-
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -20,7 +18,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String name = "";
   String email = "";
   
-  bool notificationsEnabled = true;
+
   final String disclaimerText = '''
 RupeeLetter is a financial news and information platform.
 
@@ -172,7 +170,7 @@ RupeeLetter is a financial news and insights platform focused on simplifying mar
       setState(() {
         name = user['name'] ?? "";
         email = user['email'] ?? "";
-        notificationsEnabled = user['notifications'] ?? true;
+
         loading = false;
       });
     } catch (e) {
@@ -193,25 +191,6 @@ RupeeLetter is a financial news and insights platform focused on simplifying mar
     MaterialPageRoute(builder: (_) => const SignInScreen()),
     (route) => false,
   );
-}
-Future<void> updateNotification(bool value) async {
-  final prefs = await SharedPreferences.getInstance();
-  final userId = prefs.getString("userId");
-
-  if (userId == null) return;
-
-  try {
-    await http.post(
-      Uri.parse("$baseUrl/api/users/notifications"),
-      headers: {"Content-Type": "application/json"},
-      body: jsonEncode({
-        "userId": userId,
-        "enabled": value,
-      }),
-    );
-  } catch (e) {
-    debugPrint("Notification update failed: $e");
-  }
 }
 
 void _showInfoDialog(String title, String content) {
@@ -297,18 +276,17 @@ Widget build(BuildContext context) {
             const SizedBox(height: 20),
 
             /// 🔴 PROFILE IMAGE
-            Center(
-              child: CircleAvatar(
-                radius: 55,
-                backgroundColor: Colors.red,
-                child: const CircleAvatar(
-                  radius: 52,
-                  backgroundImage: NetworkImage(
-                    "https://i.pravatar.cc/300",
-                  ),
-                ),
+           Center(
+            child: CircleAvatar(
+              radius: 55,
+              backgroundColor: Colors.grey.shade300,
+              child: Icon(
+                Icons.person,
+                size: 50,
+                color: Colors.grey.shade600,
               ),
             ),
+          ),
 
             const SizedBox(height: 30),
 
@@ -396,35 +374,10 @@ Widget build(BuildContext context) {
             const SizedBox(height: 30),
 
             /// ================= SETTINGS =================
-            Text(
-              "Settings",
-              style: GoogleFonts.poppins(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 10),
+            
+           
 
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  "Notifications",
-                  style: GoogleFonts.poppins(fontSize: 15),
-                ),
-                Switch(
-  value: notificationsEnabled,
-  onChanged: (val) {
-    setState(() => notificationsEnabled = val);
-    updateNotification(val);
-  },
-),
-
-              ],
-            ),
-
-            const SizedBox(height: 20),
-
+            
             /// ---------------- LOGOUT ----------------
             TextButton(
               onPressed: logout,

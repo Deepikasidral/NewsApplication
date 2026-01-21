@@ -1,0 +1,43 @@
+<svg width="128" height="128" viewBox="0 0 128 128" fill="none"
+     xmlns="http://www.w3.org/2000/svg">
+
+  <!-- Back page (3 sides, slightly rounded corners) -->
+  <path d="
+    M34 43
+    Q34 39 30 39
+    H22
+    Q18 39 18 43
+    V111
+    Q18 115 22 115
+    H30
+    Q34 115 34 115
+  "
+        stroke="#9CA3AF"
+        stroke-width="6"
+        fill="none"
+        stroke-linecap="round"
+        stroke-linejoin="round"/>
+
+  <!-- Front page -->
+  <rect x="34" y="24" width="74" height="92" rx="10"
+        stroke="#9CA3AF" stroke-width="6"/>
+
+  <!-- Image box -->
+  <rect x="50" y="40" width="22" height="18" rx="3"
+        stroke="#9CA3AF" stroke-width="5"/>
+
+  <!-- Small text lines beside image -->
+  <line x1="78" y1="44" x2="98" y2="44"
+        stroke="#9CA3AF" stroke-width="5" stroke-linecap="round"/>
+  <line x1="78" y1="56" x2="98" y2="56"
+        stroke="#9CA3AF" stroke-width="5" stroke-linecap="round"/>
+
+  <!-- Three equal lines below image box -->
+  <line x1="50" y1="72" x2="96" y2="72"
+        stroke="#9CA3AF" stroke-width="5" stroke-linecap="round"/>
+  <line x1="50" y1="84" x2="96" y2="84"
+        stroke="#9CA3AF" stroke-width="5" stroke-linecap="round"/>
+  <line x1="50" y1="96" x2="96" y2="96"
+        stroke="#9CA3AF" stroke-width="5" stroke-linecap="round"/>
+
+</svg>

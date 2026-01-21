@@ -6,8 +6,9 @@ from datetime import datetime, timedelta, timezone
 from urllib.parse import quote
 from dotenv import load_dotenv
 from pymongo import MongoClient
-from openai import AzureOpenAI
+from openai import OpenAI
 from pytz import timezone as pytz_timezone
+import hashlib
 
 import firebase_admin
 from firebase_admin import credentials, messaging
@@ -36,18 +37,25 @@ client = MongoClient(mongo_uri)
 db = client[db_name]
 
 filtered_news = db["filtered_news"]
-companies_col = db["Company_data"]
-
-azure_client = AzureOpenAI(
-    api_key=os.getenv("AZURE_OPENAI_KEY"),
-    azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
-    api_version=os.getenv("AZURE_OPENAI_API_VERSION")
+filtered_news.create_index(
+    "content_hash",
+    unique=True,
+    partialFilterExpression={
+        "content_hash": {"$exists": True}
+    }
 )
 
-AZURE_DEPLOYMENT = os.getenv("AZURE_DEPLOYMENT")
 
-# Ensure deduplication (safe to run multiple times)
-filtered_news.create_index("FileName", unique=True)
+companies_col = db["Company_data"]
+
+
+
+openai_client = OpenAI(
+    api_key=os.getenv("OPENAI_API_KEY")
+)
+
+
+
 
 FIREBASE_KEY_PATH = os.path.join(
     os.path.dirname(__file__),
@@ -80,6 +88,16 @@ def get_last_run_time():
 def save_last_run_time(dt):
     with open(LAST_RUN_FILE, "w") as f:
         f.write(dt.isoformat())
+
+def compute_news_hash(article):
+    text = (
+        (article.get("Headline", "") + " " + article.get("story", ""))
+        .lower()
+        .strip()
+    )
+    text = re.sub(r"\s+", " ", text)
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
 
 # ================================
 # 🌐 FETCH PTI NEWS
@@ -140,93 +158,95 @@ def fetch_pti_news():
 # ================================
 def get_llm_response(system_prompt, user_input):
     try:
-        response = azure_client.chat.completions.create(
-            model=AZURE_DEPLOYMENT,  # deployment name
+        response = openai_client.chat.completions.create(
+            model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_input},
             ],
             temperature=0.0,
         )
+
         return response.choices[0].message.content.strip()
+
     except Exception as e:
-        print("❌ Azure OpenAI Error:", str(e))
+        print("❌ OpenAI Error:", e)
         return None
 
 # ================================
 # ⚙️ notification CALL HELPER
 # ================================
 
-# def send_push_notification(article, agent2, agent3):
-#     title = "🚨 High Impact Market News"
-
-#     body = (
-#         f"{article.get('Headline')}\n"
-#         f"Sentiment: {agent3['sentiment']} | Impact: {agent3['impact']}"
-#     )
-
-#     message = messaging.Message(
-#         notification=messaging.Notification(
-#             title=title,
-#             body=body,
-#         ),
-#        data={
-#             "FileName": article.get("FileName", ""),
-#             "headline": article.get("Headline", ""),
-#             "sentiment": agent3["sentiment"],
-#             "impact": agent3["impact"]
-#         },
-
-#         topic="market_alerts"
-#     )
-
-#     try:
-#         messaging.send(message)
-#         print("🔔 Push notification sent")
-#     except Exception as e:
-#         print("❌ Push notification failed:", e)
-
 def send_push_notification(article, agent2, agent3):
     title = "🚨 High Impact Market News"
+
     body = (
         f"{article.get('Headline')}\n"
         f"Sentiment: {agent3['sentiment']} | Impact: {agent3['impact']}"
     )
 
-    # 🔥 ONLY USERS WHO ENABLED NOTIFICATIONS
-    users = db["Users"].find(
-        {
-            "notifications": True,
-            "fcmToken": {"$exists": True, "$ne": ""}
-        },
-        {"fcmToken": 1}
-    )
-
-    tokens = [u["fcmToken"] for u in users]
-
-    if not tokens:
-        print("🔕 No users eligible for notifications")
-        return
-
-    message = messaging.MulticastMessage(
+    message = messaging.Message(
         notification=messaging.Notification(
             title=title,
             body=body,
         ),
-        data={
+       data={
             "FileName": article.get("FileName", ""),
             "headline": article.get("Headline", ""),
             "sentiment": agent3["sentiment"],
             "impact": agent3["impact"]
         },
-        tokens=tokens
+
+        topic="market_alerts"
     )
 
     try:
-        response = messaging.send_multicast(message)
-        print(f"🔔 Sent to {response.success_count} users")
+        messaging.send(message)
+        print("🔔 Push notification sent")
     except Exception as e:
         print("❌ Push notification failed:", e)
+
+# def send_push_notification(article, agent2, agent3):
+#     title = "🚨 High Impact Market News"
+#     body = (
+#         f"{article.get('Headline')}\n"
+#         f"Sentiment: {agent3['sentiment']} | Impact: {agent3['impact']}"
+#     )
+
+#     # 🔥 ONLY USERS WHO ENABLED NOTIFICATIONS
+#     users = db["Users"].find(
+#         {
+#             "notifications": True,
+#             "fcmToken": {"$exists": True, "$ne": ""}
+#         },
+#         {"fcmToken": 1}
+#     )
+
+#     tokens = [u["fcmToken"] for u in users]
+
+#     if not tokens:
+#         print("🔕 No users eligible for notifications")
+#         return
+
+#     message = messaging.MulticastMessage(
+#         notification=messaging.Notification(
+#             title=title,
+#             body=body,
+#         ),
+#         data={
+#             "FileName": article.get("FileName", ""),
+#             "headline": article.get("Headline", ""),
+#             "sentiment": agent3["sentiment"],
+#             "impact": agent3["impact"]
+#         },
+#         tokens=tokens
+#     )
+
+#     try:
+#         response = messaging.send_multicast(message)
+#         print(f"🔔 Sent to {response.success_count} users")
+#     except Exception as e:
+#         print("❌ Push notification failed:", e)
 
 # ================================
 # 🧠 AGENT 1: NEWS FILTER
@@ -592,9 +612,7 @@ def run_pipeline():
         if not file_name:
             continue
 
-        if filtered_news.find_one({"FileName": file_name}):
-            print(f"⏩ Duplicate skipped: {file_name}")
-            continue
+        
 
         print(f"\n📰 Processing: {article.get('Headline','')[:80]}")
 
@@ -617,37 +635,45 @@ def run_pipeline():
             agent3["sentiment"] in ["Very Bullish", "Very Bearish"]
         )
 
-        if notify:
-            send_push_notification(article, agent2, agent3)
+        
+        
+        content_hash = compute_news_hash(article)
 
         final_doc = {
-            **article,
-            "decision": agent1["decision"],
-            "filter_reason": agent1.get("reason"),
-            "summary": agent2["summary"],
-            "sector": agent2["sector"],
-            "companies": agent2["companies"],
-            "global": agent2["global"],
-            "commodities": agent2["commodities"],
-            "sentiment": agent3["sentiment"],
-            "impact": agent3["impact"],
-            "impact_rationale": agent3.get("rationale"),
-            "ingested_at": datetime.now(timezone.utc)
-        }
+                **article,
+                "content_hash": content_hash,   # 🔥 ADD THIS
+                "decision": agent1["decision"],
+                "filter_reason": agent1.get("reason"),
+                "summary": agent2["summary"],
+                "sector": agent2["sector"],
+                "companies": agent2["companies"],
+                "global": agent2["global"],
+                "commodities": agent2["commodities"],
+                "sentiment": agent3["sentiment"],
+                "impact": agent3["impact"],
+                "impact_rationale": agent3.get("rationale"),
+                "ingested_at": datetime.now(timezone.utc)
+            }
+
 
         try:
-            filtered_news.insert_one(final_doc)
-            stored_count += 1
-            print("✅ Stored enriched PTI article")
-            
-            pti_time = parse_pti_time(article.get("PublishedAt", ""))
-            if pti_time:
-                save_last_run_time(pti_time)
-        except Exception as e:
-            if "duplicate key" in str(e).lower():
-                print(f"⏩ Duplicate insert race condition: {file_name}")
+            result = filtered_news.update_one(
+                {"content_hash": content_hash},
+                {"$setOnInsert": final_doc},
+                upsert=True
+            )
+
+            if result.upserted_id:
+                stored_count += 1
+                print("✅ Stored new article")
+
+                if notify:
+                    send_push_notification(article, agent2, agent3)
             else:
-                print(f"❌ Insert failed: {e}")
+                print("⏩ Duplicate skipped (same content)")
+        except Exception as e:
+            print(f"❌ Insert failed: {e}")
+
 
     print(f"\n🎯 Pipeline complete: Fetched={fetched_count}, Filtered={filtered_count}, Stored={stored_count}")
     
