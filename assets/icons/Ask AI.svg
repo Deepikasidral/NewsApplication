@@ -1,0 +1,23 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 64 64"
+  fill="none"
+  stroke="#8A8F94"
+  stroke-width="5"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="
+    M24 10
+    H50
+    A8 8 0 0 1 58 18
+    V38
+    A8 8 0 0 1 50 46
+    H22
+    L12 54
+    V18
+    A8 8 0 0 1 20 10
+    H24
+    Z
+  "/>
+</svg>
