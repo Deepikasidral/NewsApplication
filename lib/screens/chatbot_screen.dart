@@ -9,6 +9,9 @@ import 'saved_screen.dart';
 import 'events_screen.dart';
 import 'profile_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'home_screen.dart';
 
 
 class ChatbotScreen extends StatefulWidget {
@@ -23,8 +26,25 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   final TextEditingController _controller = TextEditingController();
   final List<ChatMessage> _messages = [];
   bool _loading = false;
-  int _bottomIndex = 0;
+  int _bottomIndex = 1;
   bool _rateLimited = false;
+  String _userName = "there";
+
+
+Future<void> _loadUserName() async {
+  final prefs = await SharedPreferences.getInstance();
+  setState(() {
+    _userName = prefs.getString("userName") ?? "there";
+  });
+}
+@override
+void initState() {
+  super.initState();
+  _loadUserName();
+}
+
+
+
 
 
   @override
@@ -125,6 +145,87 @@ void dispose() {
     _scrollToBottom(); 
   }
 
+  Widget _buildAskAIHome() {
+  return Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 20),
+    child: Column(
+      children: [
+        const Spacer(flex: 2),
+
+        
+
+        const SizedBox(height: 24),
+
+        /// GREETING
+        Text(
+          "Hi $_userName,",
+          style: GoogleFonts.poppins(
+            fontSize: 22,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+
+        const SizedBox(height: 8),
+
+              Text(
+        "What would you like to know about today’s markets?",
+        textAlign: TextAlign.center, // ✅ CENTER TEXT
+        style: GoogleFonts.poppins(
+          fontSize: 18,
+          fontWeight: FontWeight.w400,
+          color: Colors.black54,
+        ),
+      ),
+
+
+        const SizedBox(height: 32),
+
+        _buildSuggestion("Help me understand today's market trend"),
+        _buildSuggestion("Summarize latest business news"),
+        _buildSuggestion("Explain impact of RBI decisions"),
+
+        const Spacer(flex: 3),
+      ],
+    ),
+  );
+}
+Widget _buildSuggestion(String text) {
+  return GestureDetector(
+    onTap: () {
+      _controller.text = text;
+      _sendMessage();
+    },
+    child: Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black12.withOpacity(0.05),
+            blurRadius: 6,
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.auto_awesome, size: 18, color: Color(0xFFF05151)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: GoogleFonts.poppins(fontSize: 14.5),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+
   Widget _buildMessage(ChatMessage msg) {
     return Align(
       alignment: msg.isUser ? Alignment.centerRight : Alignment.centerLeft,
@@ -171,35 +272,72 @@ void dispose() {
   
 
   Widget _buildInputBar() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(color: Colors.black12, blurRadius: 6),
-        ],
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: TextField(
-                controller: _controller,
-                enabled: !_rateLimited,
-              decoration: const InputDecoration(
-                hintText: "Ask about news, companies, impact...",
-                border: InputBorder.none,
-              ),
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      boxShadow: [
+        BoxShadow(color: Colors.black12, blurRadius: 6),
+      ],
+    ),
+    child: Row(
+      children: [
+
+        /// 📷 CAMERA ICON
+        IconButton(
+          icon: const Icon(
+            Icons.camera_alt_outlined,
+            color: Colors.grey,
+          ),
+          onPressed: () {
+            // TODO: open camera / image picker later
+          },
+        ),
+
+        /// TEXT FIELD
+        Expanded(
+          child: TextField(
+            controller: _controller,
+            enabled: !_rateLimited,
+            decoration: InputDecoration(
+              hintText: "Ask anything",
+              hintStyle: GoogleFonts.poppins(color: Colors.grey),
+              border: InputBorder.none,
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.send, color: Color(0xFFF05151)),
-           onPressed: (_loading || _rateLimited) ? null : _sendMessage,
+        ),
 
-          )
-        ],
-      ),
-    );
-  }
+        /// ➤ SEND BUTTON
+        IconButton(
+          icon: const Icon(
+            Icons.send,
+            color: Color(0xFFF05151),
+          ),
+          onPressed: (_loading || _rateLimited) ? null : _sendMessage,
+        ),
+      ],
+    ),
+  );
+}
+
+
+  BottomNavigationBarItem _navItem({
+  required String label,
+  required String active,
+  required String inactive,
+  required int index,
+}) {
+  final bool selected = _bottomIndex == index;
+
+  return BottomNavigationBarItem(
+    icon: SvgPicture.asset(
+      selected ? active : inactive,
+      height: 22,
+    ),
+    label: label,
+    tooltip: label,
+  );
+}
 @override
 Widget build(BuildContext context) {
   return Scaffold(
@@ -219,12 +357,14 @@ Widget build(BuildContext context) {
     ),
     body: Column(
   children: [
-    Expanded(
-      child: ListView.builder(
-        controller: _scrollController,
-        itemCount: _messages.length,
-        itemBuilder: (_, i) => _buildMessage(_messages[i]),
-      ),
+   Expanded(
+      child: _messages.isEmpty
+          ? _buildAskAIHome()   // 👈 GOOGLE-STYLE HOME
+          : ListView.builder(
+              controller: _scrollController,
+              itemCount: _messages.length,
+              itemBuilder: (_, i) => _buildMessage(_messages[i]),
+            ),
     ),
 
     if (_loading)
@@ -252,48 +392,108 @@ Widget build(BuildContext context) {
   ],
 ),
 
-    bottomNavigationBar: BottomNavigationBar(
-      currentIndex: _bottomIndex,
-      type: BottomNavigationBarType.fixed,
-      selectedItemColor: const Color(0xFFEA6B6B),
-      unselectedItemColor: Colors.black54,
-      onTap: (index) {
-        if (index == _bottomIndex) return;
-
-        Widget destination;
-        switch (index) {
-          case 0:
-            destination = const NewsFeedScreen();
-            break;
-          case 2:
-            return;
-          case 3:
-            destination = const CompanyScreen();
-            break;
-          case 4:
-            destination = const EventsScreen();
-            break;
-          case 5:
-            destination = const SavedNewsFeedScreen();
-            break;
-          default:
-            return;
-        }
-        
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => destination),
-        );
-      },
-      items: const [
-        BottomNavigationBarItem(icon: Icon(Icons.newspaper), label: "NEWS"),
-        BottomNavigationBarItem(icon: Icon(Icons.show_chart), label: "INDEX"),
-        BottomNavigationBarItem(icon: Icon(Icons.smart_toy), label: "ASK AI"),
-        BottomNavigationBarItem(icon: Icon(Icons.business), label: "COMPANIES"),
-        BottomNavigationBarItem(icon: Icon(Icons.event_available), label: "EVENTS"),
-        BottomNavigationBarItem(icon: Icon(Icons.bookmark), label: "Saved"),
-      ],
+    bottomNavigationBar: Container(
+  decoration: const BoxDecoration(
+    color: Colors.white,
+    border: Border(
+      top: BorderSide(color: Color(0xFFE0E0E0), width: 0.8),
     ),
+  ),
+  child: BottomNavigationBar(
+  currentIndex: _bottomIndex,
+  type: BottomNavigationBarType.fixed,
+  backgroundColor: Colors.white,
+  elevation: 0,
+
+  // 🔥 THIS FIXES BLUE TEXT
+  selectedItemColor: const Color(0xFFEA6B6B),
+  unselectedItemColor: Colors.black54,
+
+  showUnselectedLabels: true,
+
+  selectedLabelStyle: GoogleFonts.poppins(
+    fontSize: 13,
+    fontWeight: FontWeight.w600,
+    height: 1.2,
+  ),
+  unselectedLabelStyle: GoogleFonts.poppins(
+    fontSize: 13,
+    fontWeight: FontWeight.w400,
+    height: 1.2,
+  ),
+ onTap: (index) {
+  if (index == _bottomIndex) return;
+
+  Widget? destination;
+
+  switch (index) {
+    case 0:
+      destination=const NewsFeedScreen();
+      break;
+
+    case 1:
+      destination = const ChatbotScreen();
+      break;
+
+    case 2:
+      destination = const CompanyScreen();
+      break;
+
+    case 3:
+      destination = const EventsScreen();
+      break;
+
+    case 4:
+      destination = const SavedNewsFeedScreen();
+      break;
+
+    default:
+      return;
+  }
+
+  Navigator.pushReplacement(
+    context,
+    MaterialPageRoute(builder: (_) => destination!),
+  );
+},
+
+
+  items: [
+    _navItem(
+      label: "NEWS",
+      active: 'assets/icons/News Red.svg',
+      inactive: 'assets/icons/News.svg',
+      index: 0,
+    ),
+    _navItem(
+      label: "ASK AI",
+      active: 'assets/icons/Ask AI Red.svg',
+      inactive: 'assets/icons/Ask AI.svg',
+      index: 1,
+    ),
+    _navItem(
+      label: "COMPANIES",
+      active: 'assets/icons/Graph Red.svg',
+      inactive: 'assets/icons/Graph.svg',
+      index: 2,
+    ),
+    _navItem(
+      label: "EVENTS",
+      active: 'assets/icons/Calender Red.svg',
+      inactive: 'assets/icons/Calender.svg',
+      index: 3,
+    ),
+    _navItem(
+      label: "SAVED",
+      active: 'assets/icons/Save red.svg',
+      inactive: 'assets/icons/Save.svg',
+      index: 4,
+    ),
+  ],
+),
+
+),
+
   );
 }
 }

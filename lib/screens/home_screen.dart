@@ -13,6 +13,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_html/flutter_html.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+
 
 
 
@@ -51,7 +53,7 @@ bool _hasLoadedOnce = false;
 void initState() {
   super.initState();
   WidgetsBinding.instance.addObserver(this);
-
+  _bottomIndex = 0; 
   _searchController.addListener(_applySearch);
   _init();
 }
@@ -90,6 +92,13 @@ void didChangeAppLifecycleState(AppLifecycleState state) {
     }
   }
 }
+List<Article> _removeDuplicates(List<Article> list) {
+  final map = <String, Article>{};
+  for (var a in list) {
+    map[a.id] = a; // _id should be unique
+  }
+  return map.values.toList();
+}
 
 
 
@@ -125,7 +134,9 @@ void didChangeAppLifecycleState(AppLifecycleState state) {
 
       if (resp.statusCode == 200) {
         final data = json.decode(resp.body);
-        _articles = (data as List).map((e) => Article.fromJson(e)).toList();
+        _articles = _removeDuplicates(
+  (data as List).map((e) => Article.fromJson(e)).toList(),
+);
         _articles.sort((a, b) => b.date.compareTo(a.date));
         _filtered = List.from(_articles);
         
@@ -213,9 +224,9 @@ void _showCompanySelector(List<Map<String, dynamic>> companies) {
 
       if (resp.statusCode == 200) {
         final body = json.decode(resp.body);
-        _articles = (body['data'] as List)
-            .map((e) => Article.fromJson(e))
-            .toList();
+       _articles = _removeDuplicates(
+            (body['data'] as List).map((e) => Article.fromJson(e)).toList(),
+          );
 
         
         _sortByLatest();
@@ -225,6 +236,8 @@ void _showCompanySelector(List<Map<String, dynamic>> companies) {
     } catch (e) {
       _error = "Error: $e";
     }
+    _hasLoadedOnce = true;
+
 
     _stopLoading();
   }
@@ -254,10 +267,9 @@ Future<void> _fetchGlobalNews() async {
 
     if (resp.statusCode == 200) {
       final body = json.decode(resp.body);
-      _articles = (body['data'] as List)
-          .map((e) => Article.fromJson(e))
-          .toList();
-
+      _articles = _removeDuplicates(
+  (body['data'] as List).map((e) => Article.fromJson(e)).toList(),
+);
       
       _sortByLatest();
     } else {
@@ -266,6 +278,7 @@ Future<void> _fetchGlobalNews() async {
   } catch (e) {
     _error = "Error: $e";
   }
+  _hasLoadedOnce = true;
 
   _stopLoading();
 }
@@ -280,9 +293,9 @@ Future<void> _fetchCommoditiesNews() async {
 
     if (resp.statusCode == 200) {
       final body = json.decode(resp.body);
-      _articles = (body['data'] as List)
-          .map((e) => Article.fromJson(e))
-          .toList();
+      _articles = _removeDuplicates(
+  (body['data'] as List).map((e) => Article.fromJson(e)).toList(),
+);
 
       
       _sortByLatest();
@@ -292,6 +305,7 @@ Future<void> _fetchCommoditiesNews() async {
   } catch (e) {
     _error = "Error: $e";
   }
+  _hasLoadedOnce = true;
 
   _stopLoading();
 }
@@ -422,158 +436,159 @@ void _sortByLatest() {
   }
 
   showDialog(
-    context: context,
-    barrierDismissible: true,
-    builder: (ctx) => Dialog(
-      backgroundColor: const Color(0xFFF5EDED),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+  context: context,
+  barrierDismissible: true,
+  builder: (ctx) => Dialog(
+    backgroundColor: Colors.white, // ✅ WHITE BACKGROUND
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(16),
+    ),
+    child: SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
 
-            /// ---------------- TITLE ----------------
-            Text(
-              a.title,
-              style: GoogleFonts.poppins(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
+          /// ---------------- TITLE ----------------
+          Text(
+            a.title,
+            style: GoogleFonts.poppins(
+              fontSize: 16,           // ✅ SAME AS CARD TITLE
+              fontWeight: FontWeight.w700,
+              color: Colors.black,
+            ),
+          ),
+
+          const SizedBox(height: 12),
+
+          /// ---------------- FULL STORY ----------------
+          if (a.story.isNotEmpty) ...[
+            Html(
+              data: a.story,
+              style: {
+                "p": Style(
+                  fontFamily: GoogleFonts.poppins().fontFamily,
+                  fontSize: FontSize(14.5), // ✅ SAME AS CARD SUMMARY
+                  lineHeight: LineHeight.number(1.4),
+                  color: Colors.black87,
+                  margin: Margins.only(bottom: 12),
+                ),
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+
+          /// ---------------- SENTIMENT ----------------
+          if (a.sentiment.isNotEmpty)
+            Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: "Sentiment: ",
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black,
+                    ),
+                  ),
+                  TextSpan(
+                    text: a.sentiment,
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: sentimentColor(a.sentiment),
+                    ),
+                  ),
+                ],
               ),
             ),
 
-            const SizedBox(height: 12),
+          const SizedBox(height: 6),
 
-            /// ---------------- FULL STORY ----------------
-            if (a.story.isNotEmpty) ...[
-              
-              const SizedBox(height: 8),
-
-              Html(
-                data: a.story,
-                style: {
-                  "p": Style(
-                    fontFamily: GoogleFonts.poppins().fontFamily,
-                    fontSize: FontSize(14.5),
-                    lineHeight: LineHeight.number(1.5),
-                    margin: Margins.only(bottom: 12),
+          /// ---------------- IMPACT ----------------
+          if (a.impact.isNotEmpty)
+            Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: "Impact: ",
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black,
+                    ),
                   ),
-                },
-              ),
-
-              const SizedBox(height: 16),
-            ],
-
-            /// ---------------- SENTIMENT ----------------
-            if (a.sentiment.isNotEmpty)
-              Text.rich(
-                TextSpan(
-                  children: [
-                    TextSpan(
-                      text: "Sentiment: ",
-                      style: GoogleFonts.poppins(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.black,
-                      ),
+                  TextSpan(
+                    text: a.impact,
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: impactColor(a.impact),
                     ),
-                    TextSpan(
-                      text: a.sentiment,
-                      style: GoogleFonts.poppins(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: sentimentColor(a.sentiment),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-            const SizedBox(height: 6),
-
-            /// ---------------- IMPACT ----------------
-            if (a.impact.isNotEmpty)
-              Text.rich(
-                TextSpan(
-                  children: [
-                    TextSpan(
-                      text: "Impact: ",
-                      style: GoogleFonts.poppins(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.black,
-                      ),
-                    ),
-                    TextSpan(
-                      text: a.impact,
-                      style: GoogleFonts.poppins(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: impactColor(a.impact),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-            /// ---------------- COMPANIES ----------------
-            if (a.companies.isNotEmpty) ...[
-              const SizedBox(height: 16),
-
-              Text(
-                "Companies",
-                style: GoogleFonts.poppins(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-
-              const SizedBox(height: 8),
-
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: a.companies.map(
-                  (company) => Chip(
-                    label: Text(
-                      company,
-                      style: GoogleFonts.poppins(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
-                    ),
-                    backgroundColor: const Color(0xFFEA6B6B),
                   ),
-                ).toList(),
+                ],
               ),
-            ],
+            ),
 
-            const SizedBox(height: 20),
+          /// ---------------- COMPANIES ----------------
+          if (a.companies.isNotEmpty) ...[
+            const SizedBox(height: 14),
 
-            /// ---------------- CLOSE ----------------
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: Text(
-                  "Close",
-                  style: GoogleFonts.poppins(
-                    color: const Color(0xFFEA6B6B),
-                    fontWeight: FontWeight.w700,
+            Text(
+              "Companies",
+              style: GoogleFonts.poppins(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: Colors.black,
+              ),
+            ),
+
+            const SizedBox(height: 8),
+
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: a.companies.map(
+                (company) => Chip(
+                  backgroundColor: const Color(0xFFEA6B6B),
+                  label: Text(
+                    company,
+                    style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
-              ),
+              ).toList(),
             ),
           ],
-        ),
+
+          const SizedBox(height: 18),
+
+          /// ---------------- CLOSE BUTTON ----------------
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(
+                "Close",
+                style: GoogleFonts.poppins(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFFEA6B6B),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     ),
+  ),
+
+
   );
 }
-
 
 
   // ------------------------- UI -------------------------
@@ -625,43 +640,86 @@ void _sortByLatest() {
     );
   }
 
-  Widget _buildTabsRow() {
-    final tabs = ["LATEST", "TRENDING", "GLOBAL", "COMMODITIES"];
+Widget _buildTabsRow() {
+  final tabs = ["LATEST", "TRENDING", "GLOBAL", "COMMODITIES"];
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: SizedBox(
-        height: 46,
-        child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          itemCount: tabs.length,
-          separatorBuilder: (_, __) => const SizedBox(width: 8),
-          itemBuilder: (context, idx) {
-            final selected = idx == _tabIndex;
-            return GestureDetector(
-              onTap: () => _onTabChange(idx),
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color:
-                      selected ? const Color(0xFFEDECF0) : Colors.transparent,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  tabs[idx],
-                  style: TextStyle(
-                    fontWeight:
-                        selected ? FontWeight.bold : FontWeight.normal,
+  return Container(
+    color: Colors.white,
+    child: Column(
+      children: [
+        SizedBox(
+          height: 44,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: tabs.length,
+            itemBuilder: (context, idx) {
+              final selected = idx == _tabIndex;
+
+              return GestureDetector(
+                onTap: () => _onTabChange(idx),
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 22),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        tabs[idx],
+                        style: GoogleFonts.poppins(
+                          fontSize: 13,
+                          fontWeight:
+                              selected ? FontWeight.w600 : FontWeight.w400,
+                          color: selected
+                              ? const Color(0xFFEA6B6B)
+                              : Colors.black54,
+                        ),
+                      ),
+
+                      const SizedBox(height: 4),
+
+                      /// ✅ underline EXACTLY same width as text
+                      Container(
+                        height: 2,
+                        decoration: BoxDecoration(
+                          color: selected
+                              ? const Color(0xFFEA6B6B)
+                              : Colors.transparent,
+                        ),
+                        width: _textWidth(
+                          tabs[idx],
+                          GoogleFonts.poppins(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         ),
-      ),
-    );
-  }
+
+        const Divider(height: 1, thickness: 0.8),
+      ],
+    ),
+  );
+}
+
+
+double _textWidth(String text, TextStyle style) {
+  final painter = TextPainter(
+    text: TextSpan(text: text, style: style),
+    maxLines: 1,
+    textDirection: Directionality.of(context), // ✅ FIX
+  )..layout();
+
+  return painter.size.width;
+}
+
+
 
   Widget _buildFeed() {
     if (_isLoading) {
@@ -822,7 +880,7 @@ Widget _buildArticleCard(Article a) {
                 ),
               ),
 
-            const SizedBox(height: 6),
+            const SizedBox(height: 0),
 
             /// ---------------- IMPACT ----------------
             if (a.impact.isNotEmpty)
@@ -849,7 +907,7 @@ Widget _buildArticleCard(Article a) {
                 ),
               ),
 
-            const SizedBox(height: 10),
+            const SizedBox(height: 0),
 
             /// ---------------- FOOTER ----------------
            /// ---------------- FOOTER ----------------
@@ -929,11 +987,32 @@ Row(
   );
 }
 
+BottomNavigationBarItem _navItem({
+  required String label,
+  required String active,
+  required String inactive,
+  required int index,
+}) {
+  final bool selected = _bottomIndex == index;
+
+  return BottomNavigationBarItem(
+    icon: SvgPicture.asset(
+      selected ? active : inactive,
+      height: 22,
+    ),
+    label: label,
+    tooltip: label,
+  );
+}
+
+
+
+
   // ------------------------- BUILD -------------------------
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F7FA),
+      backgroundColor: const Color.fromARGB(255, 255, 255, 255),
       body: SafeArea(
         child: Column(
           children: [
@@ -944,49 +1023,108 @@ Row(
           ],
         ),
       ),
-      bottomNavigationBar: BottomNavigationBar(
+     bottomNavigationBar: Container(
+  decoration: const BoxDecoration(
+    color: Colors.white,
+    border: Border(
+      top: BorderSide(color: Color(0xFFE0E0E0), width: 0.8),
+    ),
+  ),
+  child: BottomNavigationBar(
   currentIndex: _bottomIndex,
   type: BottomNavigationBarType.fixed,
+  backgroundColor: Colors.white,
+  elevation: 0,
+
+  // 🔥 THIS FIXES BLUE TEXT
   selectedItemColor: const Color(0xFFEA6B6B),
   unselectedItemColor: Colors.black54,
-  onTap: (index) {
+
+  showUnselectedLabels: true,
+
+  selectedLabelStyle: GoogleFonts.poppins(
+    fontSize: 13,
+    fontWeight: FontWeight.w600,
+    height: 1.2,
+  ),
+  unselectedLabelStyle: GoogleFonts.poppins(
+    fontSize: 13,
+    fontWeight: FontWeight.w400,
+    height: 1.2,
+  ),
+ onTap: (index) {
   if (index == _bottomIndex) return;
 
-  Widget destination;
+  Widget? destination;
+
   switch (index) {
     case 0:
+      // NEWS (current screen)
       return;
-    case 2:
+
+    case 1:
       destination = const ChatbotScreen();
       break;
-    case 3:
+
+    case 2:
       destination = const CompanyScreen();
       break;
-    case 4:
+
+    case 3:
       destination = const EventsScreen();
       break;
-    case 5:
+
+    case 4:
       destination = const SavedNewsFeedScreen();
       break;
+
     default:
       return;
   }
-  
+
   Navigator.pushReplacement(
     context,
-    MaterialPageRoute(builder: (_) => destination),
+    MaterialPageRoute(builder: (_) => destination!),
   );
 },
 
-  items: const [
-    BottomNavigationBarItem(icon: Icon(Icons.newspaper), label: "NEWS"),
-    BottomNavigationBarItem(icon: Icon(Icons.show_chart), label: "INDEX"),
-    BottomNavigationBarItem(icon: Icon(Icons.smart_toy), label: "ASK AI"),
-    BottomNavigationBarItem(icon: Icon(Icons.business), label: "COMPANIES"),
-    BottomNavigationBarItem(icon: Icon(Icons.event_available), label: "EVENTS"),
-    BottomNavigationBarItem(icon: Icon(Icons.bookmark), label: "Saved"),
+
+  items: [
+    _navItem(
+      label: "NEWS",
+      active: 'assets/icons/News Red.svg',
+      inactive: 'assets/icons/News.svg',
+      index: 0,
+    ),
+    _navItem(
+      label: "ASK AI",
+      active: 'assets/icons/Ask AI Red.svg',
+      inactive: 'assets/icons/Ask AI.svg',
+      index: 1,
+    ),
+    _navItem(
+      label: "COMPANIES",
+      active: 'assets/icons/Graph Red.svg',
+      inactive: 'assets/icons/Graph.svg',
+      index: 2,
+    ),
+    _navItem(
+      label: "EVENTS",
+      active: 'assets/icons/Calender Red.svg',
+      inactive: 'assets/icons/Calender.svg',
+      index: 3,
+    ),
+    _navItem(
+      label: "SAVED",
+      active: 'assets/icons/Save red.svg',
+      inactive: 'assets/icons/Save.svg',
+      index: 4,
+    ),
   ],
 ),
+
+),
+
 
     );
   }
