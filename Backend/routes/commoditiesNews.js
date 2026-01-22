@@ -13,7 +13,7 @@ router.get("/", async (req, res) => {
     const commoditiesNews = await FilteredNews.find({
       commodities: true
     })
-      .sort({ published_at: -1 })
+      .sort({ ingested_at: -1 })
       .limit(50);
 
     res.status(200).json({
