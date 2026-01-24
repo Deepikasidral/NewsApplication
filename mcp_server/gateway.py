@@ -13,7 +13,6 @@
 #     return {"answer": answer}
 
 from fastapi.middleware.cors import CORSMiddleware
-
 from fastapi import FastAPI, Request
 from pydantic import BaseModel
 from mcp_server.llm import ask_llm
@@ -35,6 +34,6 @@ class ChatRequest(BaseModel):
 
 @app.post("/chat")
 async def chat(req: ChatRequest, request: Request):
-    check_rate_limit(request)
+    #check_rate_limit(request)
     answer = ask_llm(req.question)
     return {"answer": answer}

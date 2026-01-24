@@ -56,7 +56,7 @@ void dispose() {
 
 
   // 🔹 Chatbot API URL
-  static const String _baseUrl = "http://13.51.242.86:8000/chat";
+  static const String _baseUrl = "http://10.244.218.93:8000/chat";
 
   // 🔹 SAME LOGIC as ChatbotService.askQuestion()
  Future<String> _askQuestion(String question) async {
@@ -181,7 +181,7 @@ void dispose() {
         const SizedBox(height: 32),
 
         _buildSuggestion("Help me understand today's market trend"),
-        _buildSuggestion("Ask about 10 top volatile stocks today"),
+        _buildSuggestion("Ask about 5 top volatile stocks today"),
         _buildSuggestion("Ask about best funds to start sip in"),
 
         const Spacer(flex: 3),
