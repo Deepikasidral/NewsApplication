@@ -47,7 +47,7 @@ bool _hasLoadedOnce = false;
 
 
 
-  final String baseUrl = "http://10.244.218.93:5000";
+  final String baseUrl = "http://13.51.242.86:5000";
 
  @override
 void initState() {
