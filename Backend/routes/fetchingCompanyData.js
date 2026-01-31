@@ -15,14 +15,22 @@ router.get("/by-names", async (req, res) => {
       .map(n => n.trim())
       .filter(Boolean);
 
-    const docs = await Company.find({
-      "NAME OF COMPANY": { $in: nameArray }
-    }).lean();
+    const docs = await Company.find(
+      {
+        "NAME OF COMPANY": { $in: nameArray }
+      },
+      {
+        SYMBOL: 1,
+        "NAME OF COMPANY": 1,
+        EXCHANGE: 1,
+        _id: 0
+      }
+    ).lean();
 
     const result = docs.map(d => ({
       name: d["NAME OF COMPANY"],
       symbol: d["SYMBOL"],
-      exchange: "NSE",
+      exchange: d["EXCHANGE"] || "NSE", // ✅ fallback
     }));
 
     return res.json({ success: true, data: result });

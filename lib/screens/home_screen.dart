@@ -17,8 +17,6 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 
 
-
-
 class NewsFeedScreen extends StatefulWidget {
   final String? openFileName;
 
@@ -44,10 +42,7 @@ late String currentUserId;
 bool _hasLoadedOnce = false;
 
 
-
-
-
-  final String baseUrl = "http://13.51.242.86:5000";
+final String baseUrl = "http://13.51.242.86:5000";
 
  @override
 void initState() {
@@ -173,9 +168,9 @@ _hasLoadedOnce = true;
   return List<Map<String, dynamic>>.from(body["data"]);
 }
 
-Future<void> _openTradingView(String symbol) async {
+Future<void> _openTradingView(String exchange, String symbol) async {
   final url =
-      "https://www.tradingview.com/chart/?symbol=NSE:$symbol";
+      "https://www.tradingview.com/chart/?symbol=$exchange:$symbol";
 
   final uri = Uri.parse(url);
 
@@ -183,6 +178,7 @@ Future<void> _openTradingView(String symbol) async {
     await launchUrl(uri, mode: LaunchMode.inAppWebView);
   }
 }
+
 void _showCompanySelector(List<Map<String, dynamic>> companies) {
   showModalBottomSheet(
     context: context,
@@ -202,11 +198,14 @@ void _showCompanySelector(List<Map<String, dynamic>> companies) {
         ...companies.map(
           (c) => ListTile(
             title: Text(c["name"]),
-            subtitle: Text("NSE:${c["symbol"]}"),
-            onTap: () {
-              Navigator.pop(context);
-              _openTradingView(c["symbol"]);
-            },
+           subtitle: Text("${c["exchange"]}:${c["symbol"]}"),
+          onTap: () {
+            Navigator.pop(context);
+            _openTradingView(
+              c["exchange"],
+              c["symbol"],
+            );
+          },
           ),
         ),
       ],
@@ -952,9 +951,12 @@ Row(
                 if (companies.isEmpty) return;
 
                 if (companies.length == 1) {
-                  _openTradingView(
-                      companies.first["symbol"]);
-                } else {
+                _openTradingView(
+                  companies.first["exchange"],
+                  companies.first["symbol"],
+                );
+              }
+              else {
                   _showCompanySelector(companies);
                 }
               } catch (e) {

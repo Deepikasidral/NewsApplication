@@ -12,11 +12,16 @@ const companySchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    EXCHANGE: {
+      type: String,
+      trim: true,
+      default: "NSE",
+    },
   },
   {
-    collection: "Company_data", // ✅ matches Mongo
+    collection: "Company_data",
     timestamps: false,
-    strict: false,              // ✅ REQUIRED for spaced fields
+    strict: false, // still OK for spaced fields
   }
 );
 
