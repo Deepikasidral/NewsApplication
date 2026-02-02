@@ -125,5 +125,33 @@ router.post("/save-fcm", async (req, res) => {
   }
 });
 
+/// 📰 ANALYTICS - TRACK NEWS SWIPE COUNT (PER DAY)
+router.post("/news-analytics", async (req, res) => {
+  try {
+    const { userId, date } = req.body;
+
+    if (!userId || !date) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing userId or date",
+      });
+    }
+
+    await User.findByIdAndUpdate(
+      userId,
+      {
+        $inc: {
+          [`newsViews.${date}`]: 1,
+        },
+      },
+      { upsert: true }
+    );
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("❌ News analytics error:", err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 module.exports = router;

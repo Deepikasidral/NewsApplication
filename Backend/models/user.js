@@ -70,7 +70,11 @@ sessions: [
     timestamp: Date,
   },
 ],
-
+newsViews: {
+  type: Map,
+  of: Number,
+  default: {}
+},
 
 
     createdAt: { type: Date, default: Date.now },

@@ -41,8 +41,12 @@ with WidgetsBindingObserver{
 late String currentUserId;
 bool _hasLoadedOnce = false;
 
+final PageController _pageController = PageController();
 
-final String baseUrl = "http://13.51.242.86:5000";
+DateTime _lastTrackedDate = DateTime.now();
+
+
+final String baseUrl = "http://10.244.218.93:5000";
 
  @override
 void initState() {
@@ -61,13 +65,15 @@ Future<void> _init() async {
 }
 
 
-  @override
+@override
 void dispose() {
   WidgetsBinding.instance.removeObserver(this);
+  _pageController.dispose(); // ✅ ADD THIS
   _searchController.removeListener(_applySearch);
   _searchController.dispose();
   super.dispose();
 }
+
 @override
 void didChangeAppLifecycleState(AppLifecycleState state) {
   if (state == AppLifecycleState.resumed && _hasLoadedOnce) {
@@ -93,6 +99,30 @@ List<Article> _removeDuplicates(List<Article> list) {
     map[a.id] = a; // _id should be unique
   }
   return map.values.toList();
+}
+
+
+
+Future<void> _trackNewsView() async {
+  if (currentUserId.isEmpty) return;
+
+  final now = DateTime.now();
+  final date = DateFormat("yyyy-MM-dd").format(now);
+
+  try {
+    await http.post(
+      Uri.parse("$baseUrl/api/users/profile/news-analytics"),
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode({
+        "userId": currentUserId,
+        "date": date,
+      }),
+    );
+  } catch (e) {
+    debugPrint("News analytics error: $e");
+  }
+
+  _lastTrackedDate = now;
 }
 
 
@@ -127,17 +157,25 @@ List<Article> _removeDuplicates(List<Article> list) {
     try {
       final resp = await http.get(Uri.parse("$baseUrl/api/news"));
 
-      if (resp.statusCode == 200) {
-        final data = json.decode(resp.body);
-        _articles = _removeDuplicates(
-  (data as List).map((e) => Article.fromJson(e)).toList(),
-);
-        _articles.sort((a, b) => b.date.compareTo(a.date));
-        _filtered = List.from(_articles);
-        
-      } else {
-        _error = "Failed to load latest news";
-      }
+     if (resp.statusCode == 200) {
+  final data = json.decode(resp.body);
+
+  _articles = _removeDuplicates(
+    (data as List).map((e) => Article.fromJson(e)).toList(),
+  );
+
+  _articles.sort((a, b) => b.date.compareTo(a.date));
+  _filtered = List.from(_articles);
+
+  // ✅ COUNT FIRST ARTICLE VIEW (VERY IMPORTANT)
+  if (_articles.isNotEmpty) {
+    _trackNewsView();
+  }
+
+} else {
+  _error = "Failed to load latest news";
+}
+
     } catch (e) {
       _error = "Error: $e";
     }
@@ -726,46 +764,64 @@ double _textWidth(String text, TextStyle style) {
 
 
   Widget _buildFeed() {
-    if (_isLoading) {
-      return const Expanded(
-        child: Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    if (_error.isNotEmpty) {
-      return Expanded(child: Center(child: Text(_error)));
-    }
-
-    if (_filtered.isEmpty) {
-      return const Expanded(child: Center(child: Text("No articles found")));
-    }
-
-   return Expanded(
-  child: RefreshIndicator(
-    onRefresh: () {
-  switch (_tabIndex) {
-    case 0:
-      return _fetchLatestNews();
-    case 1:
-      return _fetchTrendingNews();
-    case 2:
-      return _fetchGlobalNews();
-    case 3:
-      return _fetchCommoditiesNews();
-    default:
-      return _fetchLatestNews();
+  if (_isLoading) {
+    return const Expanded(
+      child: Center(child: CircularProgressIndicator()),
+    );
   }
-},
 
-    child: ListView.builder(
-      itemCount: _filtered.length,
-      padding: const EdgeInsets.only(bottom: 80),
-      itemBuilder: (_, i) => _buildArticleCard(_filtered[i]),
+  if (_error.isNotEmpty) {
+    return Expanded(child: Center(child: Text(_error)));
+  }
+
+  if (_filtered.isEmpty) {
+    return const Expanded(child: Center(child: Text("No articles found")));
+  }
+
+  return Expanded(
+    child: RefreshIndicator(
+      onRefresh: () {
+        switch (_tabIndex) {
+          case 0:
+            return _fetchLatestNews();
+          case 1:
+            return _fetchTrendingNews();
+          case 2:
+            return _fetchGlobalNews();
+          case 3:
+            return _fetchCommoditiesNews();
+          default:
+            return _fetchLatestNews();
+        }
+      },
+
+      /// 🔥 KEY PART
+      child: PageView.builder(
+  controller: _pageController,
+  scrollDirection: Axis.vertical,
+  itemCount: _filtered.length,
+  physics: const AlwaysScrollableScrollPhysics(),
+
+  onPageChanged: (index) {
+    _trackNewsView(); // 👈 COUNT SWIPE
+  },
+
+  itemBuilder: (context, index) {
+    return Padding(
+      padding: const EdgeInsets.only(
+        top: 12,
+        left: 14,
+        right: 14,
+        bottom: 90,
+      ),
+      child: _buildArticleCard(_filtered[index]),
+    );
+  },
+),
+
     ),
-  ),
-);
-
-  }
+  );
+}
 Widget _buildArticleCard(Article a) {
   final dateFormatted = DateFormat.yMMMd().add_jm().format(a.date);
 
@@ -801,198 +857,199 @@ Widget _buildArticleCard(Article a) {
     }
   }
 
-  return Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-    child: InkWell(
-      borderRadius: BorderRadius.circular(14),
-      onTap: () => _showFullStory(a),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black12.withOpacity(0.05),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-
-            /// ---------------- TITLE ----------------
-            Text(
-              a.title,
-              style: GoogleFonts.poppins(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-
-            const SizedBox(height: 8),
-
-            /// ---------------- SUMMARY ----------------
-            Text(
-              a.summary,
-              softWrap: true,
-              style: GoogleFonts.poppins(
-                fontSize: 14.5,
-                height: 1.4,
-                fontWeight: FontWeight.w400,
-              ),
-            ),
-
-            const SizedBox(height: 12),
-
-            /// ---------------- COMPANIES ----------------
-            if (a.companies.isNotEmpty)
-              Text(
-                "Companies: ${a.companies.join(', ')}",
-                style: GoogleFonts.poppins(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-
-            const SizedBox(height: 8),
-
-            /// ---------------- SENTIMENT ----------------
-            if (a.sentiment.isNotEmpty)
-              Text.rich(
-                TextSpan(
-                  children: [
-                    TextSpan(
-                      text: "Sentiment: ",
-                      style: GoogleFonts.poppins(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.black,
-                      ),
-                    ),
-                    TextSpan(
-                      text: a.sentiment,
-                      style: GoogleFonts.poppins(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: sentimentColor(a.sentiment),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-            const SizedBox(height: 0),
-
-            /// ---------------- IMPACT ----------------
-            if (a.impact.isNotEmpty)
-              Text.rich(
-                TextSpan(
-                  children: [
-                    TextSpan(
-                      text: "Impact: ",
-                      style: GoogleFonts.poppins(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.black,
-                      ),
-                    ),
-                    TextSpan(
-                      text: a.impact,
-                      style: GoogleFonts.poppins(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: impactColor(a.impact),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-            const SizedBox(height: 0),
-
-            /// ---------------- FOOTER ----------------
-           /// ---------------- FOOTER ----------------
-Row(
-  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-  children: [
-
-    /// DATE
-    Text(
-      dateFormatted,
-      style: GoogleFonts.poppins(
-        fontSize: 11,
-        color: Colors.grey,
+  return InkWell(
+    borderRadius: BorderRadius.circular(14),
+    onTap: () => _showFullStory(a),
+    child: Container(
+      margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black12.withOpacity(0.05),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
-    ),
 
-    /// ACTIONS
-    Row(
-      children: [
+      /// 🔥 THIS FIXES OVERFLOW
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: constraints.maxHeight,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
 
-        /// 📈 TradingView
-        if (a.companies.isNotEmpty)
-          IconButton(
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
-            icon: Image.asset(
-              "assets/tradingview.png",
-              height: 36, // ⬆ increased
-              width: 36,
+                  /// TITLE
+                  Text(
+                    a.title,
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  /// SUMMARY
+                  Text(
+                    a.summary,
+                    style: GoogleFonts.poppins(
+                      fontSize: 14.5,
+                      height: 1.4,
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  /// COMPANIES
+                  if (a.companies.isNotEmpty)
+                    Text(
+                      "Companies: ${a.companies.join(', ')}",
+                      style: GoogleFonts.poppins(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+
+                  const SizedBox(height: 8),
+
+                  /// SENTIMENT
+                  if (a.sentiment.isNotEmpty)
+                    Text.rich(
+                      TextSpan(
+                        children: [
+                          TextSpan(
+                            text: "Sentiment: ",
+                            style: GoogleFonts.poppins(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          TextSpan(
+                            text: a.sentiment,
+                            style: GoogleFonts.poppins(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: sentimentColor(a.sentiment),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                  /// IMPACT
+                  if (a.impact.isNotEmpty)
+                    Text.rich(
+                      TextSpan(
+                        children: [
+                          TextSpan(
+                            text: "Impact: ",
+                            style: GoogleFonts.poppins(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          TextSpan(
+                            text: a.impact,
+                            style: GoogleFonts.poppins(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: impactColor(a.impact),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                  const SizedBox(height: 16),
+
+                  /// FOOTER
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+
+                      /// DATE
+                      Text(
+                        dateFormatted,
+                        style: GoogleFonts.poppins(
+                          fontSize: 11,
+                          color: Colors.grey,
+                        ),
+                      ),
+
+                      /// ACTIONS
+                      Row(
+                        children: [
+
+                          /// TRADINGVIEW
+                          if (a.companies.isNotEmpty)
+                            IconButton(
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                              icon: Image.asset(
+                                "assets/tradingview.png",
+                                height: 36,
+                                width: 36,
+                              ),
+                              onPressed: () async {
+                                try {
+                                  final companies =
+                                      await _fetchCompanyDetails(a.companies);
+
+                                  if (companies.isEmpty) return;
+
+                                  if (companies.length == 1) {
+                                    _openTradingView(
+                                      companies.first["exchange"],
+                                      companies.first["symbol"],
+                                    );
+                                  } else {
+                                    _showCompanySelector(companies);
+                                  }
+                                } catch (e) {
+                                  debugPrint("TradingView error: $e");
+                                }
+                              },
+                            ),
+
+                          /// SAVE
+                          IconButton(
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            icon: Icon(
+                              _locallySavedIds.contains(a.id)
+                                  ? Icons.bookmark
+                                  : Icons.bookmark_border,
+                              size: 36,
+                              color: _locallySavedIds.contains(a.id)
+                                  ? Colors.red
+                                  : Colors.grey,
+                            ),
+                            onPressed: () => _toggleSaveNews(a.id),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-            tooltip: "View chart on TradingView",
-            onPressed: () async {
-              try {
-                final companies =
-                    await _fetchCompanyDetails(a.companies);
-
-                if (companies.isEmpty) return;
-
-                if (companies.length == 1) {
-                _openTradingView(
-                  companies.first["exchange"],
-                  companies.first["symbol"],
-                );
-              }
-              else {
-                  _showCompanySelector(companies);
-                }
-              } catch (e) {
-                debugPrint("TradingView error: $e");
-              }
-            },
-          ),
-
-        const SizedBox(width: 0),
-
-        /// 🔖 SAVE
-        IconButton(
-          padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(),
-          icon: Icon(
-            _locallySavedIds.contains(a.id)
-                ? Icons.bookmark
-                : Icons.bookmark_border,
-            size: 36, // ⬆ increased
-            color: _locallySavedIds.contains(a.id)
-                ? Colors.red
-                : Colors.grey,
-          ),
-          onPressed: () => _toggleSaveNews(a.id),
-        ),
-      ],
-    ),
-  ],
-),
-
-          ],
-        ),
+          );
+        },
       ),
     ),
   );
 }
+
 
 BottomNavigationBarItem _navItem({
   required String label,
