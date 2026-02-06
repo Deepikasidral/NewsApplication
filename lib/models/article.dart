@@ -1,24 +1,27 @@
-// lib/models/article.dart
-
 import 'package:html/parser.dart' as html;
 import 'package:intl/intl.dart';
 
 class Article {
-  final String id; // MongoDB _id
-  final String title;       // Headline
-  final String excerpt;     // Preview text
-  final String story;       // Full story
-  final List<String> tags;  // Category + subcategory
-  final String url;         // link
-  final DateTime date;      // PublishedAt
+  final String id;
+  final String title;
+  final String excerpt;
+  final String story;
+  final List<String> tags;
+  final String url;
+  final DateTime date;
 
   // ---- AI / PROCESSED FIELDS ----
   final String summary;
   final String rationale;
   final String tone;
   final String impact;
-  final String sector;      // kept for compatibility
   final String sentiment;
+
+  final String sector;          // Rupee Letter sector
+  final String sector_market;    // TradingView sector
+  final bool commodities;   // True/False
+  final List<String> commodities_market;
+
   final List<String> companies;
 
   Article({
@@ -33,42 +36,44 @@ class Article {
     this.rationale = "",
     this.tone = "",
     this.impact = "",
-    this.sector = "",
     this.sentiment = "",
+    this.sector = "",
+    this.sector_market = "",
+    this.commodities = false,
+    this.commodities_market = const [],
     this.companies = const [],
   });
 
-  // -------------------------------------------------------
-  //                HTML CLEANER UTILITY
-  // -------------------------------------------------------
+  // ---------------- HTML CLEANER ----------------
   static String cleanHtml(String? data) {
     if (data == null || data.isEmpty) return "";
     final doc = html.parse(data);
     return doc.body?.text.trim() ?? "";
   }
 
-  // -------------------------------------------------------
-  //                JSON PARSER
-  // -------------------------------------------------------
+  // ---------------- JSON PARSER ----------------
   factory Article.fromJson(Map<String, dynamic> json) {
-    // Clean full story from HTML
     final rawStory = (json['story'] ?? '').toString();
     final storyText = cleanHtml(rawStory);
 
-    // Generate excerpt
     final excerptText = storyText.length > 200
         ? '${storyText.substring(0, 200)}...'
         : storyText;
 
-    // Parse companies array
     final List<String> companiesList =
         (json['companies'] as List<dynamic>?)
                 ?.map((e) => e.toString())
                 .toList() ??
             [];
 
+    final List<String> commoditiesList =
+        (json['commodities_market'] as List<dynamic>?)
+                ?.map((e) => e.toString())
+                .toList() ??
+            [];
+
     return Article(
-      id: json['_id'].toString(), // ✅ REQUIRED
+      id: json['_id'].toString(),
       title: cleanHtml(json['Headline'] ?? 'Untitled'),
       excerpt: excerptText,
       story: storyText,
@@ -82,29 +87,30 @@ class Article {
       url: json['link'] ?? '',
       date: parsePublishedAt(json['PublishedAt']),
 
-      // ---- AI fields ----
       summary: cleanHtml(json['summary']),
-      rationale: cleanHtml(json['rationale']),
+      rationale: cleanHtml(json['impact_rationale']),
       tone: json['tone'] ?? "",
       impact: json['impact'] ?? "",
-      sector: json['sector'] ?? "",
       sentiment: json['sentiment'] ?? "",
+
+      sector: json['sector'] ?? "",
+      sector_market: json['sector_market'] ?? "",
+
+      commodities: json['commodities'] ?? false,
+      commodities_market: commoditiesList,
+
       companies: companiesList,
     );
   }
 }
 
-// -------------------------------------------------------
-//                DATE PARSER
-// -------------------------------------------------------
+// ---------------- DATE PARSER ----------------
 DateTime parsePublishedAt(String? input) {
   if (input == null || input.isEmpty) return DateTime.now();
 
   try {
-    // Example: Friday, Oct 17, 2025 17:51:17
     return DateFormat("EEEE, MMM d, yyyy HH:mm:ss").parse(input);
   } catch (e) {
-    print("Date parse error: $e");
     return DateTime.now();
   }
 }

@@ -4,7 +4,6 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:news_application/screens/saved_screen.dart';
 import 'package:news_application/screens/profile_screen.dart';
-
 import 'chatbot_screen.dart';
 import '../models/article.dart';
 import 'company_screen.dart';
@@ -14,6 +13,8 @@ import 'package:flutter_html/flutter_html.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:visibility_detector/visibility_detector.dart';
+
 
 
 
@@ -41,7 +42,8 @@ with WidgetsBindingObserver{
 late String currentUserId;
 bool _hasLoadedOnce = false;
 
-final PageController _pageController = PageController();
+
+
 
 DateTime _lastTrackedDate = DateTime.now();
 
@@ -68,9 +70,9 @@ Future<void> _init() async {
 @override
 void dispose() {
   WidgetsBinding.instance.removeObserver(this);
-  _pageController.dispose(); // ✅ ADD THIS
   _searchController.removeListener(_applySearch);
   _searchController.dispose();
+  
   super.dispose();
 }
 
@@ -168,9 +170,7 @@ Future<void> _trackNewsView() async {
   _filtered = List.from(_articles);
 
   // ✅ COUNT FIRST ARTICLE VIEW (VERY IMPORTANT)
-  if (_articles.isNotEmpty) {
-    _trackNewsView();
-  }
+  
 
 } else {
   _error = "Failed to load latest news";
@@ -206,9 +206,39 @@ _hasLoadedOnce = true;
   return List<Map<String, dynamic>>.from(body["data"]);
 }
 
-Future<void> _openTradingView(String exchange, String symbol) async {
+Future<Map<String, dynamic>?> _fetchSectorDetails(String sector) async {
   final url =
-      "https://www.tradingview.com/chart/?symbol=$exchange:$symbol";
+      "$baseUrl/api/sector-lookup/by-name?name=$sector";
+
+  final resp = await http.get(Uri.parse(url));
+
+  if (resp.statusCode != 200) return null;
+
+  final body = jsonDecode(resp.body);
+
+  if (!body["success"]) return null;
+
+  return body["data"];
+}
+Future<Map<String, dynamic>?> _fetchCommodityDetails(String commodity) async {
+  final url =
+      "$baseUrl/api/commodity-lookup/by-name?name=$commodity";
+
+  final resp = await http.get(Uri.parse(url));
+
+  if (resp.statusCode != 200) return null;
+
+  final body = jsonDecode(resp.body);
+
+  if (!body["success"]) return null;
+
+  return body["data"];
+}
+
+
+Future<void> _openTradingView(String fullSymbol) async {
+  final url =
+      "https://www.tradingview.com/chart/?symbol=$fullSymbol";
 
   final uri = Uri.parse(url);
 
@@ -238,18 +268,52 @@ void _showCompanySelector(List<Map<String, dynamic>> companies) {
             title: Text(c["name"]),
            subtitle: Text("${c["exchange"]}:${c["symbol"]}"),
           onTap: () {
-            Navigator.pop(context);
-            _openTradingView(
-              c["exchange"],
-              c["symbol"],
-            );
-          },
+  Navigator.pop(context);
+  _openTradingView(
+    "${c["exchange"]}:${c["symbol"]}",
+  );
+},
+
           ),
         ),
       ],
     ),
   );
 }
+
+void _showCommoditySelector(List<Map<String, dynamic>> commodities) {
+  showModalBottomSheet(
+    context: context,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (_) => Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Padding(
+          padding: EdgeInsets.all(16),
+          child: Text(
+            "View chart on TradingView",
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+        ),
+        ...commodities.map(
+          (c) => ListTile(
+            title: Text(c["name"]),
+            subtitle: Text(c["symbol"]),
+            onTap: () {
+              Navigator.pop(context);
+              _openTradingView(
+                c["symbol"].toString(),
+              );
+            },
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
 
   // ------------------------- FETCH TRENDING -------------------------
   Future<void> _fetchTrendingNews() async {
@@ -568,38 +632,100 @@ void _sortByLatest() {
             ),
 
           /// ---------------- COMPANIES ----------------
-          if (a.companies.isNotEmpty) ...[
-            const SizedBox(height: 14),
+          /// ---------------- MARKET INFORMATION ----------------
+if (a.companies.isNotEmpty) ...[
+  const SizedBox(height: 14),
 
-            Text(
-              "Companies",
-              style: GoogleFonts.poppins(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: Colors.black,
-              ),
-            ),
+  Text(
+    "Companies",
+    style: GoogleFonts.poppins(
+      fontSize: 13,
+      fontWeight: FontWeight.w700,
+      color: Colors.black,
+    ),
+  ),
 
-            const SizedBox(height: 8),
+  const SizedBox(height: 8),
 
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: a.companies.map(
-                (company) => Chip(
-                  backgroundColor: const Color(0xFFEA6B6B),
-                  label: Text(
-                    company,
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ).toList(),
-            ),
-          ],
+  Wrap(
+    spacing: 8,
+    runSpacing: 8,
+    children: a.companies.map(
+      (company) => Chip(
+        backgroundColor: const Color(0xFFEA6B6B),
+        label: Text(
+          company,
+          style: GoogleFonts.poppins(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
+        ),
+      ),
+    ).toList(),
+  ),
+]
+
+else if (a.sector_market.isNotEmpty) ...[
+  const SizedBox(height: 14),
+
+  Text(
+    "Sector",
+    style: GoogleFonts.poppins(
+      fontSize: 13,
+      fontWeight: FontWeight.w700,
+      color: Colors.black,
+    ),
+  ),
+
+  const SizedBox(height: 8),
+
+  Chip(
+    backgroundColor: const Color(0xFFEA6B6B),
+    label: Text(
+      a.sector_market,
+      style: GoogleFonts.poppins(
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+        color: Colors.white,
+      ),
+    ),
+  ),
+]
+
+else if (a.commodities_market.isNotEmpty) ...[
+  const SizedBox(height: 14),
+
+  Text(
+    "Commodity",
+    style: GoogleFonts.poppins(
+      fontSize: 13,
+      fontWeight: FontWeight.w700,
+      color: Colors.black,
+    ),
+  ),
+
+  const SizedBox(height: 8),
+
+  Wrap(
+    spacing: 8,
+    runSpacing: 8,
+    children: a.commodities_market.map(
+      (commodity) => Chip(
+        backgroundColor: const Color(0xFFEA6B6B),
+        label: Text(
+          commodity,
+          style: GoogleFonts.poppins(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
+        ),
+      ),
+    ).toList(),
+  ),
+],
+
 
           const SizedBox(height: 18),
 
@@ -796,28 +922,33 @@ double _textWidth(String text, TextStyle style) {
       },
 
       /// 🔥 KEY PART
-      child: PageView.builder(
-  controller: _pageController,
-  scrollDirection: Axis.vertical,
-  itemCount: _filtered.length,
+      child: ListView.builder(
   physics: const AlwaysScrollableScrollPhysics(),
-
-  onPageChanged: (index) {
-    _trackNewsView(); // 👈 COUNT SWIPE
-  },
+  itemCount: _filtered.length,
 
   itemBuilder: (context, index) {
-    return Padding(
-      padding: const EdgeInsets.only(
-        top: 12,
-        left: 14,
-        right: 14,
-        bottom: 90,
+    final article = _filtered[index];
+
+    return VisibilityDetector(
+      key: Key(article.id),
+      onVisibilityChanged: (info) {
+        if (info.visibleFraction > 0.6) {
+          _trackNewsView();
+        }
+      },
+      child: Padding(
+        padding: const EdgeInsets.only(
+          top: 12,
+          left: 14,
+          right: 14,
+          bottom: 10,
+        ),
+        child: _buildArticleCard(article),
       ),
-      child: _buildArticleCard(_filtered[index]),
     );
   },
-),
+)
+
 
     ),
   );
@@ -875,181 +1006,240 @@ Widget _buildArticleCard(Article a) {
         ],
       ),
 
-      /// 🔥 THIS FIXES OVERFLOW
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          return SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minHeight: constraints.maxHeight,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+      // 🔥 IMPORTANT FIX HERE
+      child: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
 
-                  /// TITLE
-                  Text(
-                    a.title,
-                    style: GoogleFonts.poppins(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-
-                  const SizedBox(height: 8),
-
-                  /// SUMMARY
-                  Text(
-                    a.summary,
-                    style: GoogleFonts.poppins(
-                      fontSize: 14.5,
-                      height: 1.4,
-                    ),
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  /// COMPANIES
-                  if (a.companies.isNotEmpty)
-                    Text(
-                      "Companies: ${a.companies.join(', ')}",
-                      style: GoogleFonts.poppins(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-
-                  const SizedBox(height: 8),
-
-                  /// SENTIMENT
-                  if (a.sentiment.isNotEmpty)
-                    Text.rich(
-                      TextSpan(
-                        children: [
-                          TextSpan(
-                            text: "Sentiment: ",
-                            style: GoogleFonts.poppins(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          TextSpan(
-                            text: a.sentiment,
-                            style: GoogleFonts.poppins(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                              color: sentimentColor(a.sentiment),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                  /// IMPACT
-                  if (a.impact.isNotEmpty)
-                    Text.rich(
-                      TextSpan(
-                        children: [
-                          TextSpan(
-                            text: "Impact: ",
-                            style: GoogleFonts.poppins(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          TextSpan(
-                            text: a.impact,
-                            style: GoogleFonts.poppins(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                              color: impactColor(a.impact),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                  const SizedBox(height: 16),
-
-                  /// FOOTER
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-
-                      /// DATE
-                      Text(
-                        dateFormatted,
-                        style: GoogleFonts.poppins(
-                          fontSize: 11,
-                          color: Colors.grey,
-                        ),
-                      ),
-
-                      /// ACTIONS
-                      Row(
-                        children: [
-
-                          /// TRADINGVIEW
-                          if (a.companies.isNotEmpty)
-                            IconButton(
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                              icon: Image.asset(
-                                "assets/tradingview.png",
-                                height: 36,
-                                width: 36,
-                              ),
-                              onPressed: () async {
-                                try {
-                                  final companies =
-                                      await _fetchCompanyDetails(a.companies);
-
-                                  if (companies.isEmpty) return;
-
-                                  if (companies.length == 1) {
-                                    _openTradingView(
-                                      companies.first["exchange"],
-                                      companies.first["symbol"],
-                                    );
-                                  } else {
-                                    _showCompanySelector(companies);
-                                  }
-                                } catch (e) {
-                                  debugPrint("TradingView error: $e");
-                                }
-                              },
-                            ),
-
-                          /// SAVE
-                          IconButton(
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                            icon: Icon(
-                              _locallySavedIds.contains(a.id)
-                                  ? Icons.bookmark
-                                  : Icons.bookmark_border,
-                              size: 36,
-                              color: _locallySavedIds.contains(a.id)
-                                  ? Colors.red
-                                  : Colors.grey,
-                            ),
-                            onPressed: () => _toggleSaveNews(a.id),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ],
+            /// TITLE
+            Text(
+              a.title,
+              style: GoogleFonts.poppins(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
               ),
             ),
-          );
-        },
+
+            const SizedBox(height: 8),
+
+            /// SUMMARY
+            Text(
+              a.summary,
+              style: GoogleFonts.poppins(
+                fontSize: 14.5,
+                height: 1.4,
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            /// COMPANIES
+            /// MARKET TAG (Company / Sector / Commodity)
+
+if (a.companies.isNotEmpty)
+  Text(
+    "Companies: ${a.companies.join(', ')}",
+    style: GoogleFonts.poppins(
+      fontSize: 13,
+      fontWeight: FontWeight.w600,
+    ),
+  )
+else if (a.sector_market.isNotEmpty)
+  Text(
+    "Sector: ${a.sector_market}",
+    style: GoogleFonts.poppins(
+      fontSize: 13,
+      fontWeight: FontWeight.w600,
+    ),
+  )
+else if (a.commodities_market.isNotEmpty)
+  Text(
+    "Commodity: ${a.commodities_market.join(', ')}",
+    style: GoogleFonts.poppins(
+      fontSize: 13,
+      fontWeight: FontWeight.w600,
+    ),
+  ),
+
+            const SizedBox(height: 8),
+
+            /// SENTIMENT
+            if (a.sentiment.isNotEmpty)
+              Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: "Sentiment: ",
+                      style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    TextSpan(
+                      text: a.sentiment,
+                      style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: sentimentColor(a.sentiment),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+            /// IMPACT
+            if (a.impact.isNotEmpty)
+              Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: "Impact: ",
+                      style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    TextSpan(
+                      text: a.impact,
+                      style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: impactColor(a.impact),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+            const SizedBox(height: 16),
+
+            /// FOOTER
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+
+                /// DATE
+                Text(
+                  dateFormatted,
+                  style: GoogleFonts.poppins(
+                    fontSize: 11,
+                    color: Colors.grey,
+                  ),
+                ),
+
+                /// ACTIONS
+                Row(
+                  children: [
+
+                    /// TRADINGVIEW
+                    if (
+  a.companies.isNotEmpty ||
+  a.sector_market.isNotEmpty ||
+  a.commodities_market.isNotEmpty
+)
+  IconButton(
+    padding: EdgeInsets.zero,
+    constraints: const BoxConstraints(),
+    icon: Image.asset(
+      "assets/tradingview.png",
+      height: 36,
+      width: 36,
+    ),
+    onPressed: () async {
+      try {
+
+        // ---------- 1️⃣ COMPANY ----------
+        if (a.companies.isNotEmpty) {
+          final companies =
+              await _fetchCompanyDetails(a.companies);
+
+          if (companies.isEmpty) return;
+
+          if (companies.length == 1) {
+            _openTradingView(
+  "${companies.first["exchange"]}:${companies.first["symbol"]}",
+);
+
+          } else {
+            _showCompanySelector(companies);
+          }
+          return;
+        }
+
+        // ---------- 2️⃣ SECTOR ----------
+        if (a.sector_market.isNotEmpty) {
+          final sector =
+              await _fetchSectorDetails(a.sector_market);
+
+          if (sector != null) {
+           _openTradingView(
+  sector["symbol"].toString(),
+);
+
+            return;
+          }
+        }
+
+        // ---------- 3️⃣ COMMODITY ----------
+        if (a.commodities_market.isNotEmpty) {
+
+  final List<Map<String, dynamic>> commodityList = [];
+
+  for (String name in a.commodities_market) {
+    final data = await _fetchCommodityDetails(name);
+    if (data != null) {
+      commodityList.add(data);
+    }
+  }
+
+  if (commodityList.isEmpty) return;
+
+  if (commodityList.length == 1) {
+    _openTradingView(
+      commodityList.first["symbol"].toString(),
+    );
+  } else {
+    _showCommoditySelector(commodityList);
+  }
+
+  return;
+}
+
+
+      } catch (e) {
+        debugPrint("TradingView error: $e");
+      }
+    },
+  ),
+
+
+                    /// SAVE
+                    IconButton(
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      icon: Icon(
+                        _locallySavedIds.contains(a.id)
+                            ? Icons.bookmark
+                            : Icons.bookmark_border,
+                        size: 36,
+                        color: _locallySavedIds.contains(a.id)
+                            ? Colors.red
+                            : Colors.grey,
+                      ),
+                      onPressed: () => _toggleSaveNews(a.id),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     ),
   );
 }
-
 
 BottomNavigationBarItem _navItem({
   required String label,

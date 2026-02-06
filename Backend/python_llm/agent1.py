@@ -312,30 +312,117 @@ def process_agent1(article):
 # 🧠 AGENT 2: SUMMARY & COMPANY TAGGING
 # ================================
 
-
-
-
 agent2a_prompt = """
 You are a financial entity extraction agent.
 
 TASK:
-Extract ALL company names mentioned in the article.
-Include:
-- Full names
-- Short names
-- Acronyms (e.g., SBI, HDFC, ONGC)
-- Indian or global companies if explicitly mentioned
+Read and understand the news and classify as either STOCK or COMMODITY news.
 
-RULES:
-- Do NOT infer or guess
-- Do NOT normalize names
-- Return exactly what appears in text
 
-OUTPUT (STRICT JSON ONLY):
+### ALLOWED COMMODITIES ###
+
+You MUST choose commodities ONLY from this list:
+
+- GOLD
+- SILVER
+- CRUDE OIL
+- NATURAL GAS
+- COPPER
+- ALUMINIUM
+- ZINC
+- LEAD
+- NICKEL
+
+Do NOT output any commodity outside this list.
+Do NOT output variations like "Brent", "WTI", "Gold Futures", etc.
+Use EXACT spelling from list above.
+
+---
+
+### ✅ ALLOWED SECTORS ###
+
+
+If multiple companies are involved, you MUST choose ONLY ONE sector from this list:
+
+- Nifty Bank
+- Nifty IT
+- Nifty Pharma
+- Nifty FMCG
+- Nifty Auto
+- Nifty Metal
+- Nifty Energy
+- Nifty Financial Services
+- Nifty Realty
+- Nifty Oil & Gas
+
+⚠️ Do NOT create new sectors
+⚠️ Do NOT modify sector names
+⚠️ Use EXACT spelling
+
+---
+
+
+### CLASSIFICATION RULE ###
+
+
+IF COMMODITY NEWS:
+- Identify directly impacted commodity
+- Mention maximum 2 commodities
+- Only choose from allowed commodities list
+- Do NOT include companies
+
+IF STOCK NEWS:
+- Extract ONLY companies DIRECTLY involved in MAIN EVENT
+
+---
+
+### INCLUDE a company ONLY IF:
+The company is:
+- Taking an action
+- Being directly impacted
+- Primary subject of event
+- Official participant in transaction
+
+---
+
+### DO NOT INCLUDE companies that are:
+- Competitors or comparison references
+- Analyst mentions
+- Historical or contextual mentions
+- Industry discussion only
+- Opinion quotes without involvement
+
+---
+
+###  PRIORITY RULE
+If article focuses on ONE company → return only that company
+
+If SAME event involves multiple companies → return all
+
+If MORE THAN 4 relevant companies → return:
+- sector from allowed list
+- companies MUST be empty
+
+---
+
+### STRICT RULES
+- Do NOT infer companies
+- Do NOT normalize company names
+- Return EXACT text names
+- If sector selected → companies must be empty
+- If commodity news → companies must be empty
+
+---
+
+### OUTPUT JSON ONLY
 {
-  "companies": ["string", "string"]
+  "news_type": "stock" or "commodity",
+  "companies": [],
+  "sector": "",
+  "commodities": []
 }
 """
+
 
 agent2_prompt = """
 You are Agent 2, the Summarization & Sector Classification Agent for Rupee Letter (India).
@@ -493,38 +580,72 @@ def match_llm_companies_to_db(llm_companies, company_lookup, threshold=85):
 def process_agent2a(article):
     text = f"Title: {article.get('Headline','')}\n\nContent:\n{article.get('story','')}"
     result = get_llm_response(agent2a_prompt, text)
+
     if not result:
-        return []
+        return None
 
     try:
-        data = json.loads(result)
-        return data.get("companies", [])
-    except json.JSONDecodeError:
+        return json.loads(result)
+    except:
         print("⚠️ Agent2A JSON error")
-        print(result)
-        return []
+        return None
+
 
 
 def process_agent2(article):
     text = f"Title: {article.get('Headline','')}\n\nContent:\n{article.get('story','')}"
 
     # 2️⃣ Agent 2A → raw company mentions
-    llm_companies = process_agent2a(article)
+    agent2a_data = process_agent2a(article)
+
+    if not agent2a_data:
+        return None
+
+    news_type = agent2a_data.get("news_type")
+    llm_companies = agent2a_data.get("companies", [])
+    llm_sector = agent2a_data.get("sector", "")
+    llm_commodities = agent2a_data.get("commodities", [])
+
     print(f"\n🧠 LLM extracted companies: {llm_companies}")
 
     # 3️⃣ Build lookup + fuzzy match
     company_lookup = load_companies_cache()
     validated_companies = match_llm_companies_to_db(llm_companies, company_lookup)
 
+    final_sector = ""
+    final_commodities = []
+    final_companies = validated_companies
+
+    if news_type == "commodity":
+        final_companies = []
+        final_commodities = llm_commodities
+        final_sector = ""
+
+    elif news_type == "stock":
+        final_commodities = []
+
+        if len(validated_companies) >= 4:
+            final_sector = llm_sector if llm_sector else ""
+            final_companies = []
+
+        else:
+            final_sector = ""
 
     # 4️⃣ Call Agent 2 for summary & sector
     llm_input = f"""
-Article:
-{text}
+    Article:
+    {text}
 
-Validated companies from Rupee Letter database:
-{validated_companies if validated_companies else "None"}
-"""
+    Validated companies:
+    {final_companies if final_companies else "None"}
+
+    Sector override:
+    {final_sector if final_sector else "None"}
+
+    Commodities:
+    {final_commodities if final_commodities else "None"}
+    """
+
 
     result = get_llm_response(agent2_prompt, llm_input)
     if not result:
@@ -538,7 +659,9 @@ Validated companies from Rupee Letter database:
         return None
 
     # 5️⃣ FORCE companies to validated list only
-    agent2_data["companies"] = validated_companies
+    agent2_data["companies"] = final_companies
+    agent2_data["sector_override"] = final_sector
+    agent2_data["commodities_override"] = final_commodities
 
     return agent2_data
 
@@ -607,6 +730,31 @@ def parse_pti_time(pti_time_str):
     except Exception:
         return None
 
+def remove_pti_references(text):
+    if not text:
+        return text
+
+    # Remove (PTI)
+    text = re.sub(r"\(PTI\)", "", text, flags=re.IGNORECASE)
+
+    # Remove sentences containing PTI
+    text = re.sub(r"[^.]*\bPTI\b[^.]*\.", "", text, flags=re.IGNORECASE)
+
+    # Remove "Press Trust of India"
+    text = re.sub(r"Press Trust of India", "", text, flags=re.IGNORECASE)
+
+    # 🔥 Remove trailing PTI bureau codes like: PTI NKD TRB TRB
+    text = re.sub(r"\bPTI\b[\sA-Z]{0,20}$", "", text.strip())
+
+    # 🔥 Remove standalone 2-4 letter uppercase codes at end
+    text = re.sub(r"\b[A-Z]{2,4}\b(?:\s+\b[A-Z]{2,4}\b)*$", "", text.strip())
+
+    # Clean extra whitespace
+    text = re.sub(r"\s+", " ", text).strip()
+
+    return text
+
+
 # ================================
 # 🚀 PIPELINE RUNNER
 # ================================
@@ -650,22 +798,42 @@ def run_pipeline():
         
         
         content_hash = compute_news_hash(article)
+        clean_headline = remove_pti_references(article.get("Headline", ""))
+        clean_story = remove_pti_references(article.get("story", ""))
 
         final_doc = {
-                **article,
-                "content_hash": content_hash,   # 🔥 ADD THIS
-                "decision": agent1["decision"],
-                "filter_reason": agent1.get("reason"),
-                "summary": agent2["summary"],
-                "sector": agent2["sector"],
-                "companies": agent2["companies"],
-                "global": agent2["global"],
-                "commodities": agent2["commodities"],
-                "sentiment": agent3["sentiment"],
-                "impact": agent3["impact"],
-                "impact_rationale": agent3.get("rationale"),
-                "ingested_at": datetime.now(timezone.utc)
-            }
+            **article,
+            "Headline": clean_headline,
+            "story": clean_story,
+            "content_hash": content_hash,
+
+            "decision": agent1["decision"],
+            "filter_reason": agent1.get("reason"),
+
+            "summary": agent2["summary"],
+
+            # ⭐ Rupee Letter Sector
+            "sector": agent2["sector"],
+
+            # ⭐ Trading / Market Sector
+            "sector_market": agent2.get("sector_override"),
+
+            "companies": agent2["companies"],
+
+            "global": agent2["global"],
+
+            # ⭐ Commodity Boolean Flag
+            "commodities": agent2["commodities"],
+
+            # ⭐ Actual Commodity Names
+            "commodities_market": agent2.get("commodities_override"),
+
+            "sentiment": agent3["sentiment"],
+            "impact": agent3["impact"],
+            "impact_rationale": agent3.get("rationale"),
+
+            "ingested_at": datetime.now(timezone.utc)
+        }
 
 
         try:
