@@ -41,7 +41,9 @@ with WidgetsBindingObserver{
  Set<String> _locallySavedIds = {};
 late String currentUserId;
 bool _hasLoadedOnce = false;
+late final PageController _pageController;
 
+Set<String> _viewedArticles = {};
 
 
 
@@ -56,6 +58,8 @@ void initState() {
   WidgetsBinding.instance.addObserver(this);
   _bottomIndex = 0; 
   _searchController.addListener(_applySearch);
+  _pageController = PageController(viewportFraction: 0.72);
+
   _init();
 }
 
@@ -72,7 +76,8 @@ void dispose() {
   WidgetsBinding.instance.removeObserver(this);
   _searchController.removeListener(_applySearch);
   _searchController.dispose();
-  
+  _pageController.dispose();
+
   super.dispose();
 }
 
@@ -101,6 +106,24 @@ List<Article> _removeDuplicates(List<Article> list) {
     map[a.id] = a; // _id should be unique
   }
   return map.values.toList();
+}
+
+void _scrollToArticle(String fileName) {
+  final index = _filtered.indexWhere(
+    (a) => a.fileName == fileName,
+  );
+
+  if (index != -1) {
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (!_pageController.hasClients) return;
+
+      _pageController.animateToPage(
+        index,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+      );
+    });
+  }
 }
 
 
@@ -168,6 +191,12 @@ Future<void> _trackNewsView() async {
 
   _articles.sort((a, b) => b.date.compareTo(a.date));
   _filtered = List.from(_articles);
+
+  if (widget.openFileName != null &&
+    widget.openFileName!.isNotEmpty) {
+  _scrollToArticle(widget.openFileName!);
+}
+
 
   // ✅ COUNT FIRST ARTICLE VIEW (VERY IMPORTANT)
   
@@ -922,33 +951,33 @@ double _textWidth(String text, TextStyle style) {
       },
 
       /// 🔥 KEY PART
-      child: ListView.builder(
-  physics: const AlwaysScrollableScrollPhysics(),
-  itemCount: _filtered.length,
+     child: PageView.builder(
+    scrollDirection: Axis.vertical,
+    controller: _pageController,
+    padEnds: false,
+    physics: const BouncingScrollPhysics(),
+    itemCount: _filtered.length,
+    itemBuilder: (context, index) {
+      final article = _filtered[index];
 
-  itemBuilder: (context, index) {
-    final article = _filtered[index];
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: VisibilityDetector(
+  key: Key(article.id),
+  onVisibilityChanged: (info) {
+    if (info.visibleFraction > 0.6 &&
+        !_viewedArticles.contains(article.id)) {
 
-    return VisibilityDetector(
-      key: Key(article.id),
-      onVisibilityChanged: (info) {
-        if (info.visibleFraction > 0.6) {
-          _trackNewsView();
-        }
-      },
-      child: Padding(
-        padding: const EdgeInsets.only(
-          top: 12,
-          left: 14,
-          right: 14,
-          bottom: 10,
-        ),
-        child: _buildArticleCard(article),
-      ),
-    );
+      _viewedArticles.add(article.id);
+      _trackNewsView();
+    }
   },
-)
+  child: _buildArticleCard(article),
+),
 
+      );
+    },
+  ),
 
     ),
   );
@@ -988,27 +1017,26 @@ Widget _buildArticleCard(Article a) {
     }
   }
 
-  return InkWell(
-    borderRadius: BorderRadius.circular(14),
-    onTap: () => _showFullStory(a),
-    child: Container(
-      margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black12.withOpacity(0.05),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
+  return SizedBox(
+    height: MediaQuery.of(context).size.height * 0.75, // 🔥 KEY LINE
+    child: InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: () => _showFullStory(a),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
 
-      // 🔥 IMPORTANT FIX HERE
-      child: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1017,51 +1045,54 @@ Widget _buildArticleCard(Article a) {
             Text(
               a.title,
               style: GoogleFonts.poppins(
-                fontSize: 16,
+                fontSize: 18,
                 fontWeight: FontWeight.w700,
-              ),
-            ),
-
-            const SizedBox(height: 8),
-
-            /// SUMMARY
-            Text(
-              a.summary,
-              style: GoogleFonts.poppins(
-                fontSize: 14.5,
-                height: 1.4,
               ),
             ),
 
             const SizedBox(height: 12),
 
-            /// COMPANIES
-            /// MARKET TAG (Company / Sector / Commodity)
+            /// SUMMARY (Scrollable if long)
+            Expanded(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: Text(
+                  a.summary,
+                  style: GoogleFonts.poppins(
+                    fontSize: 15,
+                    height: 1.5,
+                  ),
+                ),
+              ),
+            ),
 
-if (a.companies.isNotEmpty)
-  Text(
-    "Companies: ${a.companies.join(', ')}",
-    style: GoogleFonts.poppins(
-      fontSize: 13,
-      fontWeight: FontWeight.w600,
-    ),
-  )
-else if (a.sector_market.isNotEmpty)
-  Text(
-    "Sector: ${a.sector_market}",
-    style: GoogleFonts.poppins(
-      fontSize: 13,
-      fontWeight: FontWeight.w600,
-    ),
-  )
-else if (a.commodities_market.isNotEmpty)
-  Text(
-    "Commodity: ${a.commodities_market.join(', ')}",
-    style: GoogleFonts.poppins(
-      fontSize: 13,
-      fontWeight: FontWeight.w600,
-    ),
-  ),
+            const SizedBox(height: 12),
+
+            /// MARKET TAG
+            if (a.companies.isNotEmpty)
+              Text(
+                "Companies: ${a.companies.join(', ')}",
+                style: GoogleFonts.poppins(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              )
+            else if (a.sector_market.isNotEmpty)
+              Text(
+                "Sector: ${a.sector_market}",
+                style: GoogleFonts.poppins(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              )
+            else if (a.commodities_market.isNotEmpty)
+              Text(
+                "Commodity: ${a.commodities_market.join(', ')}",
+                style: GoogleFonts.poppins(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
 
             const SizedBox(height: 8),
 
@@ -1073,14 +1104,14 @@ else if (a.commodities_market.isNotEmpty)
                     TextSpan(
                       text: "Sentiment: ",
                       style: GoogleFonts.poppins(
-                        fontSize: 16,
+                        fontSize: 15,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
                     TextSpan(
                       text: a.sentiment,
                       style: GoogleFonts.poppins(
-                        fontSize: 16,
+                        fontSize: 15,
                         fontWeight: FontWeight.w700,
                         color: sentimentColor(a.sentiment),
                       ),
@@ -1097,14 +1128,14 @@ else if (a.commodities_market.isNotEmpty)
                     TextSpan(
                       text: "Impact: ",
                       style: GoogleFonts.poppins(
-                        fontSize: 16,
+                        fontSize: 15,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
                     TextSpan(
                       text: a.impact,
                       style: GoogleFonts.poppins(
-                        fontSize: 16,
+                        fontSize: 15,
                         fontWeight: FontWeight.w700,
                         color: impactColor(a.impact),
                       ),
@@ -1113,7 +1144,7 @@ else if (a.commodities_market.isNotEmpty)
                 ),
               ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
 
             /// FOOTER
             Row(
@@ -1134,86 +1165,75 @@ else if (a.commodities_market.isNotEmpty)
                   children: [
 
                     /// TRADINGVIEW
-                    if (
-  a.companies.isNotEmpty ||
-  a.sector_market.isNotEmpty ||
-  a.commodities_market.isNotEmpty
-)
-  IconButton(
-    padding: EdgeInsets.zero,
-    constraints: const BoxConstraints(),
-    icon: Image.asset(
-      "assets/tradingview.png",
-      height: 36,
-      width: 36,
-    ),
-    onPressed: () async {
-      try {
+                    if (a.companies.isNotEmpty ||
+                        a.sector_market.isNotEmpty ||
+                        a.commodities_market.isNotEmpty)
+                      IconButton(
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        icon: Image.asset(
+                          "assets/tradingview.png",
+                          height: 32,
+                          width: 32,
+                        ),
+                        onPressed: () async {
+                          try {
 
-        // ---------- 1️⃣ COMPANY ----------
-        if (a.companies.isNotEmpty) {
-          final companies =
-              await _fetchCompanyDetails(a.companies);
+                            if (a.companies.isNotEmpty) {
+                              final companies =
+                                  await _fetchCompanyDetails(a.companies);
 
-          if (companies.isEmpty) return;
+                              if (companies.isEmpty) return;
 
-          if (companies.length == 1) {
-            _openTradingView(
-  "${companies.first["exchange"]}:${companies.first["symbol"]}",
-);
+                              if (companies.length == 1) {
+                                _openTradingView(
+                                  "${companies.first["exchange"]}:${companies.first["symbol"]}",
+                                );
+                              } else {
+                                _showCompanySelector(companies);
+                              }
+                              return;
+                            }
 
-          } else {
-            _showCompanySelector(companies);
-          }
-          return;
-        }
+                            if (a.sector_market.isNotEmpty) {
+                              final sector =
+                                  await _fetchSectorDetails(a.sector_market);
 
-        // ---------- 2️⃣ SECTOR ----------
-        if (a.sector_market.isNotEmpty) {
-          final sector =
-              await _fetchSectorDetails(a.sector_market);
+                              if (sector != null) {
+                                _openTradingView(
+                                  "NSE:${sector["symbol"]}",
+                                );
+                              }
+                              return;
+                            }
 
-          if (sector != null) {
-           _openTradingView(
-  sector["symbol"].toString(),
-);
+                            if (a.commodities_market.isNotEmpty) {
+                              final List<Map<String, dynamic>> commodityList = [];
 
-            return;
-          }
-        }
+                              for (String name in a.commodities_market) {
+                                final data =
+                                    await _fetchCommodityDetails(name);
+                                if (data != null) {
+                                  commodityList.add(data);
+                                }
+                              }
 
-        // ---------- 3️⃣ COMMODITY ----------
-        if (a.commodities_market.isNotEmpty) {
+                              if (commodityList.isEmpty) return;
 
-  final List<Map<String, dynamic>> commodityList = [];
+                              if (commodityList.length == 1) {
+                                _openTradingView(
+                                  commodityList.first["symbol"].toString(),
+                                );
+                              } else {
+                                _showCommoditySelector(commodityList);
+                              }
+                            }
 
-  for (String name in a.commodities_market) {
-    final data = await _fetchCommodityDetails(name);
-    if (data != null) {
-      commodityList.add(data);
-    }
-  }
-
-  if (commodityList.isEmpty) return;
-
-  if (commodityList.length == 1) {
-    _openTradingView(
-      commodityList.first["symbol"].toString(),
-    );
-  } else {
-    _showCommoditySelector(commodityList);
-  }
-
-  return;
-}
-
-
-      } catch (e) {
-        debugPrint("TradingView error: $e");
-      }
-    },
-  ),
-
+                          } catch (e) {
+                            debugPrint("TradingView error: $e");
+                          }
+                        },
+                      ),
 
                     /// SAVE
                     IconButton(
@@ -1223,7 +1243,7 @@ else if (a.commodities_market.isNotEmpty)
                         _locallySavedIds.contains(a.id)
                             ? Icons.bookmark
                             : Icons.bookmark_border,
-                        size: 36,
+                        size: 32,
                         color: _locallySavedIds.contains(a.id)
                             ? Colors.red
                             : Colors.grey,

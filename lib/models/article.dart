@@ -2,6 +2,8 @@ import 'package:html/parser.dart' as html;
 import 'package:intl/intl.dart';
 
 class Article {
+  final String fileName;
+
   final String id;
   final String title;
   final String excerpt;
@@ -25,6 +27,7 @@ class Article {
   final List<String> companies;
 
   Article({
+    required this.fileName,
     required this.id,
     required this.title,
     required this.excerpt,
@@ -52,56 +55,58 @@ class Article {
   }
 
   // ---------------- JSON PARSER ----------------
-  factory Article.fromJson(Map<String, dynamic> json) {
-    final rawStory = (json['story'] ?? '').toString();
-    final storyText = cleanHtml(rawStory);
+ factory Article.fromJson(Map<String, dynamic> json) {
+  final rawStory = (json['story'] ?? '').toString();
+  final storyText = cleanHtml(rawStory);
 
-    final excerptText = storyText.length > 200
-        ? '${storyText.substring(0, 200)}...'
-        : storyText;
+  final excerptText = storyText.length > 200
+      ? '${storyText.substring(0, 200)}...'
+      : storyText;
 
-    final List<String> companiesList =
-        (json['companies'] as List<dynamic>?)
-                ?.map((e) => e.toString())
-                .toList() ??
-            [];
+  final List<String> companiesList =
+      (json['companies'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          [];
 
-    final List<String> commoditiesList =
-        (json['commodities_market'] as List<dynamic>?)
-                ?.map((e) => e.toString())
-                .toList() ??
-            [];
+  final List<String> commoditiesList =
+      (json['commodities_market'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          [];
 
-    return Article(
-      id: json['_id'].toString(),
-      title: cleanHtml(json['Headline'] ?? 'Untitled'),
-      excerpt: excerptText,
-      story: storyText,
+  return Article(
+    fileName: json["FileName"] ?? "",   // ✅ FIXED HERE
 
-      tags: [
-        if (json['category'] != null) '#${json['category']}',
-        if (json['subcategory'] != null)
-          '#${json['subcategory'].toString().trim()}',
-      ],
+    id: json['_id'].toString(),
+    title: cleanHtml(json['Headline'] ?? 'Untitled'),
+    excerpt: excerptText,
+    story: storyText,
 
-      url: json['link'] ?? '',
-      date: parsePublishedAt(json['PublishedAt']),
+    tags: [
+      if (json['category'] != null) '#${json['category']}',
+      if (json['subcategory'] != null)
+        '#${json['subcategory'].toString().trim()}',
+    ],
 
-      summary: cleanHtml(json['summary']),
-      rationale: cleanHtml(json['impact_rationale']),
-      tone: json['tone'] ?? "",
-      impact: json['impact'] ?? "",
-      sentiment: json['sentiment'] ?? "",
+    url: json['link'] ?? '',
+    date: parsePublishedAt(json['PublishedAt']),
 
-      sector: json['sector'] ?? "",
-      sector_market: json['sector_market'] ?? "",
+    summary: cleanHtml(json['summary']),
+    rationale: cleanHtml(json['impact_rationale']),
+    tone: json['tone'] ?? "",
+    impact: json['impact'] ?? "",
+    sentiment: json['sentiment'] ?? "",
 
-      commodities: json['commodities'] ?? false,
-      commodities_market: commoditiesList,
+    sector: json['sector'] ?? "",
+    sector_market: json['sector_market'] ?? "",
 
-      companies: companiesList,
-    );
-  }
+    commodities: json['commodities'] ?? false,
+    commodities_market: commoditiesList,
+
+    companies: companiesList,
+  );
+}
 }
 
 // ---------------- DATE PARSER ----------------
