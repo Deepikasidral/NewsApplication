@@ -26,4 +26,25 @@ router.get("/:id", async (req, res) => {
   }
 });
 
+router.get("/sector/:sector", async (req, res) => {
+  try {
+    const sector = req.params.sector;
+
+    const news = await News.find({
+      sector: { $regex: new RegExp(`^${sector}$`, "i") }
+    }).sort({ publishedAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      count: news.length,
+      news,
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
+
 module.exports = router;

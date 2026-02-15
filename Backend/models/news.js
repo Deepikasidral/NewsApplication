@@ -2,7 +2,9 @@ const mongoose = require("mongoose");
 
 const newsSchema = new mongoose.Schema(
   {
-    // PTI fields
+    // ==============================
+    // 🔹 PTI ORIGINAL FIELDS
+    // ==============================
     FileName: { type: String, unique: true },
     Bylines: String,
     Copyrights: String,
@@ -17,23 +19,42 @@ const newsSchema = new mongoose.Schema(
     story: String,
     subcategory: String,
 
-    // Agent 1
+    // 🔥 Deduplication (IMPORTANT - matches Python)
+    content_hash: {
+      type: String,
+      unique: true,
+      index: true
+    },
+
+    // ==============================
+    // 🔹 AGENT 1
+    // ==============================
     decision: String,
     filter_reason: String,
 
-    // Agent 2
+    // ==============================
+    // 🔹 AGENT 2 (Rupee Letter Layer)
+    // ==============================
     summary: String,
-    sector: String,
+    sector: String, // IPO / Banking / Macro etc
     companies: [String],
     global: Boolean,
     commodities: Boolean,
 
-    // Agent 3
+    // 🔥 Trading/Market Overrides (NEW)
+    sector_market: String,             // Nifty Bank / Nifty IT etc
+    commodities_market: [String],      // GOLD / CRUDE OIL etc
+
+    // ==============================
+    // 🔹 AGENT 3
+    // ==============================
     sentiment: String,
     impact: String,
     impact_rationale: String,
 
-    // System (🔥 MOST IMPORTANT)
+    // ==============================
+    // 🔹 SYSTEM
+    // ==============================
     ingested_at: {
       type: Date,
       index: true,

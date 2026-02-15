@@ -12,6 +12,13 @@ import 'saved_screen.dart';
 import 'profile_screen.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../widgets/article_card.dart';
+import '../models/article.dart';
+import 'package:flutter_html/flutter_html.dart';
+import 'package:visibility_detector/visibility_detector.dart';
+
+
+
 
 class EventsScreen extends StatefulWidget {
   const EventsScreen({super.key});
@@ -23,7 +30,7 @@ class EventsScreen extends StatefulWidget {
 
 class _EventsScreenState extends State<EventsScreen> {
   int _selectedTab = 0;
-  final List<String> _tabs = ["Today", "Upcoming"];
+  final List<String> _tabs = ["Today", "Upcoming","Upcoming IPO"];
   
   bool _isLoading = true;
   List<CorporateEvent> _todayEvents = [];
@@ -31,16 +38,33 @@ class _EventsScreenState extends State<EventsScreen> {
   Set<String> _locallySavedEventIds = {};
   late String currentUserId;
   int _bottomIndex = 3;
+  List<Article> _ipoNews = [];
+  bool _isIpoLoading = false;
+  Set<String> _locallySavedIds = {};
+  final String baseUrl = "http://13.51.242.86:5000";
+  late final PageController _pageController;
+  Set<String> _viewedArticles = {};
+  DateTime _lastTrackedDate = DateTime.now();
 
 
-  @override
+@override
 void initState() {
   super.initState();
+  _pageController = PageController(viewportFraction: 0.72);
+
   _loadUserId().then((_) {
     _loadSavedEventIds();
+    _loadSavedNewsIds();
     _fetchEvents();
+    _fetchIpoNews();
   });
 }
+@override
+void dispose() {
+  _pageController.dispose();
+  super.dispose();
+}
+
 Future<void> _loadUserId() async {
   final prefs = await SharedPreferences.getInstance();
   currentUserId = prefs.getString("userId") ?? "";
@@ -140,6 +164,56 @@ Future<void> _loadSavedEventIds() async {
     }
   }
 
+Future<void> _fetchIpoNews() async {
+  setState(() {
+    _isIpoLoading = true;
+  });
+
+  try {
+    final response = await http.get(
+      Uri.parse("$baseUrl/api/news/sector/IPO"),
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+
+      setState(() {
+        _ipoNews = (data["news"] as List)
+            .map((e) => Article.fromJson(e))
+            .toList();
+        _isIpoLoading = false;
+      });
+    } else {
+      throw Exception("Failed to load IPO news");
+    }
+  } catch (e) {
+    setState(() {
+      _isIpoLoading = false;
+    });
+  }
+}
+Future<void> _trackNewsView() async {
+  if (currentUserId.isEmpty) return;
+
+  final now = DateTime.now();
+  final date = DateFormat("yyyy-MM-dd").format(now);
+
+  try {
+    await http.post(
+      Uri.parse("$baseUrl/api/users/profile/news-analytics"),
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode({
+        "userId": currentUserId,
+        "date": date,
+      }),
+    );
+  } catch (e) {
+    debugPrint("News analytics error: $e");
+  }
+
+  _lastTrackedDate = now;
+}
+
 
 Future<void> _toggleSaveEvent(CorporateEvent event) async {
   final eventId = event.id;
@@ -234,6 +308,548 @@ Future<void> _toggleSaveEvent(CorporateEvent event) async {
     ),
     label: label,
     tooltip: label,
+  );
+}
+
+Future<void> _toggleSaveNews(String newsId) async {
+  final bool wasSaved = _locallySavedIds.contains(newsId);
+
+  // 1️⃣ Optimistic UI update
+  setState(() {
+    if (wasSaved) {
+      _locallySavedIds.remove(newsId);
+    } else {
+      _locallySavedIds.add(newsId);
+    }
+  });
+
+  // 2️⃣ Call backend
+  try {
+    final resp = await http.post(
+      Uri.parse("$baseUrl/api/users/save-news"),
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode({
+        "userId": currentUserId,
+        "newsId": newsId,
+      }),
+    );
+
+    if (resp.statusCode != 200) {
+      throw Exception("API failed");
+    }
+  } catch (e) {
+    // 🔁 ROLLBACK UI if backend fails
+    setState(() {
+      if (wasSaved) {
+        _locallySavedIds.add(newsId);
+      } else {
+        _locallySavedIds.remove(newsId);
+      }
+    });
+
+    debugPrint("Save toggle failed: $e");
+  }
+}
+ Future<List<Map<String, dynamic>>> _fetchCompanyDetails(
+    List<String> companyNames) async {
+
+  final names = companyNames.join(",");
+  final url =
+      "$baseUrl/api/company-lookup/by-names?names=$names";
+
+  debugPrint("TradingView API URL: $url");
+
+  final resp = await http.get(Uri.parse(url));
+
+  debugPrint("TradingView API status: ${resp.statusCode}");
+  debugPrint("TradingView API body: ${resp.body}");
+
+  if (resp.statusCode != 200) {
+    throw Exception("Failed to fetch company details");
+  }
+
+  final body = jsonDecode(resp.body);
+  return List<Map<String, dynamic>>.from(body["data"]);
+}
+
+
+Future<void> _openTradingView(String fullSymbol) async {
+  final url =
+      "https://www.tradingview.com/chart/?symbol=$fullSymbol";
+
+  final uri = Uri.parse(url);
+
+  if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+    await launchUrl(uri, mode: LaunchMode.inAppWebView);
+  }
+}
+
+void _showCompanySelector(List<Map<String, dynamic>> companies) {
+  showModalBottomSheet(
+    context: context,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (_) => Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Padding(
+          padding: EdgeInsets.all(16),
+          child: Text(
+            "View chart on TradingView",
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+        ),
+        ...companies.map(
+          (c) => ListTile(
+            title: Text(c["name"]),
+           subtitle: Text("${c["exchange"]}:${c["symbol"]}"),
+          onTap: () {
+  Navigator.pop(context);
+  _openTradingView(
+    "${c["exchange"]}:${c["symbol"]}",
+  );
+},
+
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+void _showCommoditySelector(List<Map<String, dynamic>> commodities) {
+  showModalBottomSheet(
+    context: context,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (_) => Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Padding(
+          padding: EdgeInsets.all(16),
+          child: Text(
+            "View chart on TradingView",
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+        ),
+        ...commodities.map(
+          (c) => ListTile(
+            title: Text(c["name"]),
+            subtitle: Text(c["symbol"]),
+            onTap: () {
+              Navigator.pop(context);
+              _openTradingView(
+                c["symbol"].toString(),
+              );
+            },
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+
+Future<Map<String, dynamic>?> _fetchSectorDetails(String sector) async {
+  final url =
+      "$baseUrl/api/sector-lookup/by-name?name=$sector";
+
+  final resp = await http.get(Uri.parse(url));
+
+  if (resp.statusCode != 200) return null;
+
+  final body = jsonDecode(resp.body);
+
+  if (!body["success"]) return null;
+
+  return body["data"];
+}
+Future<Map<String, dynamic>?> _fetchCommodityDetails(String commodity) async {
+  final url =
+      "$baseUrl/api/commodity-lookup/by-name?name=$commodity";
+
+  final resp = await http.get(Uri.parse(url));
+
+  if (resp.statusCode != 200) return null;
+
+  final body = jsonDecode(resp.body);
+
+  if (!body["success"]) return null;
+
+  return body["data"];
+}
+
+  // ------------------------- SHOW FULL STORY -------------------------
+ Future<void> _showFullStory(Article a) async {
+  Color sentimentColor(String s) {
+    switch (s.toLowerCase()) {
+      case "very bullish":
+        return const Color(0xFF0F9D58);
+      case "bullish":
+        return const Color(0xFF5AD079);
+      case "neutral":
+        return const Color(0xFFA6A49A);
+      case "bearish":
+        return const Color(0xFFEB6969);
+      case "very bearish":
+        return const Color(0xFFD93025);
+      default:
+        return Colors.grey;
+    }
+  }
+
+  Color impactColor(String i) {
+    switch (i.toLowerCase()) {
+      case "very high":
+        return const Color(0xFFFFB000);
+      case "high":
+        return const Color(0xFFFF9B5B);
+      case "mild":
+        return const Color(0xFFFFCD79);
+      case "negligible":
+        return const Color(0xFFFFCEAF);
+      default:
+        return Colors.grey;
+    }
+  }
+
+  showDialog(
+  context: context,
+  barrierDismissible: true,
+  builder: (ctx) => Dialog(
+    backgroundColor: Colors.white, // ✅ WHITE BACKGROUND
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(16),
+    ),
+    child: SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+
+          /// ---------------- TITLE ----------------
+          Text(
+            a.title,
+            style: GoogleFonts.poppins(
+              fontSize: 16,           // ✅ SAME AS CARD TITLE
+              fontWeight: FontWeight.w700,
+              color: Colors.black,
+            ),
+          ),
+
+          const SizedBox(height: 12),
+
+          /// ---------------- FULL STORY ----------------
+          if (a.story.isNotEmpty) ...[
+            Html(
+              data: a.story,
+              style: {
+                "p": Style(
+                  fontFamily: GoogleFonts.poppins().fontFamily,
+                  fontSize: FontSize(14.5), // ✅ SAME AS CARD SUMMARY
+                  lineHeight: LineHeight.number(1.4),
+                  color: Colors.black87,
+                  margin: Margins.only(bottom: 12),
+                ),
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+
+          /// ---------------- SENTIMENT ----------------
+          if (a.sentiment.isNotEmpty)
+            Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: "Sentiment: ",
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black,
+                    ),
+                  ),
+                  TextSpan(
+                    text: a.sentiment,
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: sentimentColor(a.sentiment),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+          const SizedBox(height: 6),
+
+          /// ---------------- IMPACT ----------------
+          if (a.impact.isNotEmpty)
+            Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: "Impact: ",
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black,
+                    ),
+                  ),
+                  TextSpan(
+                    text: a.impact,
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: impactColor(a.impact),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+          /// ---------------- COMPANIES ----------------
+          /// ---------------- MARKET INFORMATION ----------------
+if (a.companies.isNotEmpty) ...[
+  const SizedBox(height: 14),
+
+  Text(
+    "Companies",
+    style: GoogleFonts.poppins(
+      fontSize: 13,
+      fontWeight: FontWeight.w700,
+      color: Colors.black,
+    ),
+  ),
+
+  const SizedBox(height: 8),
+
+  Wrap(
+    spacing: 8,
+    runSpacing: 8,
+    children: a.companies.map(
+      (company) => Chip(
+        backgroundColor: const Color(0xFFEA6B6B),
+        label: Text(
+          company,
+          style: GoogleFonts.poppins(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
+        ),
+      ),
+    ).toList(),
+  ),
+]
+
+else if (a.sector_market.isNotEmpty) ...[
+  const SizedBox(height: 14),
+
+  Text(
+    "Sector",
+    style: GoogleFonts.poppins(
+      fontSize: 13,
+      fontWeight: FontWeight.w700,
+      color: Colors.black,
+    ),
+  ),
+
+  const SizedBox(height: 8),
+
+  Chip(
+    backgroundColor: const Color(0xFFEA6B6B),
+    label: Text(
+      a.sector_market,
+      style: GoogleFonts.poppins(
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+        color: Colors.white,
+      ),
+    ),
+  ),
+]
+
+else if (a.commodities_market.isNotEmpty) ...[
+  const SizedBox(height: 14),
+
+  Text(
+    "Commodity",
+    style: GoogleFonts.poppins(
+      fontSize: 13,
+      fontWeight: FontWeight.w700,
+      color: Colors.black,
+    ),
+  ),
+
+  const SizedBox(height: 8),
+
+  Wrap(
+    spacing: 8,
+    runSpacing: 8,
+    children: a.commodities_market.map(
+      (commodity) => Chip(
+        backgroundColor: const Color(0xFFEA6B6B),
+        label: Text(
+          commodity,
+          style: GoogleFonts.poppins(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
+        ),
+      ),
+    ).toList(),
+  ),
+],
+
+
+          const SizedBox(height: 18),
+
+          /// ---------------- CLOSE BUTTON ----------------
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(
+                "Close",
+                style: GoogleFonts.poppins(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFFEA6B6B),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  ),
+
+
+  );
+}
+
+Future<void> _loadSavedNewsIds() async {
+  if (currentUserId.isEmpty) return;
+
+  try {
+    final resp = await http.get(
+      Uri.parse("$baseUrl/api/users/$currentUserId/saved-news"),
+    );
+
+    if (resp.statusCode == 200) {
+      final body = jsonDecode(resp.body);
+      final List saved = body["data"];
+
+      setState(() {
+        _locallySavedIds =
+            saved.map((e) => e["_id"].toString()).toSet();
+      });
+    }
+  } catch (e) {
+    debugPrint("Failed to load saved ids: $e");
+  }
+}
+
+
+
+Widget _buildIpoTab() {
+  if (_isIpoLoading) {
+    return const Center(
+      child: CircularProgressIndicator(color: Color(0xFFF05151)),
+    );
+  }
+
+  if (_ipoNews.isEmpty) {
+    return const Center(
+      child: Text(
+        "No IPO News Available",
+        style: TextStyle(fontSize: 16, color: Colors.grey),
+      ),
+    );
+  }
+
+  return PageView.builder(
+    scrollDirection: Axis.vertical,
+    controller: _pageController,
+    padEnds: false,
+    physics: const BouncingScrollPhysics(),
+    itemCount: _ipoNews.length,
+    itemBuilder: (context, index) {
+      final article = _ipoNews[index];
+
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: VisibilityDetector(
+          key: Key(article.id),
+          onVisibilityChanged: (info) {
+            if (info.visibleFraction > 0.6 &&
+                !_viewedArticles.contains(article.id)) {
+
+              _viewedArticles.add(article.id);
+              _trackNewsView();   // 🔥 analytics call
+            }
+          },
+          child: ArticleCard(
+            article: article,
+            savedIds: _locallySavedIds,
+            onToggleSave: _toggleSaveNews,
+            onFetchCompanies: (companies) async {
+              if (companies.isEmpty) return;
+
+              final companyData =
+                  await _fetchCompanyDetails(companies);
+
+              if (companyData.isEmpty) return;
+
+              if (companyData.length == 1) {
+                _openTradingView(
+                  "${companyData.first["exchange"]}:${companyData.first["symbol"]}",
+                );
+              } else {
+                _showCompanySelector(companyData);
+              }
+            },
+            onOpenTradingView: _openTradingView,
+            onFetchSector: (sector) async {
+              final sectorData =
+                  await _fetchSectorDetails(sector);
+
+              if (sectorData != null) {
+                _openTradingView(
+                  "NSE:${sectorData["symbol"]}",
+                );
+              }
+            },
+            onFetchCommodities: (commodities) async {
+              final List<Map<String, dynamic>> commodityList = [];
+
+              for (String name in commodities) {
+                final data =
+                    await _fetchCommodityDetails(name);
+                if (data != null) {
+                  commodityList.add(data);
+                }
+              }
+
+              if (commodityList.isEmpty) return;
+
+              if (commodityList.length == 1) {
+                _openTradingView(
+                  commodityList.first["symbol"].toString(),
+                );
+              } else {
+                _showCommoditySelector(commodityList);
+              }
+            },
+            onOpenFullStory: _showFullStory,
+          ),
+        ),
+      );
+    },
   );
 }
 
@@ -344,12 +960,13 @@ Future<void> _toggleSaveEvent(CorporateEvent event) async {
 
             // Content based on selected tab
             Expanded(
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator(color: Color(0xFFF05151)))
-                  : _selectedTab == 0
-                      ? _buildTodayEventsTab()
-                      : _buildUpcomingEventsTab(),
+              child: _selectedTab == 0
+                  ? _buildTodayEventsTab()
+                  : _selectedTab == 1
+                      ? _buildUpcomingEventsTab()
+                      : _buildIpoTab(),
             ),
+
           ],
         ),
       ),

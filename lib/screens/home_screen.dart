@@ -14,7 +14,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:visibility_detector/visibility_detector.dart';
-
+import 'company_news_screen.dart';
 
 
 
@@ -34,6 +34,9 @@ with WidgetsBindingObserver{
 
   List<Article> _articles = [];
   List<Article> _filtered = [];
+  List<Map<String, dynamic>> _allCompanies = [];
+List<Map<String, dynamic>> _filteredCompanies = [];
+
   bool _isLoading = false;
   String _error = '';
   int _bottomIndex = 0;
@@ -67,8 +70,10 @@ void initState() {
 Future<void> _init() async {
   await _loadUserId();
   await _fetchLatestNews();
+  await _fetchCompanies();   // 🔥 ADD THIS
   await _loadSavedNewsIds();
 }
+
 
 
 @override
@@ -100,6 +105,25 @@ void didChangeAppLifecycleState(AppLifecycleState state) {
     }
   }
 }
+
+Future<void> _fetchCompanies() async {
+  try {
+    final resp =
+        await http.get(Uri.parse("$baseUrl/api/companies"));
+
+    if (resp.statusCode == 200) {
+      final data = json.decode(resp.body);
+      setState(() {
+        _allCompanies =
+            (data as List).cast<Map<String, dynamic>>();
+        _filteredCompanies = [];
+      });
+    }
+  } catch (e) {
+    debugPrint("Company fetch failed: $e");
+  }
+}
+
 List<Article> _removeDuplicates(List<Article> list) {
   final map = <String, Article>{};
   for (var a in list) {
@@ -159,21 +183,36 @@ Future<void> _trackNewsView() async {
   currentUserId = prefs.getString("userId") ?? "";
 }
 
-  void _applySearch() {
-    final q = _searchController.text.trim().toLowerCase();
-    if (q.isEmpty) {
-      setState(() => _filtered = List.from(_articles));
-      return;
-    }
+void _applySearch() {
+  final q = _searchController.text.trim().toLowerCase();
 
+  if (q.isEmpty) {
     setState(() {
-      _filtered = _articles.where((a) {
-        final hay =
-            '${a.title} ${a.excerpt} ${a.tags.join(' ')}'.toLowerCase();
-        return hay.contains(q);
-      }).toList();
+      _filtered = List.from(_articles);
+      _filteredCompanies = [];  // 🔥 Clear companies
     });
+    return;
   }
+
+  setState(() {
+    // 🔹 Filter Articles
+    _filtered = _articles.where((a) {
+      final hay =
+          '${a.title} ${a.excerpt} ${a.tags.join(' ')}'.toLowerCase();
+      return hay.contains(q);
+    }).toList();
+
+    // 🔹 Filter Companies
+    _filteredCompanies = _allCompanies.where((company) {
+      final name =
+          (company["Company Name"] ?? "").toLowerCase();
+      final symbol =
+          (company["Symbol"] ?? "").toLowerCase();
+      return name.contains(q) || symbol.contains(q);
+    }).toList();
+  });
+}
+
 
   // ------------------------- FETCH LATEST -------------------------
   Future<void> _fetchLatestNews({bool soft = false}) async {
@@ -950,38 +989,257 @@ double _textWidth(String text, TextStyle style) {
         }
       },
 
-      /// 🔥 KEY PART
-     child: PageView.builder(
-    scrollDirection: Axis.vertical,
-    controller: _pageController,
-    padEnds: false,
-    physics: const BouncingScrollPhysics(),
-    itemCount: _filtered.length,
-    itemBuilder: (context, index) {
-      final article = _filtered[index];
+     child: _searchController.text.isEmpty
 
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: VisibilityDetector(
-  key: Key(article.id),
-  onVisibilityChanged: (info) {
-    if (info.visibleFraction > 0.6 &&
-        !_viewedArticles.contains(article.id)) {
+    /// 🔥 NORMAL MODE (KEEP PAGEVIEW)
+    ? PageView.builder(
+        scrollDirection: Axis.vertical,
+        controller: _pageController,
+        padEnds: false,
+        physics: const BouncingScrollPhysics(),
+        itemCount: _filtered.length,
+        itemBuilder: (context, index) {
+          final article = _filtered[index];
 
-      _viewedArticles.add(article.id);
-      _trackNewsView();
-    }
-  },
-  child: _buildArticleCard(article),
+          return Padding(
+            padding:
+                const EdgeInsets.symmetric(vertical: 8),
+            child: VisibilityDetector(
+              key: Key(article.id),
+              onVisibilityChanged: (info) {
+                if (info.visibleFraction > 0.6 &&
+                    !_viewedArticles.contains(article.id)) {
+
+                  _viewedArticles.add(article.id);
+                  _trackNewsView();
+                }
+              },
+              child: _buildArticleCard(article),
+            ),
+          );
+        },
+      )
+
+    /// 🔎 SEARCH MODE (SHOW LISTVIEW)
+    : ListView(
+        children: [
+
+          /// Companies
+          if (_filteredCompanies.isNotEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 16, vertical: 10),
+              child: Text(
+                "Companies",
+                style: GoogleFonts.poppins(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+
+            ..._filteredCompanies.map(
+              (company) => CompanySearchCard(
+                companyName:
+                    company["Company Name"] ?? "Unknown",
+                symbol: company["Symbol"] ?? "",
+              ),
+            ),
+          ],
+
+          /// News
+          if (_filtered.isNotEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 16, vertical: 10),
+              child: Text(
+                "News",
+                style: GoogleFonts.poppins(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+
+            ..._filtered.map(
+  (article) => _buildSearchArticleCard(article),
 ),
 
-      );
-    },
-  ),
+          ],
+
+          if (_filtered.isEmpty &&
+              _filteredCompanies.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(40),
+              child: Center(
+                child: Text("No results found"),
+              ),
+            ),
+        ],
+      ),
+
 
     ),
   );
 }
+Widget _buildSearchArticleCard(Article a) {
+  final dateFormatted =
+      DateFormat.yMMMd().add_jm().format(a.date);
+
+  Color sentimentColor(String s) {
+    switch (s.toLowerCase()) {
+      case "very bullish":
+        return const Color(0xFF0F9D58);
+      case "bullish":
+        return const Color(0xFF5AD079);
+      case "neutral":
+        return const Color(0xFFA6A49A);
+      case "bearish":
+        return const Color(0xFFEB6969);
+      case "very bearish":
+        return const Color(0xFFD93025);
+      default:
+        return Colors.grey;
+    }
+  }
+
+  Color impactColor(String i) {
+    switch (i.toLowerCase()) {
+      case "very high":
+        return const Color(0xFFFFB000);
+      case "high":
+        return const Color(0xFFFF9B5B);
+      case "mild":
+        return const Color(0xFFFFCD79);
+      case "negligible":
+        return const Color(0xFFFFCEAF);
+      default:
+        return Colors.grey;
+    }
+  }
+
+  return Padding(
+    padding: const EdgeInsets.symmetric(vertical: 6),
+    child: InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: () => _showFullStory(a),
+      child: Container(
+        margin:
+            const EdgeInsets.symmetric(horizontal: 14),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+             blurRadius: 8,
+offset: const Offset(0, 3),
+
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment:
+              CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min, // 🔥 KEY FIX
+          children: [
+            Text(
+              a.title,
+              style: GoogleFonts.poppins(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            Text(
+              a.summary,
+              style: GoogleFonts.poppins(
+                fontSize: 15,
+                height: 1.5,
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            if (a.companies.isNotEmpty)
+              Text(
+                "Companies: ${a.companies.join(', ')}",
+                style: GoogleFonts.poppins(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+
+            const SizedBox(height: 6),
+
+            if (a.sentiment.isNotEmpty)
+  Text.rich(
+    TextSpan(
+      children: [
+        TextSpan(
+          text: "Sentiment: ",
+          style: GoogleFonts.poppins(
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        TextSpan(
+          text: a.sentiment,
+          style: GoogleFonts.poppins(
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            color: sentimentColor(a.sentiment),
+          ),
+        ),
+      ],
+    ),
+  ),
+
+
+            if (a.sentiment.isNotEmpty)
+  if (a.impact.isNotEmpty)
+  Text.rich(
+    TextSpan(
+      children: [
+        TextSpan(
+          text: "Impact: ",
+          style: GoogleFonts.poppins(
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        TextSpan(
+          text: a.impact,
+          style: GoogleFonts.poppins(
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            color: impactColor(a.impact),
+          ),
+        ),
+      ],
+    ),
+  ),
+
+
+            const SizedBox(height: 8),
+
+            Text(
+              dateFormatted,
+              style: GoogleFonts.poppins(
+                fontSize: 11,
+                color: Colors.grey,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
 Widget _buildArticleCard(Article a) {
   final dateFormatted = DateFormat.yMMMd().add_jm().format(a.date);
 
@@ -1286,6 +1544,7 @@ BottomNavigationBarItem _navItem({
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: false, 
       backgroundColor: const Color.fromARGB(255, 255, 255, 255),
       body: SafeArea(
         child: Column(
@@ -1400,6 +1659,74 @@ BottomNavigationBarItem _navItem({
 ),
 
 
+    );
+  }
+}
+
+class CompanySearchCard extends StatelessWidget {
+  final String companyName;
+  final String symbol;
+
+  const CompanySearchCard({
+    super.key,
+    required this.companyName,
+    required this.symbol,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding:
+          const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => CompanyNewsScreen(
+                companyName: companyName,
+                companySymbol: symbol,
+              ),
+            ),
+          );
+        },
+        child: Container(
+          padding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  companyName,
+                  style: GoogleFonts.poppins(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Text(
+                symbol,
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.grey,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
