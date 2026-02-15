@@ -21,7 +21,10 @@ class ChatbotScreen extends StatefulWidget {
   State<ChatbotScreen> createState() => _ChatbotScreenState();
 }
 
-class _ChatbotScreenState extends State<ChatbotScreen> {
+class _ChatbotScreenState extends State<ChatbotScreen> with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _controller = TextEditingController();
   final List<ChatMessage> _messages = [];
@@ -29,6 +32,55 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   int _bottomIndex = 1;
   bool _rateLimited = false;
   String _userName = "there";
+
+  static const String _sessionKey = "current_session_id";
+  static const String _chatCacheKey = "session_chat_messages";
+  static const int _maxMessages = 20;
+  String? _currentSessionId;
+
+Future<void> _initSession() async {
+  final prefs = await SharedPreferences.getInstance();
+  final savedSessionId = prefs.getString(_sessionKey);
+  final now = DateTime.now().millisecondsSinceEpoch;
+  
+  if (savedSessionId != null) {
+    final parts = savedSessionId.split('_');
+    if (parts.length == 2) {
+      final timestamp = int.tryParse(parts[1]) ?? 0;
+      final hoursSince = (now - timestamp) / (1000 * 60 * 60);
+      
+      if (hoursSince < 24) {
+        _currentSessionId = savedSessionId;
+        await _loadCachedMessages();
+        return;
+      }
+    }
+  }
+  
+  _currentSessionId = 'session_$now';
+  await prefs.setString(_sessionKey, _currentSessionId!);
+  await prefs.remove(_chatCacheKey);
+}
+
+Future<void> _loadCachedMessages() async {
+  final prefs = await SharedPreferences.getInstance();
+  final cached = prefs.getString(_chatCacheKey);
+  if (cached != null) {
+    final List<dynamic> decoded = jsonDecode(cached);
+    setState(() {
+      _messages.addAll(decoded.map((e) => ChatMessage.fromJson(e)).toList());
+    });
+  }
+}
+
+Future<void> _saveChatToCache() async {
+  final prefs = await SharedPreferences.getInstance();
+  final messagesToSave = _messages.length > _maxMessages 
+      ? _messages.sublist(_messages.length - _maxMessages) 
+      : _messages;
+  final encoded = jsonEncode(messagesToSave.map((e) => e.toJson()).toList());
+  await prefs.setString(_chatCacheKey, encoded);
+}
 
 
 Future<void> _loadUserName() async {
@@ -41,6 +93,7 @@ Future<void> _loadUserName() async {
 void initState() {
   super.initState();
   _loadUserName();
+  _initSession();
 }
 
 
@@ -64,9 +117,19 @@ void dispose() {
     final prefs = await SharedPreferences.getInstance();
     final userId = prefs.getString("userId");
 
+    // Build conversation history in OpenAI format
+    List<Map<String, String>> history = [];
+    for (var msg in _messages) {
+      history.add({
+        "role": msg.isUser ? "user" : "assistant",
+        "content": msg.text
+      });
+    }
+
     debugPrint('🔍 Sending request to: $_baseUrl');
     debugPrint('🔍 User ID: $userId');
     debugPrint('🔍 Question: $question');
+    debugPrint('🔍 History length: ${history.length}');
 
     final response = await http.post(
       Uri.parse(_baseUrl),
@@ -74,7 +137,10 @@ void dispose() {
         "Content-Type": "application/json",
         "X-User-Id": userId ?? "",
       },
-      body: jsonEncode({"question": question}),
+      body: jsonEncode({
+        "question": question,
+        "history": history
+      }),
     ).timeout(const Duration(seconds: 30));
 
     debugPrint('✅ Response status: ${response.statusCode}');
@@ -135,6 +201,7 @@ void dispose() {
     });
     _scrollToBottom(); 
     _controller.clear();
+    await _saveChatToCache();
 
     final reply = await _askQuestion(text);
 
@@ -142,7 +209,8 @@ void dispose() {
       _messages.add(ChatMessage(text: reply, isUser: false));
       _loading = false;
     });
-    _scrollToBottom(); 
+    _scrollToBottom();
+    await _saveChatToCache();
   }
 
   Widget _buildAskAIHome() {
@@ -340,12 +408,28 @@ Widget _buildSuggestion(String text) {
 }
 @override
 Widget build(BuildContext context) {
+  super.build(context);
   return Scaffold(
     backgroundColor: const Color(0xFFF6F7FA),
     appBar: AppBar(
       title: const Text("Ask AI"),
       backgroundColor: const Color(0xFFF05151),
       actions: [
+        if (_messages.isNotEmpty)
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'New Chat',
+            onPressed: () async {
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.remove(_chatCacheKey);
+              _currentSessionId = 'session_${DateTime.now().millisecondsSinceEpoch}';
+              await prefs.setString(_sessionKey, _currentSessionId!);
+              setState(() {
+                _messages.clear();
+                _rateLimited = false;
+              });
+            },
+          ),
         GestureDetector(
           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen())),
           child: const Padding(

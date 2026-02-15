@@ -1,6 +1,6 @@
 import logging
 from pymongo import MongoClient
-from mcp_server.config import MONGO_URI, DB_NAME
+from config import MONGO_URI, DB_NAME
 
 logger = logging.getLogger(__name__)
 

@@ -1,6 +1,6 @@
 from datetime import date
 from fastapi import HTTPException, Request
-from mcp_server.db import db
+from db import db
 
 rate_limits = db["rate_limits"]
 

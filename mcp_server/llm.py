@@ -1,313 +1,29 @@
-# import json
-# from openai import OpenAI
-# from datetime import datetime
-# from pytz import timezone
-
-
-
-# from mcp_server.config import OPENAI_API_KEY
-
-# from mcp_server.tools import (
-#     search_news,
-#     get_latest_news,
-#     get_news_by_company,
-#     get_news_by_sentiment,
-#     get_news_by_impact,
-#     finedge_company_tool,
-#     get_todays_market_news,
-
-# )
-
-
-# # ============================
-# # TEMP 1-TURN CHAT MEMORY
-# # ============================
-# # ============================
-# # MULTI-TURN CHAT MEMORY
-# # ============================
-
-# IST = timezone("Asia/Kolkata")
-# today = datetime.now(IST).strftime("%B %d, %Y")
-# CHAT_HISTORY = []
-
-
-# # ============================
-# # 🔐 FINAL SYSTEM PROMPT
-# # ============================
-# SYSTEM_FINAL_PROMPT = f"""
-# You are a smart and knowledgeable financial assistant.
-
-# IMPORTANT CONTEXT:
-# - Today's date is {today} (IST).
-# - Always use today's date when mentioning market timelines.
-# - Never assume or invent dates.
-
-# Follow these rules:
-# - Respond like ChatGPT with clear structure, headings, bullet points, and bold text when helpful.
-# - Use emojis naturally to improve readability.
-# - Never mention tools, databases, filters, storage, or sources.
-# - Never say phrases like "based on the data", "according to news records", or "from the database".
-# - If information is available, blend it naturally into your response.
-# - If information is missing, answer confidently using your general financial knowledge.
-# - Keep the tone professional, clear, and easy to understand.
-# - Never say something like "A tool is not required to answer your question".
-
-# IMPORTANT:
-# - After completing the main answer, ALWAYS add a section titled:
-#   "💡 You may also ask:"
-# - Under it, suggest 2–3 short, relevant follow-up questions a user might naturally ask next.
-# - The follow-up questions should be conversational and useful.
-# """
-
-
-
-# def get_openai_client():
-#     return OpenAI(
-#         api_key=OPENAI_API_KEY
-#     )
-
-
-# TOOLS = [
-#     {
-#         "type": "function",
-#         "function": {
-#             "name": "search_news",
-#             "description": "Search news by keyword",
-#             "parameters": {
-#                 "type": "object",
-#                 "properties": {
-#                     "query": {"type": "string"}
-#                 },
-#                 "required": ["query"]
-#             }
-#         }
-#     },
-#     {
-#         "type": "function",
-#         "function": {
-#             "name": "get_latest_news",
-#             "description": "Get latest news",
-#             "parameters": {"type": "object", "properties": {}}
-#         }
-#     },
-#     {
-#         "type": "function",
-#         "function": {
-#             "name": "get_news_by_company",
-#             "description": "Get news related to a specific company",
-#             "parameters": {
-#                 "type": "object",
-#                 "properties": {
-#                     "company": {"type": "string"}
-#                 },
-#                 "required": ["company"]
-#             }
-#         }
-#     },
-#     {
-#         "type": "function",
-#         "function": {
-#             "name": "get_news_by_sentiment",
-#             "description": "Get news filtered by sentiment",
-#             "parameters": {
-#                 "type": "object",
-#                 "properties": {
-#                     "sentiment": {"type": "string"}
-#                 },
-#                 "required": ["sentiment"]
-#             }
-#         }
-#     },
-#     {
-#         "type": "function",
-#         "function": {
-#             "name": "get_news_by_impact",
-#             "description": "Get news filtered by impact",
-#             "parameters": {
-#                 "type": "object",
-#                 "properties": {
-#                     "impact": {"type": "string"}
-#                 },
-#                 "required": ["impact"]
-#             }
-#         }
-#     },
-#     {
-#     "type": "function",
-#     "function": {
-#         "name": "finedge_company_tool",
-#         "description": "Get today's market news with very high impact and extreme sentiment",
-#         "parameters": {
-#             "type": "object",
-#             "properties": {
-#                 "limit": {
-#                     "type": "integer",
-#                     "default": 10
-#                 }
-#             }
-#         }
-#     }
-# },
-# {
-#     "type": "function",
-#     "function": {
-#         "name": "get_todays_market_news",
-#         "description": "Get today's market news with very high impact and extreme sentiment",
-#         "parameters": {
-#             "type": "object",
-#             "properties": {
-#                 "limit": {
-#                     "type": "integer",
-#                     "default": 10
-#                 }
-#             }
-#         }
-#     }
-# }
-
-
-# ]
-
-# TOOL_MAP = {
-#     "search_news": search_news,
-#     "get_latest_news": get_latest_news,
-#     "get_news_by_company": get_news_by_company,
-#     "get_news_by_sentiment": get_news_by_sentiment,
-#     "get_news_by_impact": get_news_by_impact,
-#     "finedge_company_tool":finedge_company_tool,
-#     "get_todays_market_news":get_todays_market_news
-# }
-
-
-# def ask_llm(question: str) -> str:
-#     global CHAT_HISTORY
-
-#     client = get_openai_client()
-
-#     # ============================
-#     # BUILD CONTEXT FROM MEMORY
-#     # ============================
-#     messages_for_tool_decision = []
-
-#     for msg in CHAT_HISTORY:
-#         messages_for_tool_decision.append(msg)
-
-#     messages_for_tool_decision.append(
-#         {"role": "user", "content": question}
-#     )
-#     # ============================
-# # FORCE TOOLS FOR MARKET QUERIES
-# # ============================
-#     force_tool = any(
-#         k in question.lower()
-#         for k in ["today", "market", "trend", "sentiment"]
-#     )
-
-#     tool_choice = "required" if force_tool else "auto"
-
-
-#     # ============================
-#     # STEP 1: TOOL DECISION
-#     # ============================
-#     response = client.chat.completions.create(
-#         model="gpt-4o-mini",
-#         messages=[
-#             {
-#                 "role": "system",
-#                 "content": "Decide whether a tool is required. Do NOT explain your decision."
-#             },
-#             *messages_for_tool_decision
-#         ],
-#         tools=TOOLS,
-#         tool_choice=tool_choice,   # 👈 USE IT HERE
-#         temperature=0,
-#     )
-
-#     msg = response.choices[0].message
-
-#     # ============================
-#     # TOOL PATH (UNCHANGED)
-#     # ============================
-#     if msg.tool_calls:
-#         tool_call = msg.tool_calls[0]
-#         tool_name = tool_call.function.name
-#         args = json.loads(tool_call.function.arguments)
-
-#         tool_result = TOOL_MAP[tool_name](**args)
-
-#         # Tool returned nothing → fallback to LLM
-#         if not tool_result:
-#             final = client.chat.completions.create(
-#                 model="gpt-4o-mini",
-#                 messages=[
-#                     {"role": "system", "content": SYSTEM_FINAL_PROMPT},
-#                     *CHAT_HISTORY,
-#                     {"role": "user", "content": question},
-#                 ],
-#                 temperature=0.6,
-#             )
-
-#             answer = final.choices[0].message.content
-
-#         else:
-#             # Tool has data → reason silently
-#             final = client.chat.completions.create(
-#                 model="gpt-4o-mini",
-#                 messages=[
-#                     {"role": "system", "content": SYSTEM_FINAL_PROMPT},
-#                     *CHAT_HISTORY,
-#                     {
-#                         "role": "user",
-#                         "content": (
-#                             f"{question}\n\n"
-#                             f"Information:\n{json.dumps(tool_result)}"
-#                         ),
-#                     },
-#                 ],
-#                 temperature=0.4,
-#             )
-
-#             answer = final.choices[0].message.content
-
-#     # ============================
-#     # NO TOOL NEEDED (UNCHANGED)
-#     # ============================
-#     else:
-#         final = client.chat.completions.create(
-#             model="gpt-4o-mini",
-#             messages=[
-#                 {"role": "system", "content": SYSTEM_FINAL_PROMPT},
-#                 *CHAT_HISTORY,
-#                 {"role": "user", "content": question},
-#             ],
-#             temperature=0.6,
-#         )
-
-#         answer = final.choices[0].message.content
-
-#     # ============================
-#     # SAVE TO MEMORY (NEW)
-#     # ============================
-#     CHAT_HISTORY.append({"role": "user", "content": question})
-#     CHAT_HISTORY.append({"role": "assistant", "content": answer})
-
-#     return answer
 
 import json
 from openai import OpenAI
 from datetime import datetime
 from pytz import timezone
 
-from mcp_server.config import OPENAI_API_KEY
-from mcp_server.tools import (
+from config import OPENAI_API_KEY
+from tools import (
     search_news,
     get_latest_news,
-
     get_news_by_sentiment,
     get_news_by_impact,
     finedge_company_tool,
     get_market_news_by_date,
+    get_company_analysis,
+    analyze_financial_health,
+    get_stock_price,
+    get_trending_stocks_today,
+    get_trending_stocks_weekly,
+    get_top_gainers_today,
+    get_top_gainers_weekly,
+    get_top_losers_today,
+    get_top_losers_weekly,
+    get_market_overview
 )
+from symbol_mapper import get_best_symbol, get_company_display_name
 
 # ============================
 # TIME & MEMORY
@@ -320,51 +36,79 @@ CHAT_HISTORY = []
 # 🔐 FINAL ANSWER PROMPT
 # ============================
 SYSTEM_FINAL_PROMPT = f"""
-You are a financial assistant.
+You are a professional financial analyst and market expert.
 
-IMPORTANT CONTEXT:
+CRITICAL INSTRUCTIONS:
 - Today's date is {today} (IST).
-- Never invent prices, returns, or numerical performance.
+- You will receive ACTUAL DATA from tools - YOU MUST USE THIS DATA in your response
+- NEVER give generic answers when specific data is provided
+- Extract and present ALL relevant numbers, prices, percentages, and company names from the data
+- If news data is provided, analyze sentiment and impact on investment decisions
+- If price data is provided, include current price, change %, volume, and trading range
+- Combine multiple data sources (price + news + sentiment) for comprehensive analysis
+
+RESPONSE STYLE:
+- Start with a direct answer using ACTUAL DATA from the information provided
+- Use bullet points for clarity
+- Include ALL specific numbers, percentages, and stock names from the data
+- Add sector analysis and market context based on the data
+- End with actionable takeaways based on the data
+
+FORMAT EXAMPLES:
+
+**For stock performance queries:**
+"Based on latest trading session (date):
+Top gainers (NSE/BSE):
+• [Stock Name] — up ~X.X% — [reason]
+• [Stock Name] — up ~X.X% on [catalyst]
+
+Other notable outperformers:
+• [Additional context]
+
+Note: [Market breadth/sector rotation insights]"
+
+**For investment advice:**
+"📌 Key takeaway: [Comprehensive 3-line summary covering market context, stock outlook, and strategic recommendation. Include broader market implications and sector dynamics that influence the investment decision.]
+
+Short answer: [Direct recommendation]
+
+Investment Perspective (Long-term)
+[Detailed analysis with bullet points]
+
+Trading Perspective (Short-term)
+[Technical/momentum analysis]
+
+Actionable Summary
+Profile | Action
+Long-term investor | [specific action]
+Short-term trader | [specific action]"
+
+**For market recap:**
+"Weekly/Daily summary (ending date):
+• [Major benchmark performance with specific %]
+• [Key drivers and catalysts]
+• [Sector performance]
+• [Currency/commodity impact]
+
+📉/📈 Key takeaway: [Market sentiment summary]"
+
+**For index prices:**
+"As of [time/date]:
+📈 Nifty 50: ~X,XXX.XX points
+📉 Sensex: ~XX,XXX.XX points
+
+Note: [Session highlights and sector performance]"
 
 CORE BEHAVIOR:
-
-1. WHEN the "Information" section CONTAINS meaningful data:
-   - Use ONLY that information.
-   - Do NOT invent price or percentage-based performance.
-   - You MAY reinterpret the user's wording to match the data provided.
-
-   Specifically:
-   - If the user asks about "top performing stocks"
-     AND the information contains news sentiment, impact, or headlines
-     BUT NOT price data,
-     THEN:
-       → Interpret "top performing" as
-         "stocks showing strong positive news momentum".
-       → Clearly base the answer on news sentiment and impact.
-       → Do NOT state that data is missing.
-       → Do NOT say phrases like:
-         "does not include specific data",
-         "insufficient information",
-         "no data available".
-
-2. WHEN the "Information" section is EMPTY or truly irrelevant:
-   - Answer in a general advisory manner.
-   - Provide strategy-oriented guidance.
-   - Avoid disclaimers about missing data.
-
-STYLE GUIDELINES:
-- Prefer bullets or short paragraphs.
-- Confident, explanatory tone.
-- No mention of tools, databases, or system limitations.
-
-OUTPUT RULES:
-- If data exists → summarize what it indicates.
-- If data is news-based → frame conclusions as news-driven momentum, not price performance.
+1. WHEN data is available → Use specific numbers and company names
+2. WHEN data is limited → Provide general market context and methodology
+3. ALWAYS include actionable insights
+4. Use emojis strategically (📈📉💰⚠️📌)
+5. Mention specific sectors, catalysts, and market drivers
 
 MANDATORY:
-- End with:
-  "💡 You may also ask:"
-- Suggest 2–3 short, relevant follow-up questions.
+- End with: "💡 You may also ask:"
+- Suggest 2–3 relevant follow-up questions
 """
 
 
@@ -393,7 +137,7 @@ DATE RESOLUTION RULES:
 - Explicit dates (e.g. "Jan 15", "15 Jan 2026") → convert to YYYY-MM-DD
 - If the user asks about a previous day or past date, ALWAYS treat it as a date-based query.
 
-TOOL SELECTION RULES:
+TOOL_SELECTION RULES:
 
 1. If the user asks about:
    - market performance on any date
@@ -405,17 +149,27 @@ TOOL SELECTION RULES:
    → Pass the resolved date in YYYY-MM-DD format.
 
 2. If the user asks about:
+   - "this week" top gainers/losers
+   - "weekly" top gainers/losers
+   - best/worst performers "this week"
+   
+   → YOU MUST call: get_trending_stocks_weekly OR get_top_gainers_today OR get_top_losers_today
+   → These tools now support weekly data
+
+3. If the user asks about:
    - a specific company
    - stock price
    - company performance
    - company-related news
+   - investment advice ("should I buy", "worth buying", "is X a good investment")
+   - company analysis or financial health
 
    → YOU MUST call: finedge_company_tool
 
-3. If the user asks to search news by keyword or topic:
+4. If the user asks to search news by keyword or topic:
    → YOU MAY call: search_news
 
-4. If the user asks for latest general news:
+5. If the user asks for latest general news:
    → YOU MAY call: get_latest_news
 
 IMPORTANT:
@@ -515,7 +269,6 @@ TOOLS = [
             "parameters": {"type": "object", "properties": {}}
         }
     },
-    
     {
         "type": "function",
         "function": {
@@ -548,6 +301,7 @@ TOOLS = [
         "type": "function",
         "function":  {
             "name": "finedge_company_tool",
+            "description": "Get company data including news, sentiment, and impact analysis. Use for investment advice.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -558,7 +312,39 @@ TOOLS = [
         }
     }
 },
-   
+    {
+        "type": "function",
+        "function": {
+            "name": "get_company_analysis",
+            "description": "Get comprehensive company analysis with financial data",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "company": {"type": "string"},
+                    "analysis_type": {
+                        "type": "string",
+                        "enum": ["comprehensive", "financial", "valuation"],
+                        "default": "comprehensive"
+                    }
+                },
+                "required": ["company"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "analyze_financial_health",
+            "description": "Analyze company's financial health and key metrics",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "company": {"type": "string"}
+                },
+                "required": ["company"]
+            }
+        }
+    },
    {
     "type": "function",
     "function": {
@@ -579,8 +365,107 @@ TOOLS = [
             "required": ["date"]
         }
     }
-}
-
+},
+    {
+        "type": "function",
+        "function": {
+            "name": "get_stock_price",
+            "description": "Get real-time stock price from Yahoo Finance",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "company": {"type": "string"}
+                },
+                "required": ["company"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_trending_stocks_today",
+            "description": "Get today's trending stocks. Use for volatile stocks, top movers queries.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "limit": {"type": "integer", "default": 10}
+                }
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_trending_stocks_weekly",
+            "description": "Get weekly trending stocks with price changes over the past week. Use when user asks about 'this week', 'weekly', or 'past week' performance.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "limit": {"type": "integer", "default": 10}
+                }
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_top_gainers_today",
+            "description": "Get top gaining stocks TODAY. Use only for today's or daily gainers.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "limit": {"type": "integer", "default": 10}
+                }
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_top_gainers_weekly",
+            "description": "Get top gaining stocks THIS WEEK. Use when user asks about 'this week', 'weekly', or 'past week' gainers.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "limit": {"type": "integer", "default": 10}
+                }
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_top_losers_today",
+            "description": "Get top losing stocks TODAY. Use only for today's or daily losers.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "limit": {"type": "integer", "default": 10}
+                }
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_top_losers_weekly",
+            "description": "Get top losing stocks THIS WEEK. Use when user asks about 'this week', 'weekly', or 'past week' losers.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "limit": {"type": "integer", "default": 10}
+                }
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_market_overview",
+            "description": "Get market summary with Nifty 50 data. Use for market sentiment, market status, overall market queries.",
+            "parameters": {"type": "object", "properties": {}}
+        }
+    }
 ]
 
 # ============================
@@ -593,34 +478,92 @@ TOOL_MAP = {
     "get_news_by_impact": get_news_by_impact,
     "finedge_company_tool": finedge_company_tool,
     "get_market_news_by_date": get_market_news_by_date,
+    "get_company_analysis": get_company_analysis,
+    "analyze_financial_health": analyze_financial_health,
+    "get_stock_price": get_stock_price,
+    "get_trending_stocks_today": get_trending_stocks_today,
+    "get_trending_stocks_weekly": get_trending_stocks_weekly,
+    "get_top_gainers_today": get_top_gainers_today,
+    "get_top_gainers_weekly": get_top_gainers_weekly,
+    "get_top_losers_today": get_top_losers_today,
+    "get_top_losers_weekly": get_top_losers_weekly,
+    "get_market_overview": get_market_overview,
 }
 
 
-def is_tool_result_relevant(question: str, tool_name: str, tool_result: dict) -> bool:
+def is_tool_result_relevant(question: str, tool_name: str, tool_result) -> bool:
     q = question.lower()
-
-    # -------- PRICE / VALUE QUERIES (INDEX or STOCK) --------
-    if any(word in q for word in ["price", "current", "value", "level"]):
+    print(f"🔍 DEBUG: Question='{q}', Tool='{tool_name}'")
+    print(f"🔍 DEBUG: Tool result type={type(tool_result)}")
+    
+    # -------- MARKET OVERVIEW QUERIES (CHECK FIRST) --------
+    if any(word in q for word in ["overview", "summary", "sentiment", "market status", "how is market"]):
+        if tool_name == "get_market_overview":
+            has_nifty = bool(tool_result.get("nifty_50"))
+            print(f"🔍 DEBUG: Market overview - Has nifty data: {has_nifty}")
+            return has_nifty
+    
+    # -------- COMPANY ANALYSIS QUERIES --------
+    if any(word in q for word in ["worth", "buying", "buy", "analysis", "company", "stock", "should i", "invest"]):
+        print(f"🔍 DEBUG: Matched company analysis keywords")
         if tool_name == "finedge_company_tool":
-            quote = tool_result.get("quote", {})
-            return quote.get("price") is not None
-
-        # Any other tool is irrelevant for price
+            print(f"🔍 DEBUG: Tool name matches finedge_company_tool")
+            # Check if we have news data (more important than quote for analysis)
+            has_news = bool(tool_result and tool_result.get("news") and len(tool_result.get("news", [])) > 0)
+            has_company = bool(tool_result and tool_result.get("company"))
+            print(f"🔍 DEBUG: Has news: {has_news}, Has company: {has_company}")
+            return has_news or has_company
+        if tool_name == "get_stock_price":
+            has_price = bool(tool_result and tool_result.get("current_price"))
+            print(f"🔍 DEBUG: Has price data: {has_price}")
+            return has_price
         return False
-
+    
     # -------- DATE / MARKET PERFORMANCE QUERIES --------
-    if any(word in q for word in ["market", "yesterday", "performed", "stocks", "date"]):
+    if any(word in q for word in ["yesterday", "performed", "date", "today", "falling", "rising", "why"]):
+        print(f"🔍 DEBUG: Matched market query keywords")
         if tool_name == "get_market_news_by_date":
-            return bool(tool_result.get("news"))
+            print(f"🔍 DEBUG: Tool name matches get_market_news_by_date")
+            has_news = bool(tool_result.get("news") and len(tool_result.get("news", [])) > 0)
+            print(f"🔍 DEBUG: Has news data: {has_news}")
+            return has_news
+        elif tool_name == "get_latest_news":
+            print(f"🔍 DEBUG: Tool name matches get_latest_news")
+            has_news = bool(isinstance(tool_result, list) and len(tool_result) > 0)
+            print(f"🔍 DEBUG: Has news data: {has_news}")
+            return has_news
         return False
 
-    # -------- DEFAULT: tool not relevant --------
-    return False
+    # -------- REAL-TIME PRICE QUERIES --------
+    if any(word in q for word in ["price", "current", "live", "real-time", "quote"]):
+        if tool_name == "get_stock_price":
+            return bool(tool_result.get("current_price"))
+        return False
+
+    # -------- TRENDING/GAINERS/LOSERS QUERIES --------
+    if any(word in q for word in ["trending", "gainers", "losers", "top", "best", "worst", "volatile"]):
+        print(f"🔍 DEBUG: Matched gainers/losers query")
+        if tool_name in ["get_trending_stocks_today", "get_trending_stocks_weekly", 
+                        "get_top_gainers_today", "get_top_gainers_weekly",
+                        "get_top_losers_today", "get_top_losers_weekly"]:
+            print(f"🔍 DEBUG: Tool name matches gainers/losers tools")
+            has_data = bool(tool_result and len(tool_result) > 0)
+            print(f"🔍 DEBUG: Has stock data: {has_data}")
+            return has_data
+        # If no data from trending tools, still try to answer from news
+        if tool_name == "get_latest_news":
+            has_news = bool(isinstance(tool_result, list) and len(tool_result) > 0)
+            return has_news
+        return False
+
+    # -------- DEFAULT: tool relevant --------
+    print(f"🔍 DEBUG: Using default relevance = True")
+    return True
 
 # ============================
 # MAIN LLM FUNCTION
 # ============================
-def ask_llm(question: str) -> str:
+def ask_llm(question: str, history: list = None) -> str:
     print("\n==============================")
     print("USER QUESTION:", question)
     print("==============================")
@@ -667,6 +610,18 @@ def ask_llm(question: str) -> str:
             print("📊 RESULT KEYS:", list(tool_result.keys()))
             if "count" in tool_result:
                 print("📰 NEWS COUNT:", tool_result["count"])
+            
+            # Debug: Print actual data to see what's being returned
+            print("🔍 SAMPLE DATA:")
+            for key, value in tool_result.items():
+                if isinstance(value, dict) and value:
+                    print(f"  {key}: {list(value.keys())[:5]}...")  # Show first 5 keys
+                    # Show actual values for quote data
+                    if key == 'quote' and value:
+                        for qkey, qval in list(value.items())[:3]:
+                            print(f"    {qkey}: {qval}")
+                elif value:
+                    print(f"  {key}: {str(value)[:100]}...")  # Show first 100 chars
         elif isinstance(tool_result, list):
             print("✅ TOOL EXECUTED SUCCESSFULLY")
             print("📰 ITEMS RETURNED:", len(tool_result))
@@ -675,21 +630,33 @@ def ask_llm(question: str) -> str:
 
 
         use_tool = is_tool_result_relevant(question, tool_name, tool_result)
-
+        print(f"🤔 TOOL RELEVANCE CHECK: {use_tool}")
+        
         if use_tool:
-            # Tool is relevant → pass data
+            # Tool is relevant → pass data with explicit instruction
+            data_context = f"""
+USER QUESTION: {question}
+
+ACTUAL DATA FROM DATABASE/API:
+{json.dumps(tool_result, indent=2)}
+
+INSTRUCTIONS:
+- Analyze the ACTUAL DATA provided above
+- Extract ALL relevant numbers, prices, percentages, company names
+- If news is provided, analyze sentiment (bullish/bearish) and impact (high/medium/low)
+- If price data is provided, mention current_price, change, change_percent, volume, high, low
+- Provide investment recommendation based on the data
+- Be specific and data-driven, not generic
+"""
             final = client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": SYSTEM_FINAL_PROMPT},
                     *CHAT_HISTORY,
-                    {
-                        "role": "user",
-                        "content": f"{question}\n\nInformation:\n{json.dumps(tool_result)}",
-                    },
+                    {"role": "user", "content": data_context},
                 ],
-                temperature=0.4,
-                max_tokens=300
+                temperature=0.3,
+                max_tokens=800
             )
         else:
             # Tool is irrelevant → IGNORE it completely

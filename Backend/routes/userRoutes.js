@@ -57,17 +57,25 @@ router.post("/notifications", async (req, res) => {
 /// 📊 GET ANALYTICS DASHBOARD (must be before POST /analytics)
 router.get("/analytics/dashboard", async (req, res) => {
   try {
-    const users = await User.find({}, "name email totalTimeSpent sessions");
+    const users = await User.find({}, "name email totalTimeSpent sessions appOpens newsViews");
     
-    const analytics = users.map(u => ({
-      name: u.name,
-      email: u.email,
-      totalMinutes: Math.round((u.totalTimeSpent || 0) / 60),
-      sessionCount: u.sessions?.length || 0,
-      avgSessionMinutes: u.sessions?.length 
-        ? Math.round((u.totalTimeSpent || 0) / u.sessions.length / 60) 
-        : 0,
-    }));
+    const analytics = users.map(u => {
+      const newsViewsTotal = u.newsViews 
+        ? Array.from(u.newsViews.values()).reduce((a, b) => a + b, 0) 
+        : 0;
+
+      return {
+        name: u.name,
+        email: u.email,
+        totalMinutes: Math.round((u.totalTimeSpent || 0) / 60),
+        sessionCount: u.sessions?.length || 0,
+        avgSessionMinutes: u.sessions?.length 
+          ? Math.round((u.totalTimeSpent || 0) / u.sessions.length / 60) 
+          : 0,
+        appOpens: u.appOpens || 0,
+        cardsViewed: newsViewsTotal,
+      };
+    });
 
     res.json({ success: true, analytics });
   } catch (err) {
@@ -81,7 +89,7 @@ router.post("/analytics", async (req, res) => {
     const { userId, sessionDuration, timestamp } = req.body;
 
     await User.findByIdAndUpdate(userId, {
-      $inc: { totalTimeSpent: sessionDuration },
+      $inc: { totalTimeSpent: sessionDuration, appOpens: 1 },
       $push: {
         sessions: {
           duration: sessionDuration,
