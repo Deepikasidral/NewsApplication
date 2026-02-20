@@ -42,7 +42,7 @@ Future<void> saveFcmTokenToBackend(String userId) async {
   if (token == null) return;
 
   await http.post(
-    Uri.parse("http://13.51.242.86:5000/api/users/save-fcm"),
+    Uri.parse("https://13.51.242.86:5000/api/users/save-fcm"),
     headers: {"Content-Type": "application/json"},
     body: jsonEncode({
       "userId": userId,
@@ -69,7 +69,7 @@ Future<void> saveFcmTokenToBackend(String userId) async {
     
     try {
       final response = await http.post(
-        Uri.parse("http://13.51.242.86:5000/api/auth/signup"), // backend unchanged
+        Uri.parse("https://13.51.242.86:5000/api/auth/signup"), // backend unchanged
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({
           "name": name,
@@ -160,7 +160,7 @@ Future<void> saveFcmTokenToBackend(String userId) async {
       print("💾 Saving to MongoDB...");
       try {
         final response = await http.post(
-          Uri.parse("http://13.51.242.86:5000/api/auth/google-login"),
+          Uri.parse("https://13.51.242.86:5000/api/auth/google-login"),
           headers: {"Content-Type": "application/json"},
           body: jsonEncode(userData),
         ).timeout(const Duration(seconds: 10));

@@ -12,6 +12,7 @@
 #     answer = ask_llm(req.question)
 #     return {"answer": answer}
 
+
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, Request
 from pydantic import BaseModel

@@ -172,6 +172,13 @@ TOOL_SELECTION RULES:
 5. If the user asks for latest general news:
    → YOU MAY call: get_latest_news
 
+6. DO NOT USE TOOLS for:
+   - General investment advice ("should I buy", "worth buying", "is X a good investment")
+   - "Top 5 stocks to buy/sell" without specific company names
+   - "Best stocks for tomorrow" type questions
+   - Generic stock recommendations
+   → Answer these directly using general financial knowledge
+
 IMPORTANT:
 - Always prefer tools when factual market or historical data is requested.
 - Never explain your decision.

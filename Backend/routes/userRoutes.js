@@ -83,13 +83,28 @@ router.get("/analytics/dashboard", async (req, res) => {
   }
 });
 
+/// 📊 TRACK APP OPEN
+router.post("/app-open", async (req, res) => {
+  try {
+    const { userId } = req.body;
+
+    await User.findByIdAndUpdate(userId, {
+      $inc: { appOpens: 1 },
+    });
+
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 /// 📊 ANALYTICS - TRACK SESSION
 router.post("/analytics", async (req, res) => {
   try {
     const { userId, sessionDuration, timestamp } = req.body;
 
     await User.findByIdAndUpdate(userId, {
-      $inc: { totalTimeSpent: sessionDuration, appOpens: 1 },
+      $inc: { totalTimeSpent: sessionDuration },
       $push: {
         sessions: {
           duration: sessionDuration,

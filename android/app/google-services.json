@@ -70,6 +70,35 @@
           ]
         }
       }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:256768829103:android:02b960a977dce4509d565a",
+        "android_client_info": {
+          "package_name": "com.rupeeletter.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "256768829103-jfq1vbnks1dlbhq0scc93brolstq078r.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB_avnE65of6DjXh-f6H7rcedpiXdKYjRQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "256768829103-jfq1vbnks1dlbhq0scc93brolstq078r.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
     }
   ],
   "configuration_version": "1"

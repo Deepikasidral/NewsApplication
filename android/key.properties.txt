@@ -1,0 +1,4 @@
+storePassword=Harsh@2026
+keyPassword=Harsh@2026
+keyAlias=upload
+storeFile=app/upload-keystore.jks

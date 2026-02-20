@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthService {
-  static const String baseUrl = "http://13.51.242.86:5000/api/auth";
+  static const String baseUrl = "https://13.51.242.86:5000/api/auth";
 
   // Get stored token
   static Future<String?> getToken() async {

@@ -1,3 +1,6 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
@@ -6,9 +9,16 @@ plugins {
 }
 
 android {
-    namespace = "News.App"
+    namespace = "com.rupeeletter.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = "27.0.12077973"
+
+    val keystoreProperties = Properties()
+    val keystorePropertiesFile = rootProject.file("key.properties")
+    if (keystorePropertiesFile.exists()) {
+        keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+    }
+
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -20,7 +30,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "News.App"
+        applicationId = "com.rupeeletter.app"
         minSdk = 23
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
@@ -28,12 +38,24 @@ android {
         multiDexEnabled = true
     }
 
+    signingConfigs {
+        create("release") {
+            keyAlias = "upload"
+            keyPassword = "Harsh@2026"
+            storeFile = file("upload-keystore.jks")
+            storePassword = "Harsh@2026"
+        }
+    }
+
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
+            isMinifyEnabled = false
+            isShrinkResources = false
         }
     }
 }
+
 
 flutter {
     source = "../.."
