@@ -109,7 +109,7 @@ void dispose() {
 
 
   // 🔹 Chatbot API URL
-  static const String _baseUrl = "https://13.51.242.86:8000/chat";
+  static const String _baseUrl = "http://13.51.242.86:8000/chat";
 
   // 🔹 SAME LOGIC as ChatbotService.askQuestion()
  Future<String> _askQuestion(String question) async {

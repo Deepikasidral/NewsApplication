@@ -1,99 +1,49 @@
 {
   "project_info": {
-    "project_number": "256768829103",
-    "project_id": "news-project-a59cd",
-    "storage_bucket": "news-project-a59cd.firebasestorage.app"
+    "project_number": "661640015212",
+    "project_id": "rupeeletternews",
+    "storage_bucket": "rupeeletternews.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:256768829103:android:4aa52b72a3fac8c99d565a",
+        "mobilesdk_app_id": "1:661640015212:android:cb43a5250c3b344a6b5749",
         "android_client_info": {
-          "package_name": "News.App"
+          "package_name": "com.rupeeletter.newsapp"
         }
       },
       "oauth_client": [
         {
-          "client_id": "256768829103-el38teiaqoi5trnrtp9hg0fpe1a5nk3c.apps.googleusercontent.com",
+          "client_id": "661640015212-851n4mr5rnrdio5ibqjtfqvtb03np4im.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
-            "package_name": "News.App",
-            "certificate_hash": "5a1708843da8236282b9378e0803343fe810eac9"
+            "package_name": "com.rupeeletter.newsapp",
+            "certificate_hash": "362c0dfd50ddf395b9c9c7bde90857fe8de14ff3"
           }
         },
         {
-          "client_id": "256768829103-jfq1vbnks1dlbhq0scc93brolstq078r.apps.googleusercontent.com",
+          "client_id": "661640015212-eho6n3ief6efbbka2u14klq8tu8u0lbe.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.rupeeletter.newsapp",
+            "certificate_hash": "acffe6daaa51136373bb26997016132adbd34554"
+          }
+        },
+        {
+          "client_id": "661640015212-gdo0anmjahiuv7mg876dqb994on98i68.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyB_avnE65of6DjXh-f6H7rcedpiXdKYjRQ"
+          "current_key": "AIzaSyAobJ8HBTKWap-DqY10pRhRRObfGMBuDq4"
         }
       ],
       "services": {
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "256768829103-jfq1vbnks1dlbhq0scc93brolstq078r.apps.googleusercontent.com",
-              "client_type": 3
-            }
-          ]
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:256768829103:android:e044b3bb45a64a049d565a",
-        "android_client_info": {
-          "package_name": "com.example.news_application"
-        }
-      },
-      "oauth_client": [
-        {
-          "client_id": "256768829103-jfq1vbnks1dlbhq0scc93brolstq078r.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
-      "api_key": [
-        {
-          "current_key": "AIzaSyB_avnE65of6DjXh-f6H7rcedpiXdKYjRQ"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "256768829103-jfq1vbnks1dlbhq0scc93brolstq078r.apps.googleusercontent.com",
-              "client_type": 3
-            }
-          ]
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:256768829103:android:02b960a977dce4509d565a",
-        "android_client_info": {
-          "package_name": "com.rupeeletter.app"
-        }
-      },
-      "oauth_client": [
-        {
-          "client_id": "256768829103-jfq1vbnks1dlbhq0scc93brolstq078r.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
-      "api_key": [
-        {
-          "current_key": "AIzaSyB_avnE65of6DjXh-f6H7rcedpiXdKYjRQ"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "256768829103-jfq1vbnks1dlbhq0scc93brolstq078r.apps.googleusercontent.com",
+              "client_id": "661640015212-gdo0anmjahiuv7mg876dqb994on98i68.apps.googleusercontent.com",
               "client_type": 3
             }
           ]
@@ -103,3 +53,6 @@
   ],
   "configuration_version": "1"
 }
+
+
+

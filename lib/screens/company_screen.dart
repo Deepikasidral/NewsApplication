@@ -63,7 +63,7 @@ class _CompanyScreenState extends State<CompanyScreen> {
     });
 
     try {
-      final resp = await http.get(Uri.parse("https://13.51.242.86:5000/api/companies"));
+      final resp = await http.get(Uri.parse("http://13.51.242.86:5000/api/companies"));
 
       if (resp.statusCode == 200) {
         final data = json.decode(resp.body);

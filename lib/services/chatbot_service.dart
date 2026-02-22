@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class ChatbotService {
-  static const String _baseUrl = "https://13.51.242.86:8000/chat";
+  static const String _baseUrl = "http://13.51.242.86:8000/chat";
   // 👉 If testing on real phone, replace with your LAN IP
 
   static Future<String> askQuestion(String question) async {

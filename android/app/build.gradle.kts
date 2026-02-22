@@ -9,7 +9,7 @@ plugins {
 }
 
 android {
-    namespace = "com.rupeeletter.app"
+    namespace = "com.rupeeletter.newsapp"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = "27.0.12077973"
 
@@ -30,7 +30,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.rupeeletter.app"
+        applicationId = "com.rupeeletter.newsapp"
         minSdk = 23
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
@@ -40,10 +40,10 @@ android {
 
     signingConfigs {
         create("release") {
-            keyAlias = "upload"
-            keyPassword = "Harsh@2026"
-            storeFile = file("upload-keystore.jks")
-            storePassword = "Harsh@2026"
+            keyAlias = keystoreProperties["keyAlias"] as String
+            keyPassword = keystoreProperties["keyPassword"] as String
+            storeFile = file(keystoreProperties["storeFile"] as String)
+            storePassword = keystoreProperties["storePassword"] as String
         }
     }
 

@@ -41,7 +41,7 @@ class _EventsScreenState extends State<EventsScreen> {
   List<Article> _ipoNews = [];
   bool _isIpoLoading = false;
   Set<String> _locallySavedIds = {};
-  final String baseUrl = "https://13.51.242.86:5000";
+  final String baseUrl = "http://13.51.242.86:5000";
   late final PageController _pageController;
   Set<String> _viewedArticles = {};
   DateTime _lastTrackedDate = DateTime.now();
@@ -72,7 +72,7 @@ Future<void> _loadUserId() async {
 
 Future<void> _loadSavedEventIds() async {
   final resp = await http.get(
-    Uri.parse("https://13.51.242.86:5000/api/users/$currentUserId/saved-events"),
+    Uri.parse("http://13.51.242.86:5000/api/users/$currentUserId/saved-events"),
   );
 
   if (resp.statusCode == 200) {
@@ -94,7 +94,7 @@ Future<void> _loadSavedEventIds() async {
       debugPrint('Fetching events from: http://10.244.218.93:5000/api/events');
       
       final response = await http.get(
-        Uri.parse('https://13.51.242.86:5000/api/events'),
+        Uri.parse('http://13.51.242.86:5000/api/events'),
         headers: {'Content-Type': 'application/json'},
       ).timeout(const Duration(seconds: 10));
 
@@ -228,7 +228,7 @@ Future<void> _toggleSaveEvent(CorporateEvent event) async {
 
   try {
     final resp = await http.post(
-      Uri.parse("https://13.51.242.86:5000/api/users/save-event"),
+      Uri.parse("http://13.51.242.86:5000/api/users/save-event"),
       headers: {"Content-Type": "application/json"},
       body: jsonEncode({
         "userId": currentUserId,
