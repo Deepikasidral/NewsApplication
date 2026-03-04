@@ -53,7 +53,7 @@ Set<String> _viewedArticles = {};
 DateTime _lastTrackedDate = DateTime.now();
 
 
-final String baseUrl = "http://13.51.242.86:5000";
+final String baseUrl = "http://51.20.72.236:5000";
 
  @override
 void initState() {

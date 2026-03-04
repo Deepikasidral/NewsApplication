@@ -713,7 +713,7 @@ class _CompanyNewsScreenState extends State<CompanyNewsScreen> with SingleTicker
 
     try {
       final encodedName = Uri.encodeComponent(widget.companyName);
-      final url = "http://13.51.242.86:5000/api/filtered-news/company/$encodedName";
+      final url = "http://51.20.72.236:5000/api/filtered-news/company/$encodedName";
       
       print('📰📰📰 Fetching news for: ${widget.companyName}');
       print('📰📰📰 URL: $url');
@@ -769,7 +769,7 @@ class _CompanyNewsScreenState extends State<CompanyNewsScreen> with SingleTicker
       }
 
       final url = Uri.parse(
-        'http://13.51.242.86:5001/api/ai-overview/$symbol'
+        'http://51.20.72.236:5001/api/ai-overview/$symbol'
       ).replace(queryParameters: {
         'company_name': widget.companyName,
         'v': '5'
@@ -831,7 +831,7 @@ class _CompanyNewsScreenState extends State<CompanyNewsScreen> with SingleTicker
       }
 
       final url = Uri.parse(
-        'http://13.51.242.86:5001/api/ai-insight/$symbol'
+        'http://51.20.72.236:5001/api/ai-insight/$symbol'
       ).replace(queryParameters: {
         'company_name': widget.companyName,
         'v': '5'
@@ -885,7 +885,7 @@ class _CompanyNewsScreenState extends State<CompanyNewsScreen> with SingleTicker
 
     try {
       final encodedName = Uri.encodeComponent(widget.companyName);
-      final url = "http://13.51.242.86:5000/api/events/company/$encodedName";
+      final url = "http://51.20.72.236:5000/api/events/company/$encodedName";
       
       print('🎉🎉🎉 Fetching events for: ${widget.companyName}');
       

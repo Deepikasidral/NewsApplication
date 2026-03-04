@@ -124,7 +124,7 @@ RupeeLetter is a financial news and insights platform focused on simplifying mar
   
 
 
-  static const String baseUrl = "http://13.51.242.86:5000";
+  static const String baseUrl = "http://51.20.72.236:5000";
 
   @override
   void initState() {

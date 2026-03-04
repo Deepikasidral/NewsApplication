@@ -12,7 +12,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # API Configuration - Try both HTTPS and HTTP
 API_URLS = [
-    "http://13.51.242.86:5000/api/users/profile/analytics/dashboard",
+    "http://51.20.72.236:5000/api/users/profile/analytics/dashboard",
     "https://13.51.242.86:5000/api/users/profile/analytics/dashboard"
 ]
 

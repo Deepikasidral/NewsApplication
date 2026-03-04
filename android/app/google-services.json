@@ -22,11 +22,27 @@
           }
         },
         {
+          "client_id": "661640015212-b2dclcc0ndh3ckc10l06djttpia7he9c.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.rupeeletter.newsapp",
+            "certificate_hash": "5a1708843da8236282b9378e0803343fe810eac9"
+          }
+        },
+        {
           "client_id": "661640015212-eho6n3ief6efbbka2u14klq8tu8u0lbe.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.rupeeletter.newsapp",
             "certificate_hash": "acffe6daaa51136373bb26997016132adbd34554"
+          }
+        },
+        {
+          "client_id": "661640015212-s94tdslphbdf0l5hk3a3n7jlgc67e9gg.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.rupeeletter.newsapp",
+            "certificate_hash": "f17925115e3cdce22912a71c2cb212ff8c870ead"
           }
         },
         {
