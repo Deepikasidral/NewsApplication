@@ -112,7 +112,7 @@ collection = db[COLLECTION_NAME]
 # -----------------------------
 # Calculate last week date
 # -----------------------------
-last_week = datetime.utcnow() - timedelta(days=5)
+last_week = datetime.utcnow() - timedelta(days=3)
 
 # -----------------------------
 # Delete old news

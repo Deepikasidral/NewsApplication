@@ -19,6 +19,7 @@
           "android_info": {
             "package_name": "com.rupeeletter.newsapp",
             "certificate_hash": "362c0dfd50ddf395b9c9c7bde90857fe8de14ff3"
+<<<<<<< Updated upstream
           }
         },
         {
@@ -46,6 +47,11 @@
           }
         },
         {
+=======
+          }
+        },
+        {
+>>>>>>> Stashed changes
           "client_id": "661640015212-gdo0anmjahiuv7mg876dqb994on98i68.apps.googleusercontent.com",
           "client_type": 3
         }

@@ -15,7 +15,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 import 'company_news_screen.dart';
-
+import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'index_screen.dart';
 
 
 class NewsFeedScreen extends StatefulWidget {
@@ -48,6 +49,8 @@ late final PageController _pageController;
 
 Set<String> _viewedArticles = {};
 
+BannerAd? _bannerAd;
+bool _isAdLoaded = false;
 
 
 DateTime _lastTrackedDate = DateTime.now();
@@ -64,6 +67,27 @@ void initState() {
   _pageController = PageController(viewportFraction: 0.72);
 
   _init();
+  _initBannerAd(); 
+}
+void _initBannerAd() {
+  _bannerAd = BannerAd(
+    adUnitId: 'ca-app-pub-3940256099942544/6300978111', // 🔥 USE TEST FIRST
+    size: AdSize.banner,
+    request: const AdRequest(),
+    listener: BannerAdListener(
+      onAdLoaded: (ad) {
+        setState(() {
+          _isAdLoaded = true;
+        });
+      },
+      onAdFailedToLoad: (ad, error) {
+        ad.dispose();
+        print("Ad failed to load: $error");
+      },
+    ),
+  );
+
+  _bannerAd!.load();
 }
 
 
@@ -82,7 +106,7 @@ void dispose() {
   _searchController.removeListener(_applySearch);
   _searchController.dispose();
   _pageController.dispose();
-
+  _bannerAd?.dispose();
   super.dispose();
 }
 
@@ -1556,108 +1580,88 @@ BottomNavigationBarItem _navItem({
           ],
         ),
       ),
-     bottomNavigationBar: Container(
-  decoration: const BoxDecoration(
-    color: Colors.white,
-    border: Border(
-      top: BorderSide(color: Color(0xFFE0E0E0), width: 0.8),
-    ),
-  ),
-  child: BottomNavigationBar(
-  currentIndex: _bottomIndex,
-  type: BottomNavigationBarType.fixed,
-  backgroundColor: Colors.white,
-  elevation: 0,
+     bottomNavigationBar: Column(
+  mainAxisSize: MainAxisSize.min,
+  children: [
 
-  // 🔥 THIS FIXES BLUE TEXT
-  selectedItemColor: const Color(0xFFEA6B6B),
-  unselectedItemColor: Colors.black54,
+    // ✅ SHOW AD
+    if (_isAdLoaded)
+      SizedBox(
+        height: _bannerAd!.size.height.toDouble(),
+        width: double.infinity,
+        child: AdWidget(ad: _bannerAd!),
+      ),
 
-  showUnselectedLabels: true,
+    // ✅ YOUR EXISTING NAV BAR
+    Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          top: BorderSide(color: Color(0xFFE0E0E0), width: 0.8),
+        ),
+      ),
+      child: BottomNavigationBar(
+        currentIndex: _bottomIndex,
+        type: BottomNavigationBarType.fixed,
+        backgroundColor: Colors.white,
+        elevation: 0,
+        selectedItemColor: const Color(0xFFEA6B6B),
+        unselectedItemColor: Colors.black54,
+        showUnselectedLabels: true,
+        selectedLabelStyle: GoogleFonts.poppins(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          height: 1.2,
+        ),
+        unselectedLabelStyle: GoogleFonts.poppins(
+          fontSize: 13,
+          fontWeight: FontWeight.w400,
+          height: 1.2,
+        ),
+        onTap: (index) {
+          if (index == _bottomIndex) return;
 
-  selectedLabelStyle: GoogleFonts.poppins(
-    fontSize: 13,
-    fontWeight: FontWeight.w600,
-    height: 1.2,
-  ),
-  unselectedLabelStyle: GoogleFonts.poppins(
-    fontSize: 13,
-    fontWeight: FontWeight.w400,
-    height: 1.2,
-  ),
- onTap: (index) {
-  if (index == _bottomIndex) return;
+          Widget? destination;
 
-  Widget? destination;
+          switch (index) {
+            case 0:
+              return;
+            case 1:
+              destination = const IndexScreen();
+              break;
+            case 2:
+              destination = const ChatbotScreen();
+              break;
+            case 3:
+              destination = const CompanyScreen();
+              break;
+            case 4:
+              destination = const EventsScreen();
+              break;
+            case 5:
+              destination = const SavedNewsFeedScreen();
+              break;
+            default:
+              return;
+          }
 
-  switch (index) {
-    case 0:
-      // NEWS (current screen)
-      return;
-
-    case 1:
-      destination = const ChatbotScreen();
-      break;
-
-    case 2:
-      destination = const CompanyScreen();
-      break;
-
-    case 3:
-      destination = const EventsScreen();
-      break;
-
-    case 4:
-      destination = const SavedNewsFeedScreen();
-      break;
-
-    default:
-      return;
-  }
-
-  Navigator.pushReplacement(
-    context,
-    MaterialPageRoute(builder: (_) => destination!),
-  );
-},
-
-
-  items: [
-    _navItem(
-      label: "NEWS",
-      active: 'assets/icons/News Red.svg',
-      inactive: 'assets/icons/News.svg',
-      index: 0,
-    ),
-    _navItem(
-      label: "ASK AI",
-      active: 'assets/icons/Ask AI Red.svg',
-      inactive: 'assets/icons/Ask AI.svg',
-      index: 1,
-    ),
-    _navItem(
-      label: "COMPANIES",
-      active: 'assets/icons/Graph Red.svg',
-      inactive: 'assets/icons/Graph.svg',
-      index: 2,
-    ),
-    _navItem(
-      label: "EVENTS",
-      active: 'assets/icons/Calender Red.svg',
-      inactive: 'assets/icons/Calender.svg',
-      index: 3,
-    ),
-    _navItem(
-      label: "SAVED",
-      active: 'assets/icons/Save red.svg',
-      inactive: 'assets/icons/Save.svg',
-      index: 4,
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => destination!),
+          );
+        },
+        items: [
+          _navItem(label: "NEWS", active: 'assets/icons/News Red.svg', inactive: 'assets/icons/News.svg', index: 0),
+          _navItem(label: "INDEX", active: 'assets/icons/Ask AI Red.svg', inactive: 'assets/icons/Ask AI.svg', index: 1),
+          _navItem(label: "ASK AI", active: 'assets/icons/Ask AI Red.svg', inactive: 'assets/icons/Ask AI.svg', index: 2),
+          _navItem(label: "COMPANIES", active: 'assets/icons/Graph Red.svg', inactive: 'assets/icons/Graph.svg', index: 3),
+          _navItem(label: "EVENTS", active: 'assets/icons/Calender Red.svg', inactive: 'assets/icons/Calender.svg', index: 4),
+          _navItem(label: "SAVED", active: 'assets/icons/Save red.svg', inactive: 'assets/icons/Save.svg', index: 5),
+        ],
+      ),
     ),
   ],
 ),
-
-),
-
 
     );
   }

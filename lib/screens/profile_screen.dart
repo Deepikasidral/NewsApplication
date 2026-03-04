@@ -181,6 +181,72 @@ RupeeLetter is a financial news and insights platform focused on simplifying mar
     }
   }
 
+  Future<void> deleteAccount() async {
+  final prefs = await SharedPreferences.getInstance();
+  final userId = prefs.getString("userId");
+
+  if (userId == null) return;
+
+  try {
+    final response = await http.post(
+      Uri.parse("$baseUrl/api/users/delete-account"),
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode({"userId": userId}),
+    );
+
+    if (response.statusCode == 200) {
+      await prefs.clear();
+
+      if (!mounted) return;
+
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const SignInScreen()),
+        (route) => false,
+      );
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Account deleted successfully")),
+      );
+    } else {
+      throw Exception("Delete failed");
+    }
+  } catch (e) {
+    debugPrint("❌ Delete account error: $e");
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Failed to delete account")),
+    );
+  }
+}
+void showDeleteDialog() {
+  showDialog(
+    context: context,
+    builder: (_) => AlertDialog(
+      title: const Text("Delete Account"),
+      content: const Text(
+        "Are you sure? This action cannot be undone.",
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text("Cancel"),
+        ),
+        TextButton(
+          onPressed: () {
+            Navigator.pop(context);
+            deleteAccount();
+          },
+          child: const Text(
+            "Delete",
+            style: TextStyle(color: Colors.red),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
   /// 🔹 LOGOUT
   Future<void> logout() async {
   final prefs = await SharedPreferences.getInstance();
@@ -391,6 +457,17 @@ Widget build(BuildContext context) {
               ),
             ),
 
+            TextButton(
+                onPressed: showDeleteDialog,
+                style: TextButton.styleFrom(padding: EdgeInsets.zero),
+                child: Text(
+                  "Delete Account",
+                  style: GoogleFonts.poppins(
+                    fontSize: 15,
+                    color: Colors.red,
+                  ),
+                ),
+              ),
             const SizedBox(height: 30),
           ],
         ),

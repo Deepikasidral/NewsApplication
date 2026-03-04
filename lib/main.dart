@@ -5,6 +5,8 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:news_application/screens/splash_screen.dart';
 import 'package:news_application/screens/home_screen.dart';
 import 'package:news_application/services/analytics_service.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
+
 
 final GlobalKey<NavigatorState> navigatorKey =
     GlobalKey<NavigatorState>();
@@ -15,6 +17,9 @@ void main() async {
   await dotenv.load(fileName: ".env");
 
   FirebaseMessaging messaging = FirebaseMessaging.instance;
+
+    // ✅ Initialize AdMob
+  await MobileAds.instance.initialize();
 
   // 🔔 REQUEST PERMISSION
   NotificationSettings settings =
@@ -38,6 +43,7 @@ void main() async {
   FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
     _handleNotification(message.data);
   });
+
 
   runApp(const MyApp());
 }

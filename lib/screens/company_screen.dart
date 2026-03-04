@@ -10,6 +10,7 @@ import 'profile_screen.dart';
 import '../services/stock_price_service.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'index_screen.dart';
 
 class CompanyScreen extends StatefulWidget {
   const CompanyScreen({super.key});
@@ -24,7 +25,7 @@ class _CompanyScreenState extends State<CompanyScreen> {
   List<Map<String, dynamic>> _filteredCompanies = [];
   bool _isLoading = false;
   String _error = '';
-  int _bottomIndex = 2;
+  int _bottomIndex = 3;
 
   @override
   void initState() {
@@ -238,69 +239,41 @@ class _CompanyScreenState extends State<CompanyScreen> {
   Widget? destination;
 
   switch (index) {
-    case 0:
-      destination=const NewsFeedScreen();
-      break;
+            case 0:
+              destination = const NewsFeedScreen();
+              break;
+            case 1:
+              destination = const IndexScreen();
+              break;
+            case 2:
+              destination = const ChatbotScreen();
+              break;
+            case 3:
+              destination = const CompanyScreen();
+              break;
+            case 4:
+              destination = const EventsScreen();
+              break;
+            case 5:
+              destination = const SavedNewsFeedScreen();
+              break;
+            default:
+              return;
+          }
 
-    case 1:
-      destination = const ChatbotScreen();
-      break;
-
-    case 2:
-      destination = const CompanyScreen();
-      break;
-
-    case 3:
-      destination = const EventsScreen();
-      break;
-
-    case 4:
-      destination = const SavedNewsFeedScreen();
-      break;
-
-    default:
-      return;
-  }
-
-  Navigator.pushReplacement(
-    context,
-    MaterialPageRoute(builder: (_) => destination!),
-  );
-},
-
-
-  items: [
-    _navItem(
-      label: "NEWS",
-      active: 'assets/icons/News Red.svg',
-      inactive: 'assets/icons/News.svg',
-      index: 0,
-    ),
-    _navItem(
-      label: "ASK AI",
-      active: 'assets/icons/Ask AI Red.svg',
-      inactive: 'assets/icons/Ask AI.svg',
-      index: 1,
-    ),
-    _navItem(
-      label: "COMPANIES",
-      active: 'assets/icons/Graph Red.svg',
-      inactive: 'assets/icons/Graph.svg',
-      index: 2,
-    ),
-    _navItem(
-      label: "EVENTS",
-      active: 'assets/icons/Calender Red.svg',
-      inactive: 'assets/icons/Calender.svg',
-      index: 3,
-    ),
-    _navItem(
-      label: "SAVED",
-      active: 'assets/icons/Save red.svg',
-      inactive: 'assets/icons/Save.svg',
-      index: 4,
-    ),
-  ],
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => destination!),
+          );
+        },
+        items: [
+          _navItem(label: "NEWS", active: 'assets/icons/News Red.svg', inactive: 'assets/icons/News.svg', index: 0),
+          _navItem(label: "INDEX", active: 'assets/icons/Ask AI Red.svg', inactive: 'assets/icons/Ask AI.svg', index: 1),
+          _navItem(label: "ASK AI", active: 'assets/icons/Ask AI Red.svg', inactive: 'assets/icons/Ask AI.svg', index: 2),
+          _navItem(label: "COMPANIES", active: 'assets/icons/Graph Red.svg', inactive: 'assets/icons/Graph.svg', index: 3),
+          _navItem(label: "EVENTS", active: 'assets/icons/Calender Red.svg', inactive: 'assets/icons/Calender.svg', index: 4),
+          _navItem(label: "SAVED", active: 'assets/icons/Save red.svg', inactive: 'assets/icons/Save.svg', index: 5),
+        ],
 ),
 
 ),

@@ -20,6 +20,8 @@ const userProfileRoutes = require("./routes/userRoutes");
 const sectorLookupRoutes = require("./routes/sectorlookup");
 const commodityLookupRoutes = require("./routes/commoditylookup");
 
+const indexRoutes = require("./routes/indexRoutes");
+
 
 
 //const summarizerRoutes = require("./routes/summarizer");
@@ -48,7 +50,7 @@ app.use("/api/company-lookup", fetchingcompanyRoute);
 app.use("/api/users/profile", userProfileRoutes);
 app.use("/api/sector-lookup", sectorLookupRoutes);
 app.use("/api/commodity-lookup", commodityLookupRoutes);
-
+app.use("/api/index", indexRoutes);
 
 
 // Test route to verify server is running

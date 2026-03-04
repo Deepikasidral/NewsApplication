@@ -31,7 +31,11 @@ android {
 
     defaultConfig {
         applicationId = "com.rupeeletter.newsapp"
+<<<<<<< Updated upstream
         minSdk = 23
+=======
+        minSdk = flutter.minSdkVersion
+>>>>>>> Stashed changes
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName

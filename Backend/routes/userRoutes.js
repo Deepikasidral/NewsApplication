@@ -1,7 +1,7 @@
 const express = require("express");
 const User = require("../models/user");
 const router = express.Router();
-
+const FilteredNews = require("../models/filteredNews"); 
 /// FETCH PROFILE
 router.post("/", async (req, res) => {
   try {
@@ -174,6 +174,43 @@ router.post("/news-analytics", async (req, res) => {
   } catch (err) {
     console.error("❌ News analytics error:", err);
     res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/// ❌ DELETE ACCOUNT
+router.post("/delete-account", async (req, res) => {
+  try {
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: "UserId required",
+      });
+    }
+
+    const deletedUser = await User.findByIdAndDelete(userId);
+
+    if (!deletedUser) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    console.log("🗑️ Account deleted:", deletedUser.email);
+
+    res.json({
+      success: true,
+      message: "Account deleted successfully",
+    });
+
+  } catch (err) {
+    console.error("❌ Delete account error:", err);
+    res.status(500).json({
+      success: false,
+      error: err.message,
+    });
   }
 });
 
