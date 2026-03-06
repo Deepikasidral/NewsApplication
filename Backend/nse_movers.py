@@ -46,12 +46,17 @@ def get_movers():
         }))
         return
 
-    gainers = df.sort_values(
+   # Separate gainers and losers first
+    gainers_df = df[df["pChange"] > 0]
+    losers_df = df[df["pChange"] < 0]
+
+    # Sort them
+    gainers = gainers_df.sort_values(
         by="pChange",
         ascending=False
     ).head(5)
 
-    losers = df.sort_values(
+    losers = losers_df.sort_values(
         by="pChange",
         ascending=True
     ).head(5)

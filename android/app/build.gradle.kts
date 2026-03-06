@@ -31,11 +31,9 @@ android {
 
     defaultConfig {
         applicationId = "com.rupeeletter.newsapp"
-<<<<<<< Updated upstream
-        minSdk = 23
-=======
+
         minSdk = flutter.minSdkVersion
->>>>>>> Stashed changes
+
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -71,4 +69,3 @@ dependencies {
     implementation("com.google.firebase:firebase-firestore-ktx")
     implementation("androidx.multidex:multidex:2.0.1")
 }
-

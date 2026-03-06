@@ -1015,12 +1015,9 @@ Widget _buildIpoTab() {
               destination = const ChatbotScreen();
               break;
             case 3:
-              destination = const CompanyScreen();
-              break;
-            case 4:
               destination = const EventsScreen();
               break;
-            case 5:
+            case 4:
               destination = const SavedNewsFeedScreen();
               break;
             default:
@@ -1036,9 +1033,8 @@ Widget _buildIpoTab() {
           _navItem(label: "NEWS", active: 'assets/icons/News Red.svg', inactive: 'assets/icons/News.svg', index: 0),
           _navItem(label: "INDEX", active: 'assets/icons/Ask AI Red.svg', inactive: 'assets/icons/Ask AI.svg', index: 1),
           _navItem(label: "ASK AI", active: 'assets/icons/Ask AI Red.svg', inactive: 'assets/icons/Ask AI.svg', index: 2),
-          _navItem(label: "COMPANIES", active: 'assets/icons/Graph Red.svg', inactive: 'assets/icons/Graph.svg', index: 3),
-          _navItem(label: "EVENTS", active: 'assets/icons/Calender Red.svg', inactive: 'assets/icons/Calender.svg', index: 4),
-          _navItem(label: "SAVED", active: 'assets/icons/Save red.svg', inactive: 'assets/icons/Save.svg', index: 5),
+          _navItem(label: "EVENTS", active: 'assets/icons/Calender Red.svg', inactive: 'assets/icons/Calender.svg', index: 3),
+          _navItem(label: "SAVED", active: 'assets/icons/Save red.svg', inactive: 'assets/icons/Save.svg', index: 4),
         ],
 ),
 

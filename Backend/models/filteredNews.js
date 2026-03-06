@@ -66,3 +66,7 @@ const newsSchema = new mongoose.Schema(
 
 // Explicit collection name
 module.exports = mongoose.models.filtered_news || mongoose.model("filtered_news", filteredNewsSchema);
+
+// Database indexes for performance
+filteredNewsSchema.index({ global: 1, commodities: 1, ingested_at: -1 });
+filteredNewsSchema.index({ sector_market: 1, ingested_at: -1 });

@@ -7,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:news_application/screens/saved_screen.dart';
 import 'chatbot_screen.dart';
 import 'company_screen.dart';
+import 'company_news_screen.dart';
 import 'events_screen.dart';
 import 'home_screen.dart';
 import '../models/article.dart';
@@ -14,6 +15,8 @@ import 'package:intl/intl.dart';
 import 'package:flutter_html/flutter_html.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/stock_price_service.dart';
+import 'profile_screen.dart';
 
 
 
@@ -29,6 +32,7 @@ class _IndexScreenState extends State<IndexScreen> {
 
   String selectedIndex = "^NSEI";
   int _bottomIndex = 1;
+  int _tabIndex = 0;
 
   double price = 0;
   List chartData = [];
@@ -41,17 +45,63 @@ Set<String> _locallySavedIds = {};
 late String currentUserId;
 
   final String baseUrl = "http://51.20.72.236:5000";
+  
+  List<Map<String, dynamic>> _companies = [];
+  List<Map<String, dynamic>> _filteredCompanies = [];
+  final TextEditingController _searchController = TextEditingController();
+  bool _isLoadingCompanies = false;
 
   @override
   void initState() {
     super.initState();
+    _searchController.addListener(_applyCompanySearch);
     _init();
+    _fetchCompanies();
   }
+  
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+  
   Future<void> _init() async {
-  await _loadUserId();
-  await _loadSavedNewsIds();
-  fetchIndexData();
-}
+    await _loadUserId();
+    await _loadSavedNewsIds();
+    fetchIndexData();
+  }
+  
+  void _applyCompanySearch() {
+    final query = _searchController.text.trim().toLowerCase();
+    if (query.isEmpty) {
+      setState(() => _filteredCompanies = List.from(_companies));
+      return;
+    }
+    setState(() {
+      _filteredCompanies = _companies.where((company) {
+        final companyName = (company["Company Name"] ?? "").toLowerCase();
+        final symbol = (company["Symbol"] ?? "").toLowerCase();
+        return companyName.contains(query) || symbol.contains(query);
+      }).toList();
+    });
+  }
+  
+  Future<void> _fetchCompanies() async {
+    setState(() => _isLoadingCompanies = true);
+    try {
+      final resp = await http.get(Uri.parse("$baseUrl/api/companies"));
+      if (resp.statusCode == 200) {
+        final data = json.decode(resp.body);
+        setState(() {
+          _companies = (data as List).cast<Map<String, dynamic>>();
+          _filteredCompanies = List.from(_companies);
+        });
+      }
+    } catch (e) {
+      debugPrint("Company fetch failed: $e");
+    }
+    setState(() => _isLoadingCompanies = false);
+  }
 
   Future<void> fetchIndexData() async {
     if (!mounted) return;
@@ -687,56 +737,100 @@ List<FlSpot> getMiniSpots(List chart) {
   return spots;
 }
 
-  List<FlSpot> getSpots() {
+List<FlSpot> getSpots() {
   List<FlSpot> spots = [];
 
   for (int i = 0; i < chartData.length; i++) {
     final close = chartData[i]["close"];
 
-    // ignore null or zero values (prevents vertical line)
-    if (close == null || close == 0) continue;
+    if (close == null) continue;
 
     spots.add(
       FlSpot(
         spots.length.toDouble(),
-        close.toDouble(),
+        double.tryParse(close.toString()) ?? 0,
       ),
     );
   }
 
   return spots;
 }
+double _textWidth(String text, TextStyle style) {
+  final painter = TextPainter(
+    text: TextSpan(text: text, style: style),
+    maxLines: 1,
+    textDirection: Directionality.of(context),
+  )..layout();
 
-  Widget tab(String title, String symbol) {
-    bool active = selectedIndex == symbol;
-
-    return GestureDetector(
-      onTap: () {
-  setState(() {
-    selectedIndex = symbol;
-
-    // ⭐ IMPORTANT FIX
-    isGlobal = (symbol == "^DJI");
-  });
-
-  if (isGlobal) {
-  fetchGlobalData();   // for global indices
-  fetchGlobalNews();   // for global news
-} else {
-  fetchIndexData();
+  return painter.size.width;
 }
-},
-      child: Text(
-        title,
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.bold,
-          color: active ? Colors.red : Colors.black54,
-        ),
-      ),
-    );
-  }
 
+ Widget tab(String title, String symbol, int index) {
+  bool active = _tabIndex == index;
+
+  return GestureDetector(
+    onTap: () {
+      setState(() {
+        _tabIndex = index;
+
+        if (index == 4) {
+          isGlobal = false;
+          _filteredCompanies = List.from(_companies);
+        } else {
+          selectedIndex = symbol;
+          isGlobal = (symbol == "^DJI");
+
+          if (isGlobal) {
+            fetchGlobalData();
+            fetchGlobalNews();
+          } else {
+            fetchIndexData();
+          }
+        }
+      });
+    },
+    child: Padding(
+      padding: const EdgeInsets.only(right: 22),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+
+          /// TAB TEXT
+          Text(
+            title,
+            style: GoogleFonts.poppins(
+              fontSize: 13,
+              fontWeight:
+                  active ? FontWeight.w600 : FontWeight.w400,
+              color: active
+                  ? const Color(0xFFEA6B6B)
+                  : Colors.black54,
+            ),
+          ),
+
+          const SizedBox(height: 4),
+
+          /// UNDERLINE
+          Container(
+            height: 2,
+            width: _textWidth(
+              title,
+              GoogleFonts.poppins(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            color: active
+                ? const Color(0xFFEA6B6B)
+                : Colors.transparent,
+          ),
+          const Divider(height: 1, thickness: 0.8),
+        ],
+      ),
+    ),
+  );
+}
   BottomNavigationBarItem _navItem({
   required String label,
   required String active,
@@ -757,11 +851,51 @@ List<FlSpot> getMiniSpots(List chart) {
 
 @override
 Widget build(BuildContext context) {
+  final List displayGainers = gainers;
+  final List displayLosers = losers;
 
   return Scaffold(
-    backgroundColor: Colors.grey.shade100,
+  backgroundColor: Colors.grey.shade100,
 
-     bottomNavigationBar: Container(
+  /// TOP BAR
+  appBar: AppBar(
+    backgroundColor: const Color(0xFFF05151),
+    elevation: 0,
+    title: Text(
+      "Index",
+      style: GoogleFonts.poppins(
+        fontSize: 20,
+        fontWeight: FontWeight.w600,
+        color: Colors.black,
+      ),
+    ),
+    actions: [
+      Padding(
+        padding: const EdgeInsets.only(right: 16),
+        child: GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const ProfileScreen(),
+              ),
+            );
+          },
+          child: const CircleAvatar(
+            radius: 18,
+            backgroundColor: Color(0xFFE0E0E0),
+            child: Icon(
+              Icons.person,
+              size: 18,
+              color: Color(0xFF757575),
+            ),
+          ),
+        ),
+      )
+    ],
+  ),
+
+  bottomNavigationBar: Container(
   decoration: const BoxDecoration(
     color: Colors.white,
     border: Border(
@@ -806,12 +940,9 @@ Widget build(BuildContext context) {
               destination = const ChatbotScreen();
               break;
             case 3:
-              destination = const CompanyScreen();
-              break;
-            case 4:
               destination = const EventsScreen();
               break;
-            case 5:
+            case 4:
               destination = const SavedNewsFeedScreen();
               break;
             default:
@@ -827,9 +958,8 @@ Widget build(BuildContext context) {
           _navItem(label: "NEWS", active: 'assets/icons/News Red.svg', inactive: 'assets/icons/News.svg', index: 0),
           _navItem(label: "INDEX", active: 'assets/icons/Ask AI Red.svg', inactive: 'assets/icons/Ask AI.svg', index: 1),
           _navItem(label: "ASK AI", active: 'assets/icons/Ask AI Red.svg', inactive: 'assets/icons/Ask AI.svg', index: 2),
-          _navItem(label: "COMPANIES", active: 'assets/icons/Graph Red.svg', inactive: 'assets/icons/Graph.svg', index: 3),
-          _navItem(label: "EVENTS", active: 'assets/icons/Calender Red.svg', inactive: 'assets/icons/Calender.svg', index: 4),
-          _navItem(label: "SAVED", active: 'assets/icons/Save red.svg', inactive: 'assets/icons/Save.svg', index: 5),
+          _navItem(label: "EVENTS", active: 'assets/icons/Calender Red.svg', inactive: 'assets/icons/Calender.svg', index: 3),
+          _navItem(label: "SAVED", active: 'assets/icons/Save red.svg', inactive: 'assets/icons/Save.svg', index: 4),
         ],
 ),
 
@@ -838,43 +968,78 @@ Widget build(BuildContext context) {
       child: ListView(
         children: [
 
-          /// SEARCH BAR
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Container(
-              height: 45,
-              decoration: BoxDecoration(
-                color: Colors.red.shade100,
-                borderRadius: BorderRadius.circular(25),
-              ),
-              child: const TextField(
-                decoration: InputDecoration(
-                  hintText: "Search here...",
-                  border: InputBorder.none,
-                  prefixIcon: Icon(Icons.search, color: Colors.red),
-                ),
-              ),
-            ),
-          ),
-
           /// TABS
-          Padding(
+          Container(
+            height: 50,
             padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
               children: [
-  tab("NIFTY", "^NSEI"),
-  tab("BANK NIFTY", "^NSEBANK"),
-  tab("SECTORS", "^CNXIT"),
-  tab("GLOBAL", "^DJI"),
-],
+                tab("NIFTY", "^NSEI", 0),
+                const SizedBox(width: 16),
+                tab("BANK NIFTY", "^NSEBANK", 1),
+                const SizedBox(width: 16),
+                tab("SECTORS", "^CNXIT", 2),
+                const SizedBox(width: 16),
+                tab("GLOBAL", "^DJI", 3),
+                const SizedBox(width: 16),
+                tab("COMPANIES", "", 4),
+              ],
             ),
           ),
 
           const SizedBox(height: 10),
 
-          /// GLOBAL GRID
-          if (isGlobal)
+          /// COMPANIES TAB
+          if (_tabIndex == 4)
+  Padding(
+    padding: const EdgeInsets.all(12),
+    child: Column(
+      children: [
+
+        /// 🔍 SEARCH BAR
+        Container(
+          height: 45,
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: Colors.red.shade100,
+            borderRadius: BorderRadius.circular(25),
+          ),
+          child: TextField(
+            controller: _searchController,
+            decoration: const InputDecoration(
+              hintText: "Search company...",
+              border: InputBorder.none,
+              prefixIcon: Icon(Icons.search, color: Colors.red),
+            ),
+          ),
+        ),
+
+        /// COMPANY LIST
+        if (_isLoadingCompanies)
+          const Center(child: CircularProgressIndicator())
+        else if (_filteredCompanies.isEmpty)
+          const Center(child: Text("No companies found"))
+        else
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _filteredCompanies.length,
+            itemBuilder: (context, index) {
+              final company = _filteredCompanies[index];
+              final companyName = company["Company Name"] ?? "Unknown";
+              final symbol = company["Symbol"] ?? "";
+
+              return CompanyListItem(
+                companyName: companyName,
+                symbol: symbol,
+              );
+            },
+          ),
+      ],
+    ),
+  )
+          else if (isGlobal)
             GridView.builder(
   shrinkWrap: true,
   physics: const NeverScrollableScrollPhysics(),
@@ -943,89 +1108,302 @@ Widget build(BuildContext context) {
           /// NORMAL INDEX UI
           if (!isGlobal) ...[
 
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 12),
-              padding: const EdgeInsets.all(10),
-              height: 200,
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey.shade300),
-                borderRadius: BorderRadius.circular(10),
-                color: Colors.white,
-              ),
-              child: LineChart(
-                LineChartData(
-                  gridData: FlGridData(show: false),
-                  titlesData: FlTitlesData(show: false),
-                  borderData: FlBorderData(show: false),
-                  lineBarsData: [
-                    LineChartBarData(
-                      spots: getSpots(),
-                      isCurved: true,
-                      barWidth: 3,
-                      dotData: FlDotData(show: false),
-                      color: Colors.teal,
-                    ),
-                  ],
-                ),
-              ),
+  Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 12),
+    child: Text(
+      price.toStringAsFixed(2),
+      style: const TextStyle(
+        fontSize: 32,
+        fontWeight: FontWeight.bold,
+      ),
+    ),
+  ),
+
+  Container(
+    margin: const EdgeInsets.symmetric(horizontal: 12),
+    padding: const EdgeInsets.all(10),
+    height: 250,
+    decoration: BoxDecoration(
+      border: Border.all(color: Colors.grey.shade300),
+      borderRadius: BorderRadius.circular(10),
+      color: Colors.white,
+    ),
+    child: Padding(
+      padding: const EdgeInsets.only(right: 10),
+      child: chartData.isEmpty
+          ? const Center(child: CircularProgressIndicator())
+          : LineChart(
+              LineChartData(
+                
+
+    /// remove grid
+    gridData: FlGridData(show: false),
+
+    /// remove border
+    borderData: FlBorderData(show: false),
+
+    /// enable smooth touch
+    lineTouchData: LineTouchData(
+      touchTooltipData: LineTouchTooltipData(
+        tooltipBgColor: Colors.black,
+      ),
+    ),
+    extraLinesData: ExtraLinesData(
+  horizontalLines: [
+    HorizontalLine(
+      y: price,
+      color: Colors.green.withOpacity(0.4),
+      strokeWidth: 1,
+      dashArray: [5,5],
+    )
+  ],
+  
+),
+
+    /// axis titles
+    titlesData: FlTitlesData(
+
+      leftTitles: AxisTitles(
+  sideTitles: SideTitles(
+    showTitles: true,
+    reservedSize: 50,
+    interval: 500, // adjust depending on index
+    getTitlesWidget: (value, meta) {
+      return Padding(
+        padding: const EdgeInsets.only(right: 4),
+        child: Text(
+          value.toStringAsFixed(0),
+          style: const TextStyle(
+            fontSize: 11,
+            color: Colors.grey,
+          ),
+        ),
+      );
+    },
+  ),
+),
+
+     bottomTitles: AxisTitles(
+  sideTitles: SideTitles(
+    showTitles: true,
+    interval: 1,
+    getTitlesWidget: (value, meta) {
+
+      int index = value.toInt();
+
+      if (index < 0 || index >= chartData.length) {
+        return const SizedBox();
+      }
+
+      final date = DateTime.parse(chartData[index]["date"]);
+
+      final formatted = DateFormat("d MMM").format(date);
+
+      return Padding(
+        padding: const EdgeInsets.only(top: 6),
+        child: Text(
+          formatted,
+          style: const TextStyle(
+            fontSize: 10,
+            color: Colors.grey,
+          ),
+        ),
+      );
+    },
+  ),
+),
+
+      topTitles: AxisTitles(
+        sideTitles: SideTitles(showTitles: false),
+      ),
+
+      rightTitles: AxisTitles(
+        sideTitles: SideTitles(showTitles: false),
+      ),
+    ),
+
+    /// IMPORTANT for proper scaling
+    minY: getSpots().map((e) => e.y).reduce((a,b)=>a<b?a:b) - 20,
+    maxY: getSpots().map((e) => e.y).reduce((a,b)=>a>b?a:b) + 20,
+
+    lineBarsData: [
+      LineChartBarData(
+        spots: getSpots(),
+
+        /// smooth curve
+        isCurved: true,
+
+        /// line thickness
+        barWidth: 3,
+
+        /// green color
+        color: Colors.green,
+
+        /// remove dots
+        dotData: FlDotData(show: false),
+
+        /// gradient area under chart
+        belowBarData: BarAreaData(
+          show: true,
+          gradient: LinearGradient(
+            colors: [
+              Colors.green.withOpacity(0.4),
+              Colors.green.withOpacity(0.05),
+            ],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+      ),
+    ],
+  ),
+)
+              )
             ),
 
-            const SizedBox(height: 10),
+           /// SHOW ONLY FOR NIFTY TAB
+if (_tabIndex == 0) ...[
+  
 
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Text(
-                "TOP GAINERS / LOSERS",
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey.shade700,
+  const SizedBox(height: 10),
+  
+
+  Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 12),
+    child: Text(
+      "TOP GAINERS / LOSERS",
+      style: TextStyle(
+        fontWeight: FontWeight.bold,
+        color: Colors.grey.shade700,
+      ),
+    ),
+  ),
+
+  Container(
+    margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(10),
+      border: Border.all(color: Colors.grey.shade300),
+    ),
+    child: Column(
+      children: [
+
+        /// HEADER
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
+            children: const [
+              Expanded(
+                flex: 3,
+                child: Text(
+                  "COMPANY",
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey),
                 ),
               ),
-            ),
+              Expanded(
+                flex: 2,
+                child: Text(
+                  "VALUE",
+                  textAlign: TextAlign.right,
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey),
+                ),
+              ),
+              Expanded(
+                flex: 2,
+                child: Text(
+                  "CHANGE",
+                  textAlign: TextAlign.right,
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey),
+                ),
+              ),
+            ],
+          ),
+        ),
 
-            Container(
-              margin: const EdgeInsets.all(12),
-              height: 120,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                itemCount: gainers.length + losers.length,
-                itemBuilder: (_, i) {
-                  final isGainer = i < gainers.length;
-                  final m = isGainer
-                  ? gainers[i]
-                  : losers[i - gainers.length];
-                  return Container(
-                    width: 120,
-                    margin: const EdgeInsets.all(8),
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(10),
+        Divider(height: 1),
+        
+
+        /// ROWS
+        ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: displayGainers.length + displayLosers.length,
+          itemBuilder: (_, i) {
+
+            final isGainer = i < displayGainers.length;
+
+            final m = isGainer
+                ? displayGainers[i]
+                : displayLosers[i - displayGainers.length];
+
+            final change = (m["pChange"] ?? 0).toDouble();
+
+            return Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 12, vertical: 12),
+              decoration: const BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(color: Color(0xFFE5E5E5)),
+                ),
+              ),
+              child: Row(
+                children: [
+
+                  Expanded(
+                    flex: 3,
+                    child: Text(
+                      m["symbol"] ?? "",
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          m["symbol"] ?? "",
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 6),
-                       Text(
+                  ),
+
+                  Expanded(
+                    flex: 2,
+                    child: Text(
                       "${m["lastPrice"]}",
-                      style: TextStyle(
+                      textAlign: TextAlign.right,
+                      style: const TextStyle(
+                        fontSize: 13,
                         fontWeight: FontWeight.bold,
-                        color: (m["pChange"] ?? 0) >= 0
+                      ),
+                    ),
+                  ),
+
+                  Expanded(
+                    flex: 2,
+                    child: Text(
+                      "${change.toStringAsFixed(2)}%",
+                      textAlign: TextAlign.right,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: change >= 0
                             ? Colors.green
                             : Colors.red,
                       ),
                     ),
-                      ],
-                    ),
-                  );
-                },
+                  ),
+                ],
               ),
-            ),
+            );
+          },
+        ),
+      ],
+    ),
+  ),
+],
+
+           
           ],
 
           /// NEWS (ALWAYS)
@@ -1056,4 +1434,116 @@ Widget build(BuildContext context) {
     ),
   );
 }
+}
+
+class CompanyListItem extends StatefulWidget {
+  final String companyName;
+  final String symbol;
+
+  const CompanyListItem({
+    super.key,
+    required this.companyName,
+    required this.symbol,
+  });
+
+  @override
+  State<CompanyListItem> createState() => _CompanyListItemState();
+}
+
+class _CompanyListItemState extends State<CompanyListItem> {
+  Map<String, dynamic>? stockData;
+  bool loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchStockPrice();
+  }
+
+  Future<void> _fetchStockPrice() async {
+    if (widget.symbol.isEmpty) {
+      setState(() => loading = false);
+      return;
+    }
+
+    final data = await StockPriceService.getStockPrice(widget.symbol);
+    setState(() {
+      stockData = data;
+      loading = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 4),
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => CompanyNewsScreen(
+                companyName: widget.companyName,
+                companySymbol: widget.symbol,
+              ),
+            ),
+          );
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border(
+              bottom: BorderSide(color: Colors.grey.shade200, width: 1),
+            ),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  widget.companyName,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              if (loading)
+                const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else if (stockData != null) ...[
+                const SizedBox(
+                  height: 30,
+                  child: VerticalDivider(color: Colors.grey, thickness: 1),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  stockData!['price'],
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  stockData!['changePercent'],
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: double.parse(stockData!['changePercent']) >= 0
+                        ? Colors.green
+                        : Colors.red,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

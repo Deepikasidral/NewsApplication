@@ -42,20 +42,21 @@ class _CompanyScreenState extends State<CompanyScreen> {
   }
 
   void _applySearch() {
-    final query = _searchController.text.trim().toLowerCase();
-    if (query.isEmpty) {
-      setState(() => _filteredCompanies = List.from(_companies));
-      return;
-    }
+  final query = _searchController.text.trim().toLowerCase();
 
-    setState(() {
+  setState(() {
+    if (query.isEmpty) {
+      _filteredCompanies = List.from(_companies);
+    } else {
       _filteredCompanies = _companies.where((company) {
-        final companyName = (company["Company Name"] ?? "").toLowerCase();
+        final name = (company["Company Name"] ?? "").toLowerCase();
         final symbol = (company["Symbol"] ?? "").toLowerCase();
-        return companyName.contains(query) || symbol.contains(query);
+
+        return name.contains(query) || symbol.contains(query);
       }).toList();
-    });
-  }
+    }
+  });
+}
 
   Future<void> _fetchCompanies() async {
     setState(() {
@@ -135,31 +136,35 @@ class _CompanyScreenState extends State<CompanyScreen> {
           children: [
             // Search Bar
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
-              child: Container(
-                height: 48,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF6B3B3),
-                  borderRadius: BorderRadius.circular(28),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _searchController,
-                        decoration: const InputDecoration(
-                          hintText: "Search companies...",
-                          border: InputBorder.none,
-                        ),
-                      ),
-                    ),
-                    const Icon(Icons.search, color: Colors.black54),
-                  ],
-                ),
-              ),
-            ),
-            // Company List
+  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+  child: Container(
+    height: 50,
+    decoration: BoxDecoration(
+      color: const Color(0xFFF6B3B3),
+      borderRadius: BorderRadius.circular(30),
+    ),
+    child: TextField(
+      controller: _searchController,
+      onChanged: (value) => _applySearch(),
+      decoration: InputDecoration(
+        hintText: "Search company or symbol...",
+        hintStyle: const TextStyle(color: Colors.black54),
+        prefixIcon: const Icon(Icons.search, color: Colors.black54),
+        suffixIcon: _searchController.text.isNotEmpty
+            ? IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () {
+                  _searchController.clear();
+                  _applySearch();
+                },
+              )
+            : null,
+        border: InputBorder.none,
+        contentPadding: const EdgeInsets.symmetric(vertical: 14),
+      ),
+    ),
+  ),
+),    // Company List
             Expanded(
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
@@ -249,12 +254,9 @@ class _CompanyScreenState extends State<CompanyScreen> {
               destination = const ChatbotScreen();
               break;
             case 3:
-              destination = const CompanyScreen();
-              break;
-            case 4:
               destination = const EventsScreen();
               break;
-            case 5:
+            case 4:
               destination = const SavedNewsFeedScreen();
               break;
             default:
@@ -270,9 +272,8 @@ class _CompanyScreenState extends State<CompanyScreen> {
           _navItem(label: "NEWS", active: 'assets/icons/News Red.svg', inactive: 'assets/icons/News.svg', index: 0),
           _navItem(label: "INDEX", active: 'assets/icons/Ask AI Red.svg', inactive: 'assets/icons/Ask AI.svg', index: 1),
           _navItem(label: "ASK AI", active: 'assets/icons/Ask AI Red.svg', inactive: 'assets/icons/Ask AI.svg', index: 2),
-          _navItem(label: "COMPANIES", active: 'assets/icons/Graph Red.svg', inactive: 'assets/icons/Graph.svg', index: 3),
-          _navItem(label: "EVENTS", active: 'assets/icons/Calender Red.svg', inactive: 'assets/icons/Calender.svg', index: 4),
-          _navItem(label: "SAVED", active: 'assets/icons/Save red.svg', inactive: 'assets/icons/Save.svg', index: 5),
+          _navItem(label: "EVENTS", active: 'assets/icons/Calender Red.svg', inactive: 'assets/icons/Calender.svg', index: 3),
+          _navItem(label: "SAVED", active: 'assets/icons/Save red.svg', inactive: 'assets/icons/Save.svg', index: 4),
         ],
 ),
 

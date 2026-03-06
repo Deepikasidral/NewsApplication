@@ -132,14 +132,14 @@ void didChangeAppLifecycleState(AppLifecycleState state) {
 
 Future<void> _fetchCompanies() async {
   try {
-    final resp =
-        await http.get(Uri.parse("$baseUrl/api/companies"));
+    final resp = await http.get(Uri.parse("$baseUrl/api/companies"));
 
     if (resp.statusCode == 200) {
-      final data = json.decode(resp.body);
+      final body = json.decode(resp.body);
+
       setState(() {
         _allCompanies =
-            (data as List).cast<Map<String, dynamic>>();
+            List<Map<String, dynamic>>.from(body["data"]);
         _filteredCompanies = [];
       });
     }
@@ -239,42 +239,48 @@ void _applySearch() {
 
 
   // ------------------------- FETCH LATEST -------------------------
-  Future<void> _fetchLatestNews({bool soft = false}) async {
+ Future<void> _fetchLatestNews({bool soft = false}) async {
   _startLoading(soft: soft);
 
-    try {
-      final resp = await http.get(Uri.parse("$baseUrl/api/news"));
+  try {
+    final resp = await http.get(Uri.parse("$baseUrl/api/news"));
 
-     if (resp.statusCode == 200) {
-  final data = json.decode(resp.body);
+    if (resp.statusCode == 200) {
+      final decoded = json.decode(resp.body);
 
-  _articles = _removeDuplicates(
-    (data as List).map((e) => Article.fromJson(e)).toList(),
-  );
+      List data;
 
-  _articles.sort((a, b) => b.date.compareTo(a.date));
-  _filtered = List.from(_articles);
+      if (decoded is List) {
+        data = decoded;
+      } else if (decoded is Map && decoded["data"] != null) {
+        data = decoded["data"];
+      } else {
+        data = [];
+      }
 
-  if (widget.openFileName != null &&
-    widget.openFileName!.isNotEmpty) {
-  _scrollToArticle(widget.openFileName!);
-}
+      _articles = _removeDuplicates(
+        data.map((e) => Article.fromJson(e)).toList(),
+      );
 
+      _articles.sort((a, b) => b.date.compareTo(a.date));
+      _filtered = List.from(_articles);
 
-  // ✅ COUNT FIRST ARTICLE VIEW (VERY IMPORTANT)
-  
+      if (widget.openFileName != null &&
+          widget.openFileName!.isNotEmpty) {
+        _scrollToArticle(widget.openFileName!);
+      }
 
-} else {
-  _error = "Failed to load latest news";
-}
-
-    } catch (e) {
-      _error = "Error: $e";
+    } else {
+      _error = "Failed to load latest news";
     }
-_stopLoading();
-_hasLoadedOnce = true;
 
+  } catch (e) {
+    _error = "Error: $e";
   }
+
+  _stopLoading();
+  _hasLoadedOnce = true;
+}
 
   Future<List<Map<String, dynamic>>> _fetchCompanyDetails(
     List<String> companyNames) async {
@@ -1633,12 +1639,9 @@ BottomNavigationBarItem _navItem({
               destination = const ChatbotScreen();
               break;
             case 3:
-              destination = const CompanyScreen();
-              break;
-            case 4:
               destination = const EventsScreen();
               break;
-            case 5:
+            case 4:
               destination = const SavedNewsFeedScreen();
               break;
             default:
@@ -1654,9 +1657,8 @@ BottomNavigationBarItem _navItem({
           _navItem(label: "NEWS", active: 'assets/icons/News Red.svg', inactive: 'assets/icons/News.svg', index: 0),
           _navItem(label: "INDEX", active: 'assets/icons/Ask AI Red.svg', inactive: 'assets/icons/Ask AI.svg', index: 1),
           _navItem(label: "ASK AI", active: 'assets/icons/Ask AI Red.svg', inactive: 'assets/icons/Ask AI.svg', index: 2),
-          _navItem(label: "COMPANIES", active: 'assets/icons/Graph Red.svg', inactive: 'assets/icons/Graph.svg', index: 3),
-          _navItem(label: "EVENTS", active: 'assets/icons/Calender Red.svg', inactive: 'assets/icons/Calender.svg', index: 4),
-          _navItem(label: "SAVED", active: 'assets/icons/Save red.svg', inactive: 'assets/icons/Save.svg', index: 5),
+          _navItem(label: "EVENTS", active: 'assets/icons/Calender Red.svg', inactive: 'assets/icons/Calender.svg', index: 3),
+          _navItem(label: "SAVED", active: 'assets/icons/Save red.svg', inactive: 'assets/icons/Save.svg', index: 4),
         ],
       ),
     ),

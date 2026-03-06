@@ -6,7 +6,7 @@ const YahooFinance = require("yahoo-finance2").default;
 const yahooFinance = new YahooFinance();
 
 const NodeCache = require("node-cache");
-const cache = new NodeCache({ stdTTL: 60 });
+const cache = new NodeCache({ stdTTL: 300 }); // 5 minutes cache
 
 const { exec } = require("child_process");
 const path = require("path");
@@ -45,95 +45,45 @@ router.post("/data", async (req, res) => {
       return res.json(cache.get(cacheKey));
     }
 
-    /*
-    1️⃣ INDEX PRICE
-    */
-    const quote = await yahooFinance.quote(symbol);
-
-    /*
-    2️⃣ CHART DATA
-    */
     const endDate = new Date();
-const startDate = new Date();
-startDate.setDate(endDate.getDate() - 7);
+    const startDate = new Date();
+    startDate.setDate(endDate.getDate() - 7);
 
-const chart = await yahooFinance.chart(symbol, {
-  period1: startDate,
-  period2: endDate,
-  interval: "1d",
-});
+    let newsQuery;
+    if (symbol === "^NSEI") {
+      newsQuery = { global: false, commodities: false };
+    } else if (symbol === "^NSEBANK") {
+      newsQuery = { sector_market: "Nifty Bank" };
+    } else if (symbol === "^CNXIT") {
+      newsQuery = { sector_market: "Nifty IT" };
+    }
 
-    /*
-    3️⃣ TOP MOVERS (PYTHON SCRIPT)
-    */
-    const movers = await new Promise((resolve, reject) => {
-
-      console.log("➡️ Running python script...");
-
-      const pythonPath = path.join(__dirname, "..", "venv", "bin", "python");
-      
-      const scriptPath = path.join(__dirname, "..", "nse_movers.py");
-
-      exec(
-        `"${pythonPath}" "${scriptPath}" "${symbol}"`,
-        (error, stdout, stderr) => {
-
+    // 🚀 PARALLEL EXECUTION
+    const [quote, chart, movers, news] = await Promise.all([
+      yahooFinance.quote(symbol),
+      yahooFinance.chart(symbol, { period1: startDate, period2: endDate, interval: "1d" }),
+      new Promise((resolve) => {
+        const pythonPath = path.join(__dirname, "..", "venv", "bin", "python");
+        const scriptPath = path.join(__dirname, "..", "nse_movers.py");
+        exec(`"${pythonPath}" "${scriptPath}" "${symbol}"`, { timeout: 10000 }, (error, stdout) => {
           if (error) {
             console.log("❌ PYTHON ERROR:", error);
-            console.log("❌ STDERR:", stderr);
-            reject(error);
+            resolve({ gainers: [], losers: [] });
             return;
           }
-
           try {
-            const parsed = JSON.parse(stdout);
-            resolve(parsed);
+            resolve(JSON.parse(stdout));
           } catch (e) {
-            console.log("❌ JSON PARSE ERROR:", e);
-            reject(e);
+            resolve({ gainers: [], losers: [] });
           }
-        }
-      );
-    });
-
-    /*
-    4️⃣ FETCH NEWS FROM DB
-    */
-    let news = [];
-
-    // NIFTY
-    if (symbol === "^NSEI") {
-
-      news = await FilteredNews.find({
-        global: false,
-        commodities: false
-      })
-      .sort({ ingested_at: -1 })
-      .limit(10);
-
-    }
-
-    // BANK NIFTY
-    else if (symbol === "^NSEBANK") {
-
-      news = await FilteredNews.find({
-        sector_market: "Nifty Bank"
-      })
-      .sort({ ingested_at: -1 })
-      .limit(10);
-
-    }
-
-    // IT SECTOR
-    else if (symbol === "^CNXIT") {
-
-      news = await FilteredNews.find({
-        sector_market: "Nifty IT"
-      })
-      .sort({ ingested_at: -1 })
-      .limit(10);
-
-    }
+        });
+      }),
+      newsQuery ? FilteredNews.find(newsQuery)
+        .select('Headline summary sentiment impact companies sector_market ingested_at _id')
+        .sort({ ingested_at: -1 })
+        .limit(10)
+        .lean() : Promise.resolve([])
+    ]);
 
     
     /*
@@ -146,7 +96,10 @@ const chart = await yahooFinance.chart(symbol, {
       change: quote.regularMarketChange,
       changePercent: quote.regularMarketChangePercent,
 
-      chart: chart.quotes || [],
+      chart: (chart.quotes || []).map((q, i) => ({
+  close: q.close,
+  date: new Date(chart.timestamps[i] * 1000).toISOString(),
+})),
 
       gainers: movers.gainers || [],
       losers: movers.losers || [],
