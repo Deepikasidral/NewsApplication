@@ -19,12 +19,20 @@ def get_movers():
 
     url = f"https://www.nseindia.com/api/equity-stockIndices?index={index_name.replace(' ', '%20')}"
 
-    data = nsefetch(url)
+    
 
     stocks = []
 
-    # ⭐ THIS ALWAYS WORKS
-    items = data.get("data", [])
+    data = nsefetch(url)
+
+    if not data or "data" not in data:
+        print(json.dumps({
+            "gainers": [],
+            "losers": []
+        }))
+        sys.exit(0)
+
+    items = data["data"]
 
     for d in items:
 

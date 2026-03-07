@@ -50,6 +50,7 @@ late String currentUserId;
   
   List<Map<String, dynamic>> _companies = [];
   List<Map<String, dynamic>> _filteredCompanies = [];
+  Map<String, Map<String, dynamic>> _stockPriceCache = {};
   final TextEditingController _searchController = TextEditingController();
   bool _isLoadingCompanies = false;
 
@@ -1086,9 +1087,10 @@ Widget build(BuildContext context) {
               final companyName = company["Company Name"] ?? "Unknown";
               final symbol = company["Symbol"] ?? "";
 
-              return CompanyListItem(
+              return OptimizedCompanyListItem(
                 companyName: companyName,
                 symbol: symbol,
+                stockData: _stockPriceCache[symbol],
               );
             },
           ),
@@ -1585,6 +1587,92 @@ if (_tabIndex == 0) ...[
     ),
   );
 }
+}
+
+class OptimizedCompanyListItem extends StatelessWidget {
+  final String companyName;
+  final String symbol;
+  final Map<String, dynamic>? stockData;
+
+  const OptimizedCompanyListItem({
+    super.key,
+    required this.companyName,
+    required this.symbol,
+    this.stockData,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 4),
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => CompanyNewsScreen(
+                companyName: companyName,
+                companySymbol: symbol,
+              ),
+            ),
+          );
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border(
+              bottom: BorderSide(color: Colors.grey.shade200, width: 1),
+            ),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  companyName,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              if (stockData == null)
+                const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else ...[
+                const SizedBox(
+                  height: 30,
+                  child: VerticalDivider(color: Colors.grey, thickness: 1),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  stockData!['price'],
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  '${stockData!['changePercent']}%',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: double.parse(stockData!['changePercent']) >= 0
+                        ? Colors.green
+                        : Colors.red,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class CompanyListItem extends StatefulWidget {

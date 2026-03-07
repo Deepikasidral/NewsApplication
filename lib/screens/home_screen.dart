@@ -6,7 +6,7 @@ import 'package:news_application/screens/saved_screen.dart';
 import 'package:news_application/screens/profile_screen.dart';
 import 'chatbot_screen.dart';
 import '../models/article.dart';
-import 'company_screen.dart';
+
 import 'events_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_html/flutter_html.dart';
@@ -1625,7 +1625,11 @@ BottomNavigationBarItem _navItem({
           height: 1.2,
         ),
         onTap: (index) {
-          if (index == _bottomIndex) return;
+  setState(() {
+    _bottomIndex = index;
+  });
+
+  if (index == 0) return;
 
           Widget? destination;
 
