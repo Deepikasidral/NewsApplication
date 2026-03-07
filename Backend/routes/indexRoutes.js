@@ -22,6 +22,19 @@ const globalSymbols = [
   "^N225",   // TVC:NI225
 ];
 
+const sectorSymbols = [
+  { symbol: "^NSEBANK", name: "Nifty Bank" },
+  { symbol: "^CNXIT", name: "Nifty IT" },
+  { symbol: "^CNXPHARMA", name: "Nifty Pharma" },
+  { symbol: "^CNXFMCG", name: "Nifty FMCG" },
+  { symbol: "^CNXAUTO", name: "Nifty Auto" },
+  { symbol: "^CNXMETAL", name: "Nifty Metal" },
+  { symbol: "^CNXENERGY", name: "Nifty Energy" },
+  { symbol: "^CNXFINANCE", name: "Nifty Financial Services" },
+  { symbol: "^CNXREALTY", name: "Nifty Realty" },
+  { symbol: "^CNXOILGAS", name: "Nifty Oil & Gas" },
+];
+
 /*
 POST /api/index/data
 */
@@ -85,7 +98,7 @@ router.post("/data", async (req, res) => {
         .lean() : Promise.resolve([])
     ]);
 
-    
+
     /*
     FINAL RESPONSE
     */
@@ -96,10 +109,18 @@ router.post("/data", async (req, res) => {
       change: quote.regularMarketChange,
       changePercent: quote.regularMarketChangePercent,
 
-      chart: (chart.quotes || []).map((q, i) => ({
-  close: q.close,
-  date: new Date(chart.timestamps[i] * 1000).toISOString(),
-})),
+chart: (chart.timestamps || []).map((t, i) => {
+
+  const close = chart.quotes?.[i]?.close;
+
+  if (!close) return null;
+
+  return {
+    close,
+    date: new Date(t * 1000).toISOString()
+  };
+
+}).filter(Boolean),
 
       gainers: movers.gainers || [],
       losers: movers.losers || [],
@@ -186,6 +207,57 @@ return {
 
   }
 
+});
+
+/*
+SECTOR INDEX DATA
+*/
+router.post("/sectors", async (req, res) => {
+  try {
+    const cacheKey = "sector_data";
+
+    if (cache.has(cacheKey)) {
+      console.log("⚡ Serving /sectors from cache");
+      return res.json(cache.get(cacheKey));
+    }
+
+    const data = await Promise.all(
+      sectorSymbols.map(async ({ symbol, name }) => {
+        try {
+          const quote = await yahooFinance.quote(symbol);
+
+          const endDate = new Date();
+          const startDate = new Date();
+          startDate.setDate(endDate.getDate() - 7);
+
+          const chart = await yahooFinance.chart(symbol, {
+            period1: startDate,
+            period2: endDate,
+            interval: "1d",
+          });
+
+          return {
+            symbol,
+            name,
+            price: quote.regularMarketPrice || 0,
+            chart: (chart.quotes || []).map((q, i) => ({
+              close: q.close,
+              date: chart.timestamps[i],
+            })),
+          };
+        } catch (err) {
+          console.error(`Error fetching ${symbol}:`, err.message);
+          return { symbol, name, price: 0, chart: [] };
+        }
+      })
+    );
+
+    cache.set(cacheKey, data);
+    res.json(data);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "Failed to fetch sector data" });
+  }
 });
 
 
