@@ -71,7 +71,7 @@ void initState() {
 }
 void _initBannerAd() {
   _bannerAd = BannerAd(
-    adUnitId: 'ca-app-pub-3940256099942544/6300978111', // 🔥 USE TEST FIRST
+    adUnitId: 'ca-app-pub-6088749573646337/2444903035', // 🔥 USE TEST FIRST
     size: AdSize.banner,
     request: const AdRequest(),
     listener: BannerAdListener(
@@ -1629,9 +1629,10 @@ BottomNavigationBarItem _navItem({
 
           Widget? destination;
 
-          switch (index) {
+        switch (index) {
             case 0:
-              return;
+              destination = const NewsFeedScreen();
+              break;
             case 1:
               destination = const IndexScreen();
               break;
@@ -1655,7 +1656,7 @@ BottomNavigationBarItem _navItem({
         },
         items: [
           _navItem(label: "NEWS", active: 'assets/icons/News Red.svg', inactive: 'assets/icons/News.svg', index: 0),
-          _navItem(label: "INDEX", active: 'assets/icons/Ask AI Red.svg', inactive: 'assets/icons/Ask AI.svg', index: 1),
+          _navItem(label: "INDEX", active: 'assets/icons/Index red.svg', inactive: 'assets/icons/Index.svg', index: 1),
           _navItem(label: "ASK AI", active: 'assets/icons/Ask AI Red.svg', inactive: 'assets/icons/Ask AI.svg', index: 2),
           _navItem(label: "EVENTS", active: 'assets/icons/Calender Red.svg', inactive: 'assets/icons/Calender.svg', index: 3),
           _navItem(label: "SAVED", active: 'assets/icons/Save red.svg', inactive: 'assets/icons/Save.svg', index: 4),

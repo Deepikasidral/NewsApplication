@@ -40,7 +40,9 @@ List gainers = [];
 List losers = [];
   List news = [];
   List globalData = [];
+  List sectorData = [];
   bool isGlobal = false;
+  bool isSector = false;
 Set<String> _locallySavedIds = {};
 late String currentUserId;
 
@@ -66,7 +68,13 @@ late String currentUserId;
   }
   
   Future<void> _init() async {
-    await _loadUserId();
+    // Run in parallel instead of sequential
+    await Future.wait([
+      _loadUserId(),
+      _fetchCompanies(),
+    ]);
+    
+    // Only load saved IDs and fetch data after userId is ready
     await _loadSavedNewsIds();
     fetchIndexData();
   }
@@ -105,6 +113,9 @@ late String currentUserId;
 
   Future<void> fetchIndexData() async {
     if (!mounted) return;
+    
+    setState(() => _isLoadingCompanies = true);
+    
     final res = await http.post(
       Uri.parse("$baseUrl/api/index/data"),
       headers: {"Content-Type": "application/json"},
@@ -117,6 +128,8 @@ print("RAW RESPONSE: ${res.body}");
 
 if (res.statusCode != 200) {
   print("Backend error");
+  setState(() => _isLoadingCompanies = false);
+  return;
 } 
     final data = jsonDecode(res.body);
 
@@ -126,11 +139,13 @@ if (res.statusCode != 200) {
       gainers = data["gainers"] ?? [];
       losers = data["losers"] ?? [];
       news = data["news"] ?? [];
+      _isLoadingCompanies = false;
     });
   }
 
   Future<void> fetchGlobalData() async {
-
+  setState(() => _isLoadingCompanies = true);
+  
   final res = await http.post(
     Uri.parse("$baseUrl/api/index/global"),
     headers: {"Content-Type": "application/json"},
@@ -142,6 +157,7 @@ if (res.statusCode != 200) {
 
   setState(() {
     globalData = data;
+    _isLoadingCompanies = false;
   });
 }
 
@@ -152,6 +168,41 @@ Future<void> fetchGlobalNews() async {
 
   if (res.statusCode != 200) {
     print("Failed to fetch global news");
+    return;
+  }
+
+  final data = jsonDecode(res.body);
+
+  setState(() {
+    news = data["data"] ?? [];
+  });
+}
+
+Future<void> fetchSectorData() async {
+  setState(() => _isLoadingCompanies = true);
+  
+  final res = await http.post(
+    Uri.parse("$baseUrl/api/index/sectors"),
+    headers: {"Content-Type": "application/json"},
+  );
+
+  if (!mounted) return;
+
+  final data = jsonDecode(res.body);
+
+  setState(() {
+    sectorData = data;
+    _isLoadingCompanies = false;
+  });
+}
+
+Future<void> fetchSectorNews() async {
+  final res = await http.get(
+    Uri.parse("$baseUrl/api/sector-news"),
+  );
+
+  if (res.statusCode != 200) {
+    print("Failed to fetch sector news");
     return;
   }
 
@@ -775,14 +826,19 @@ double _textWidth(String text, TextStyle style) {
 
         if (index == 4) {
           isGlobal = false;
+          isSector = false;
           _filteredCompanies = List.from(_companies);
         } else {
           selectedIndex = symbol;
           isGlobal = (symbol == "^DJI");
+          isSector = (index == 2);
 
           if (isGlobal) {
             fetchGlobalData();
             fetchGlobalNews();
+          } else if (isSector) {
+            fetchSectorData();
+            fetchSectorNews();
           } else {
             fetchIndexData();
           }
@@ -790,7 +846,7 @@ double _textWidth(String text, TextStyle style) {
       });
     },
     child: Padding(
-      padding: const EdgeInsets.only(right: 22),
+      padding: const EdgeInsets.only(right: 12),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.end,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -956,7 +1012,7 @@ Widget build(BuildContext context) {
         },
         items: [
           _navItem(label: "NEWS", active: 'assets/icons/News Red.svg', inactive: 'assets/icons/News.svg', index: 0),
-          _navItem(label: "INDEX", active: 'assets/icons/Ask AI Red.svg', inactive: 'assets/icons/Ask AI.svg', index: 1),
+          _navItem(label: "INDEX", active: 'assets/icons/Index red.svg', inactive: 'assets/icons/Index.svg', index: 1),
           _navItem(label: "ASK AI", active: 'assets/icons/Ask AI Red.svg', inactive: 'assets/icons/Ask AI.svg', index: 2),
           _navItem(label: "EVENTS", active: 'assets/icons/Calender Red.svg', inactive: 'assets/icons/Calender.svg', index: 3),
           _navItem(label: "SAVED", active: 'assets/icons/Save red.svg', inactive: 'assets/icons/Save.svg', index: 4),
@@ -976,13 +1032,13 @@ Widget build(BuildContext context) {
               scrollDirection: Axis.horizontal,
               children: [
                 tab("NIFTY", "^NSEI", 0),
-                const SizedBox(width: 16),
+                const SizedBox(width: 8),
                 tab("BANK NIFTY", "^NSEBANK", 1),
-                const SizedBox(width: 16),
+                const SizedBox(width: 8),
                 tab("SECTORS", "^CNXIT", 2),
-                const SizedBox(width: 16),
+                const SizedBox(width: 8),
                 tab("GLOBAL", "^DJI", 3),
-                const SizedBox(width: 16),
+                const SizedBox(width: 8),
                 tab("COMPANIES", "", 4),
               ],
             ),
@@ -1039,74 +1095,169 @@ Widget build(BuildContext context) {
       ],
     ),
   )
-          else if (isGlobal)
-            GridView.builder(
+          else if (isGlobal || isSector)
+            ListView.builder(
   shrinkWrap: true,
   physics: const NeverScrollableScrollPhysics(),
-  padding: const EdgeInsets.all(12),
-  itemCount: globalData.length,
-  gridDelegate:
-      const SliverGridDelegateWithFixedCrossAxisCount(
-    crossAxisCount: 2,
-    childAspectRatio: 1.1,
-    crossAxisSpacing: 10,
-    mainAxisSpacing: 10,
-  ),
+  padding: const EdgeInsets.symmetric(horizontal: 12),
+  itemCount: isGlobal ? globalData.length : sectorData.length,
   itemBuilder: (_, i) {
 
-    final g = globalData[i];
+    final g = isGlobal ? globalData[i] : sectorData[i];
+    final chartSpots = getMiniSpots(g["chart"]);
+    final price = (g["price"] ?? 0).toDouble();
 
-    return Container(
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: Column(
-        children: [
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 10),
 
-          Expanded(
-            child: LineChart(
-              LineChartData(
-                gridData: FlGridData(show: false),
-                titlesData: FlTitlesData(show: false),
-                borderData: FlBorderData(show: false),
-                lineTouchData: LineTouchData(enabled: false),
-                lineBarsData: [
-                  LineChartBarData(
-                    spots: getMiniSpots(g["chart"]),
-                    isCurved: true,
-                    dotData: FlDotData(show: false),
-                    color: Colors.pink,
-                  ),
-                ],
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                g["name"] ?? "",
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-            ),
+              const SizedBox(height: 4),
+              Text(
+                price.toStringAsFixed(2),
+                style: const TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
           ),
+        ),
 
-          const SizedBox(height: 5),
+        const SizedBox(height: 10),
 
-          Text(
-            g["name"] ?? "",
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 11),
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 12),
+          padding: const EdgeInsets.all(10),
+          height: 250,
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey.shade300),
+            borderRadius: BorderRadius.circular(10),
+            color: Colors.white,
           ),
-
-          Text(
-            "${g["price"]}",
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-            ),
+          child: Padding(
+            padding: const EdgeInsets.only(right: 10),
+            child: chartSpots.isEmpty
+                ? const Center(child: CircularProgressIndicator())
+                : LineChart(
+                    LineChartData(
+                      gridData: FlGridData(show: false),
+                      borderData: FlBorderData(show: false),
+                      lineTouchData: LineTouchData(
+                        touchTooltipData: LineTouchTooltipData(
+                          tooltipBgColor: Colors.black,
+                        ),
+                      ),
+                      extraLinesData: ExtraLinesData(
+                        horizontalLines: [
+                          HorizontalLine(
+                            y: price,
+                            color: Colors.green.withOpacity(0.4),
+                            strokeWidth: 1,
+                            dashArray: [5, 5],
+                          )
+                        ],
+                      ),
+                      titlesData: FlTitlesData(
+                        leftTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 50,
+                            interval: chartSpots.isEmpty ? 100 : (chartSpots.map((e) => e.y).reduce((a, b) => a > b ? a : b) - chartSpots.map((e) => e.y).reduce((a, b) => a < b ? a : b)) / 4,
+                            getTitlesWidget: (value, meta) {
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 4),
+                                child: Text(
+                                  value.toStringAsFixed(0),
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            interval: chartSpots.length > 5 ? (chartSpots.length / 5).floorToDouble() : 1,
+                            getTitlesWidget: (value, meta) {
+                              int index = value.toInt();
+                              if (index < 0 || index >= g["chart"].length) {
+                                return const SizedBox();
+                              }
+                              final chartItem = g["chart"][index];
+                              if (chartItem["date"] == null) return const SizedBox();
+                              
+                              final date = DateTime.fromMillisecondsSinceEpoch((chartItem["date"] * 1000).toInt());
+                              final formatted = DateFormat("d MMM").format(date);
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 6),
+                                child: Text(
+                                  formatted,
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        topTitles: AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
+                        rightTitles: AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
+                      ),
+                      minY: chartSpots.isEmpty ? 0 : chartSpots.map((e) => e.y).reduce((a, b) => a < b ? a : b) - 20,
+                      maxY: chartSpots.isEmpty ? 100 : chartSpots.map((e) => e.y).reduce((a, b) => a > b ? a : b) + 20,
+                      lineBarsData: [
+                        LineChartBarData(
+                          spots: chartSpots,
+                          isCurved: true,
+                          barWidth: 3,
+                          color: Colors.green,
+                          dotData: FlDotData(show: false),
+                          belowBarData: BarAreaData(
+                            show: true,
+                            gradient: LinearGradient(
+                              colors: [
+                                Colors.green.withOpacity(0.4),
+                                Colors.green.withOpacity(0.05),
+                              ],
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
           ),
-        ],
-      ),
+        ),
+
+        const SizedBox(height: 20),
+      ],
     );
   },
 ),
           /// NORMAL INDEX UI
-          if (!isGlobal) ...[
+          if (!isGlobal && !isSector) ...[
 
   Padding(
     padding: const EdgeInsets.symmetric(horizontal: 12),
