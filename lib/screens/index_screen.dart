@@ -81,20 +81,26 @@ late String currentUserId;
   }
   
   void _applyCompanySearch() {
-    final query = _searchController.text.trim().toLowerCase();
-    if (query.isEmpty) {
-      setState(() => _filteredCompanies = List.from(_companies));
-      return;
-    }
-    setState(() {
-      _filteredCompanies = _companies.where((company) {
-        final companyName = (company["Company Name"] ?? "").toLowerCase();
-        final symbol = (company["Symbol"] ?? "").toLowerCase();
-        return companyName.contains(query) || symbol.contains(query);
-      }).toList();
-    });
+  final query = _searchController.text.trim().toLowerCase();
+
+  if (query.isEmpty) {
+    setState(() => _filteredCompanies = List.from(_companies));
+    return;
   }
-  
+
+  setState(() {
+    _filteredCompanies = _companies.where((company) {
+
+      final companyName =
+          company["Company Name"]?.toString().toLowerCase() ?? "";
+
+      final symbol =
+          company["Symbol"]?.toString().toLowerCase() ?? "";
+
+      return companyName.contains(query) || symbol.contains(query);
+    }).toList();
+  });
+}
   Future<void> _fetchCompanies() async {
     setState(() => _isLoadingCompanies = true);
     try {
@@ -215,21 +221,33 @@ Future<void> fetchSectorNews() async {
 }
 Article _convertToArticle(Map<String, dynamic> n) {
   return Article(
-    id: n["_id"] ?? "",
-    fileName: n["FileName"] ?? "",     // ✅ FIX
-    title: n["Headline"] ?? "",
-    excerpt: n["summary"] ?? "",      // ✅ FIX
-    summary: n["summary"] ?? "",
-    story: n["story"] ?? "",
-    sentiment: n["sentiment"] ?? "",
-    impact: n["impact"] ?? "",
-    tags: List<String>.from(n["tags"] ?? []),   // ✅ FIX
-    url: n["link"] ?? "",                        // ✅ FIX
-    companies: List<String>.from(n["companies"] ?? []),
-    sector_market: n["sector_market"] ?? "",
-    commodities_market:
-        List<String>.from(n["commodities_market"] ?? []),
-    date: DateTime.tryParse(n["PublishedAt"] ?? "") ?? DateTime.now(),
+    id: n["_id"]?.toString() ?? "",
+    fileName: n["FileName"]?.toString() ?? "",
+    title: n["Headline"]?.toString() ?? "",
+    excerpt: n["summary"]?.toString() ?? "",
+    summary: n["summary"]?.toString() ?? "",
+    story: n["story"]?.toString() ?? "",
+    sentiment: n["sentiment"]?.toString() ?? "",
+    impact: n["impact"]?.toString() ?? "",
+
+    tags: (n["tags"] ?? [])
+        .map<String>((e) => e.toString())
+        .toList(),
+
+    url: n["link"]?.toString() ?? "",
+
+    companies: (n["companies"] ?? [])
+        .map<String>((e) => e.toString())
+        .toList(),
+
+    sector_market: n["sector_market"]?.toString() ?? "",
+
+    commodities_market: (n["commodities_market"] ?? [])
+        .map<String>((e) => e.toString())
+        .toList(),
+
+    date: DateTime.tryParse(n["PublishedAt"]?.toString() ?? "") 
+          ?? DateTime.now(),
   );
 }
 Widget _buildArticleCard(Article a) {
@@ -1084,13 +1102,13 @@ Widget build(BuildContext context) {
             itemCount: _filteredCompanies.length,
             itemBuilder: (context, index) {
               final company = _filteredCompanies[index];
-              final companyName = company["Company Name"] ?? "Unknown";
-              final symbol = company["Symbol"] ?? "";
+              final companyName = company["Company Name"]?.toString() ?? "Unknown";
+final symbol = company["Symbol"]?.toString() ?? "";
 
               return OptimizedCompanyListItem(
                 companyName: companyName,
                 symbol: symbol,
-                stockData: _stockPriceCache[symbol],
+                stockData: _stockPriceCache[symbol.toString()],
               );
             },
           ),
@@ -1193,32 +1211,42 @@ Widget build(BuildContext context) {
                           ),
                         ),
                         bottomTitles: AxisTitles(
-                          sideTitles: SideTitles(
-                            showTitles: true,
-                            interval: chartSpots.length > 5 ? (chartSpots.length / 5).floorToDouble() : 1,
-                            getTitlesWidget: (value, meta) {
-                              int index = value.toInt();
-                              if (index < 0 || index >= g["chart"].length) {
-                                return const SizedBox();
-                              }
-                              final chartItem = g["chart"][index];
-                              if (chartItem["date"] == null) return const SizedBox();
-                              
-                              final date = DateTime.fromMillisecondsSinceEpoch((chartItem["date"] * 1000).toInt());
-                              final formatted = DateFormat("d MMM").format(date);
-                              return Padding(
-                                padding: const EdgeInsets.only(top: 6),
-                                child: Text(
-                                  formatted,
-                                  style: const TextStyle(
-                                    fontSize: 10,
-                                    color: Colors.grey,
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
+  sideTitles: SideTitles(
+    showTitles: true,
+    interval: chartSpots.length <= 1
+        ? 1
+        : (chartSpots.length / 3).floor().clamp(1, chartSpots.length).toDouble(),
+    getTitlesWidget: (value, meta) {
+
+      int index = value.toInt();
+
+      if (index < 0 || index >= chartSpots.length) {
+        return const SizedBox();
+      }
+
+      final rawDate = g["chart"][index]["date"];
+
+DateTime date;
+
+if (rawDate is int) {
+  date = DateTime.fromMillisecondsSinceEpoch(rawDate * 1000);
+} else {
+  date = DateTime.tryParse(rawDate.toString()) ?? DateTime.now();
+}
+
+      return Padding(
+        padding: const EdgeInsets.only(top: 6),
+        child: Text(
+          DateFormat("d MMM").format(date),
+          style: const TextStyle(
+            fontSize: 10,
+            color: Colors.grey,
+          ),
+        ),
+      );
+    },
+  ),
+),
                         topTitles: AxisTitles(
                           sideTitles: SideTitles(showTitles: false),
                         ),
@@ -1231,7 +1259,7 @@ Widget build(BuildContext context) {
                       lineBarsData: [
                         LineChartBarData(
                           spots: chartSpots,
-                          isCurved: true,
+                          isCurved: false,
                           barWidth: 3,
                           color: Colors.green,
                           dotData: FlDotData(show: false),
@@ -1339,9 +1367,8 @@ Widget build(BuildContext context) {
      bottomTitles: AxisTitles(
   sideTitles: SideTitles(
     showTitles: true,
-    interval: 1,
+    interval: (chartData.length / 3).floor().clamp(1, chartData.length).toDouble(),
     getTitlesWidget: (value, meta) {
-
       int index = value.toInt();
 
       if (index < 0 || index >= chartData.length) {
@@ -1350,12 +1377,10 @@ Widget build(BuildContext context) {
 
       final date = DateTime.parse(chartData[index]["date"]);
 
-      final formatted = DateFormat("d MMM").format(date);
-
       return Padding(
         padding: const EdgeInsets.only(top: 6),
         child: Text(
-          formatted,
+          DateFormat("d MMM").format(date),
           style: const TextStyle(
             fontSize: 10,
             color: Colors.grey,
@@ -1649,7 +1674,8 @@ class OptimizedCompanyListItem extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  stockData!['price'],
+  stockData!['price'].toString(),
+
                   style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w500,
@@ -1657,13 +1683,14 @@ class OptimizedCompanyListItem extends StatelessWidget {
                 ),
                 const SizedBox(width: 12),
                 Text(
-                  '${stockData!['changePercent']}%',
+  '${stockData!['changePercent'].toString()}%',
+
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
-                    color: double.parse(stockData!['changePercent']) >= 0
-                        ? Colors.green
-                        : Colors.red,
+                    color: double.parse(stockData!['changePercent'].toString()) >= 0
+    ? Colors.green
+    : Colors.red,
                   ),
                 ),
               ],
@@ -1761,7 +1788,8 @@ class _CompanyListItemState extends State<CompanyListItem> {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  stockData!['price'],
+  stockData!['price'].toString(),
+
                   style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w500,
@@ -1769,13 +1797,13 @@ class _CompanyListItemState extends State<CompanyListItem> {
                 ),
                 const SizedBox(width: 12),
                 Text(
-                  stockData!['changePercent'],
+  '${stockData!['changePercent'].toString()}%',
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
-                    color: double.parse(stockData!['changePercent']) >= 0
-                        ? Colors.green
-                        : Colors.red,
+                    color: double.parse(stockData!['changePercent'].toString()) >= 0
+    ? Colors.green
+    : Colors.red,
                   ),
                 ),
               ],
