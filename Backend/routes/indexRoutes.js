@@ -60,7 +60,7 @@ router.post("/data", async (req, res) => {
 
     const endDate = new Date();
     const startDate = new Date();
-    startDate.setDate(endDate.getDate() - 7);
+    startDate.setDate(endDate.getDate() - 30); // 30 days to always have data
 
     let newsQuery;
     if (symbol === "^NSEI") {
@@ -71,26 +71,27 @@ router.post("/data", async (req, res) => {
       newsQuery = { sector_market: "Nifty IT" };
     }
 
-    // 🚀 PARALLEL EXECUTION
-    const [quote, chart, movers, news] = await Promise.all([
+    // 🚀 Start Python movers in background (non-blocking)
+    const pythonPath = path.join(__dirname, "..", "venv", "bin", "python");
+    const scriptPath = path.join(__dirname, "..", "nse_movers.py");
+    const moversPromise = new Promise((resolve) => {
+      exec(`"${pythonPath}" "${scriptPath}" "${symbol}"`, { timeout: 15000 }, (error, stdout) => {
+        if (error) {
+          resolve({ gainers: [], losers: [] });
+          return;
+        }
+        try {
+          resolve(JSON.parse(stdout));
+        } catch (e) {
+          resolve({ gainers: [], losers: [] });
+        }
+      });
+    });
+
+    // 🚀 Fetch chart + quote + news in parallel (do NOT wait for Python)
+    const [quote, chart, news] = await Promise.all([
       yahooFinance.quote(symbol),
       yahooFinance.chart(symbol, { period1: startDate, period2: endDate, interval: "1d" }),
-      new Promise((resolve) => {
-        const pythonPath = path.join(__dirname, "..", "venv", "bin", "python");
-        const scriptPath = path.join(__dirname, "..", "nse_movers.py");
-        exec(`"${pythonPath}" "${scriptPath}" "${symbol}"`, { timeout: 10000 }, (error, stdout) => {
-          if (error) {
-            console.log("❌ PYTHON ERROR:", error);
-            resolve({ gainers: [], losers: [] });
-            return;
-          }
-          try {
-            resolve(JSON.parse(stdout));
-          } catch (e) {
-            resolve({ gainers: [], losers: [] });
-          }
-        });
-      }),
       newsQuery ? FilteredNews.find(newsQuery)
         .select('Headline summary sentiment impact companies sector_market ingested_at _id')
         .sort({ ingested_at: -1 })
@@ -98,6 +99,13 @@ router.post("/data", async (req, res) => {
         .lean() : Promise.resolve([])
     ]);
 
+    // ⏱️ Give movers at most 3s extra — return empty arrays if still running
+    const movers = await Promise.race([
+      moversPromise,
+      new Promise((resolve) => setTimeout(() => resolve({ gainers: [], losers: [] }), 3000))
+    ]);
+
+    console.log(`✅ Chart for ${symbol}: timestamps=${chart.timestamps?.length ?? 0}, quotes=${chart.quotes?.length ?? 0}`);
 
     /*
     FINAL RESPONSE
@@ -158,40 +166,41 @@ router.post("/global", async (req, res) => {
       return res.json(cache.get(cacheKey));
     }
 
-    const data = await Promise.all(
+    const nameMap = {
+      "^GSPC": "S&P 500",
+      "^DJI": "Dow Jones",
+      "^IXIC": "NASDAQ",
+      "^HSI": "Hang Seng",
+      "^N225": "Nikkei 225",
+    };
 
-      globalSymbols.map(async (symbol) => {
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(endDate.getDate() - 30); // 30 days to always have data
+    const chartOptions = { period1: startDate, period2: endDate, interval: "1d" };
 
-        const quote = await yahooFinance.quote(symbol);
-
-        const endDate = new Date();
-const startDate = new Date();
-startDate.setDate(endDate.getDate() - 7);
-
-const chart = await yahooFinance.chart(symbol, {
-  period1: startDate,
-  period2: endDate,
-  interval: "1d",
-});
-
-        const nameMap = {
-  "^GSPC": "S&P 500",
-  "^DJI": "Dow Jones",
-  "^IXIC": "NASDAQ",
-  "^HSI": "Hang Seng",
-  "^N225": "Nikkei 225",
-};
-
-return {
-  symbol,
-  name: nameMap[symbol],
-  price: quote.regularMarketPrice,
-  chart: chart.quotes || [],
-};
-
-      })
-
+    // 🚀 Fetch ALL quotes in parallel, then ALL charts in parallel
+    // Per-symbol .catch() so one failure never kills the whole response
+    const quotes = await Promise.all(
+      globalSymbols.map((s) => yahooFinance.quote(s).catch(() => null))
     );
+    const charts = await Promise.all(
+      globalSymbols.map((s) =>
+        yahooFinance.chart(s, chartOptions).catch(() => ({ quotes: [], timestamps: [] }))
+      )
+    );
+
+    const data = globalSymbols.map((symbol, i) => {
+      const q = quotes[i];
+      const c = charts[i];
+      console.log(`✅ Global ${symbol}: price=${q?.regularMarketPrice}, chartLen=${c?.quotes?.length ?? 0}`);
+      return {
+        symbol,
+        name: nameMap[symbol],
+        price: q?.regularMarketPrice ?? 0,
+        chart: c?.quotes || [],
+      };
+    });
 
     cache.set(cacheKey, data);
 
@@ -221,36 +230,37 @@ router.post("/sectors", async (req, res) => {
       return res.json(cache.get(cacheKey));
     }
 
-    const data = await Promise.all(
-      sectorSymbols.map(async ({ symbol, name }) => {
-        try {
-          const quote = await yahooFinance.quote(symbol);
+    const sEndDate = new Date();
+    const sStartDate = new Date();
+    sStartDate.setDate(sEndDate.getDate() - 30); // 30 days to always have data
+    const sChartOptions = { period1: sStartDate, period2: sEndDate, interval: "1d" };
 
-          const endDate = new Date();
-          const startDate = new Date();
-          startDate.setDate(endDate.getDate() - 7);
-
-          const chart = await yahooFinance.chart(symbol, {
-            period1: startDate,
-            period2: endDate,
-            interval: "1d",
-          });
-
-          return {
-            symbol,
-            name,
-            price: quote.regularMarketPrice || 0,
-            chart: (chart.quotes || []).map((q, i) => ({
-              close: q.close,
-              date: chart.timestamps[i],
-            })),
-          };
-        } catch (err) {
-          console.error(`Error fetching ${symbol}:`, err.message);
-          return { symbol, name, price: 0, chart: [] };
-        }
-      })
+    // 🚀 Fetch ALL sector quotes in parallel, then ALL charts in parallel
+    const sQuotes = await Promise.all(
+      sectorSymbols.map(({ symbol }) =>
+        yahooFinance.quote(symbol).catch(() => null)
+      )
     );
+    const sCharts = await Promise.all(
+      sectorSymbols.map(({ symbol }) =>
+        yahooFinance.chart(symbol, sChartOptions).catch(() => null)
+      )
+    );
+
+    const data = sectorSymbols.map(({ symbol, name }, i) => {
+      const quote = sQuotes[i];
+      const chart = sCharts[i];
+      if (!quote || !chart) return { symbol, name, price: 0, chart: [] };
+      return {
+        symbol,
+        name,
+        price: quote.regularMarketPrice || 0,
+        chart: (chart.quotes || []).map((q, j) => ({
+          close: q.close,
+          date: chart.timestamps?.[j],
+        })),
+      };
+    });
 
     cache.set(cacheKey, data);
     res.json(data);
