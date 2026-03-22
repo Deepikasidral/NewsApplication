@@ -126,6 +126,7 @@ late String currentUserId;
   Future<void> fetchIndexData() async {
     if (!mounted) return;
 
+    setState(() {
       _isLoadingChart = true;
       _indexError = false;
     });
@@ -151,8 +152,15 @@ late String currentUserId;
         });
         return;
       }
-
+    
       final data = jsonDecode(res.body);
+
+      print("✅ Index Data Received:");
+      print("Price: ${data["price"]}");
+      print("Chart length: ${(data["chart"] ?? []).length}");
+      print("Gainers: ${(data["gainers"] ?? []).length}");
+      print("Losers: ${(data["losers"] ?? []).length}");
+      print("News: ${(data["news"] ?? []).length}");
 
       if (!mounted) return;
       setState(() {
@@ -164,7 +172,7 @@ late String currentUserId;
         _isLoadingChart = false;
       });
     } catch (e) {
-      print("fetchIndexData error: $e");
+      print("❌ fetchIndexData error: $e");
       if (!mounted) return;
       setState(() {
         _isLoadingChart = false;
@@ -172,6 +180,9 @@ late String currentUserId;
       });
     }
   }
+
+Future<void> fetchGlobalData() async {
+  if (!mounted) return;
 
   setState(() {
     _isLoadingChart = true;
@@ -191,12 +202,13 @@ late String currentUserId;
     if (res.statusCode != 200) {
       setState(() {
         _isLoadingChart = false;
-        _hasError = true;
+        _globalError = true;
       });
       return;
     }
 
     final data = jsonDecode(res.body);
+    print("✅ Global Data Received: ${data.length} indices");
     if (!mounted) return;
     setState(() {
       globalData = data;
@@ -229,6 +241,9 @@ Future<void> fetchGlobalNews() async {
   });
 }
 
+Future<void> fetchSectorData() async {
+  if (!mounted) return;
+
   setState(() {
     _isLoadingChart = true;
     _sectorError = false;
@@ -253,6 +268,7 @@ Future<void> fetchGlobalNews() async {
     }
 
     final data = jsonDecode(res.body);
+    print("✅ Sector Data Received: ${data.length} sectors");
     if (!mounted) return;
     setState(() {
       sectorData = data;
@@ -858,6 +874,8 @@ Future<void> _openTradingView(String fullSymbol) async {
 
 
 List<FlSpot> getMiniSpots(List chart) {
+  if (chart.isEmpty) return [];
+  
   List<FlSpot> spots = [];
 
   for (int i = 0; i < chart.length; i++) {
@@ -865,7 +883,7 @@ List<FlSpot> getMiniSpots(List chart) {
     if (close == null) continue;
 
     spots.add(
-      FlSpot(spots.length.toDouble(), close.toDouble()),
+      FlSpot(i.toDouble(), close.toDouble()),
     );
   }
 
@@ -873,6 +891,8 @@ List<FlSpot> getMiniSpots(List chart) {
 }
 
 List<FlSpot> getSpots() {
+  if (chartData.isEmpty) return [];
+  
   List<FlSpot> spots = [];
 
   for (int i = 0; i < chartData.length; i++) {
@@ -882,7 +902,7 @@ List<FlSpot> getSpots() {
 
     spots.add(
       FlSpot(
-        spots.length.toDouble(),
+        i.toDouble(),
         double.tryParse(close.toString()) ?? 0,
       ),
     );
@@ -1497,8 +1517,8 @@ if (rawDate is int) {
     ),
 
     /// IMPORTANT for proper scaling
-    minY: getSpots().map((e) => e.y).reduce((a,b)=>a<b?a:b) - 20,
-    maxY: getSpots().map((e) => e.y).reduce((a,b)=>a>b?a:b) + 20,
+    minY: getSpots().isEmpty ? 0 : getSpots().map((e) => e.y).reduce((a,b)=>a<b?a:b) - 20,
+    maxY: getSpots().isEmpty ? 100 : getSpots().map((e) => e.y).reduce((a,b)=>a>b?a:b) + 20,
 
     lineBarsData: [
       LineChartBarData(

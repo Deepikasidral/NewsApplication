@@ -117,18 +117,18 @@ router.post("/data", async (req, res) => {
       change: quote.regularMarketChange,
       changePercent: quote.regularMarketChangePercent,
 
-chart: (chart.timestamps || []).map((t, i) => {
+      chart: (chart.timestamps || []).map((t, i) => {
 
-  const close = chart.quotes?.[i]?.close;
+        const close = chart.quotes?.[i]?.close;
 
-  if (!close) return null;
+        if (!close) return null;
 
-  return {
-    close,
-    date: new Date(t * 1000).toISOString()
-  };
+        return {
+          close,
+          date: new Date(t * 1000).toISOString()
+        };
 
-}).filter(Boolean),
+      }).filter(Boolean),
 
       gainers: movers.gainers || [],
       losers: movers.losers || [],
