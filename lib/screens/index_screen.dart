@@ -43,10 +43,6 @@ List losers = [];
   List sectorData = [];
   bool isGlobal = false;
   bool isSector = false;
-  bool _isLoadingChart = false;
-  bool _indexError = false;    // error flag only for Nifty/BankNifty tab
-  bool _globalError = false;   // error flag only for Global tab
-  bool _sectorError = false;   // error flag only for Sectors tab
 Set<String> _locallySavedIds = {};
 late String currentUserId;
 
@@ -73,16 +69,15 @@ late String currentUserId;
   }
   
   Future<void> _init() async {
+    // Run in parallel instead of sequential
     await Future.wait([
       _loadUserId(),
       _fetchCompanies(),
     ]);
-
-    // fetchIndexData doesn't need saved IDs — run both in parallel
-    await Future.wait([
-      _loadSavedNewsIds(),
-      fetchIndexData(),
-    ]);
+    
+    // Only load saved IDs and fetch data after userId is ready
+    await _loadSavedNewsIds();
+    fetchIndexData();
   }
   
   void _applyCompanySearch() {
@@ -125,103 +120,52 @@ late String currentUserId;
 
   Future<void> fetchIndexData() async {
     if (!mounted) return;
+    
+    setState(() => _isLoadingCompanies = true);
+    
+    final res = await http.post(
+      Uri.parse("$baseUrl/api/index/data"),
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode({"symbol": selectedIndex}),
+    );
+
+print(res.body);
+print("STATUS CODE: ${res.statusCode}");
+print("RAW RESPONSE: ${res.body}");
+
+if (res.statusCode != 200) {
+  print("Backend error");
+  setState(() => _isLoadingCompanies = false);
+  return;
+} 
+    final data = jsonDecode(res.body);
 
     setState(() {
-      _isLoadingChart = true;
-      _indexError = false;
+      price = (data["price"] ?? 0).toDouble();
+      chartData = data["chart"] ?? [];
+      gainers = data["gainers"] ?? [];
+      losers = data["losers"] ?? [];
+      news = data["news"] ?? [];
+      _isLoadingCompanies = false;
     });
-
-    try {
-      final res = await http
-          .post(
-            Uri.parse("$baseUrl/api/index/data"),
-            headers: {"Content-Type": "application/json"},
-            body: jsonEncode({"symbol": selectedIndex}),
-          )
-          .timeout(const Duration(seconds: 30));
-
-      print("STATUS CODE: ${res.statusCode}");
-
-      if (!mounted) return;
-
-      if (res.statusCode != 200) {
-        print("Backend error: ${res.body}");
-        setState(() {
-          _isLoadingChart = false;
-          _indexError = true;
-        });
-        return;
-      }
-    
-      final data = jsonDecode(res.body);
-
-      print("✅ Index Data Received:");
-      print("Price: ${data["price"]}");
-      print("Chart length: ${(data["chart"] ?? []).length}");
-      print("Gainers: ${(data["gainers"] ?? []).length}");
-      print("Losers: ${(data["losers"] ?? []).length}");
-      print("News: ${(data["news"] ?? []).length}");
-
-      if (!mounted) return;
-      setState(() {
-        price = (data["price"] ?? 0).toDouble();
-        chartData = data["chart"] ?? [];
-        gainers = data["gainers"] ?? [];
-        losers = data["losers"] ?? [];
-        news = data["news"] ?? [];
-        _isLoadingChart = false;
-      });
-    } catch (e) {
-      print("❌ fetchIndexData error: $e");
-      if (!mounted) return;
-      setState(() {
-        _isLoadingChart = false;
-        _indexError = true;
-      });
-    }
   }
 
-Future<void> fetchGlobalData() async {
+  Future<void> fetchGlobalData() async {
+  setState(() => _isLoadingCompanies = true);
+  
+  final res = await http.post(
+    Uri.parse("$baseUrl/api/index/global"),
+    headers: {"Content-Type": "application/json"},
+  );
+
   if (!mounted) return;
 
+  final data = jsonDecode(res.body);
+
   setState(() {
-    _isLoadingChart = true;
-    _globalError = false;
+    globalData = data;
+    _isLoadingCompanies = false;
   });
-
-  try {
-    final res = await http
-        .post(
-          Uri.parse("$baseUrl/api/index/global"),
-          headers: {"Content-Type": "application/json"},
-        )
-        .timeout(const Duration(seconds: 30));
-
-    if (!mounted) return;
-
-    if (res.statusCode != 200) {
-      setState(() {
-        _isLoadingChart = false;
-        _globalError = true;
-      });
-      return;
-    }
-
-    final data = jsonDecode(res.body);
-    print("✅ Global Data Received: ${data.length} indices");
-    if (!mounted) return;
-    setState(() {
-      globalData = data;
-      _isLoadingChart = false;
-    });
-  } catch (e) {
-    print("fetchGlobalData error: $e");
-    if (!mounted) return;
-    setState(() {
-      _isLoadingChart = false;
-      _globalError = true;
-    });
-  }
 }
 
 Future<void> fetchGlobalNews() async {
@@ -242,46 +186,21 @@ Future<void> fetchGlobalNews() async {
 }
 
 Future<void> fetchSectorData() async {
+  setState(() => _isLoadingCompanies = true);
+  
+  final res = await http.post(
+    Uri.parse("$baseUrl/api/index/sectors"),
+    headers: {"Content-Type": "application/json"},
+  );
+
   if (!mounted) return;
 
+  final data = jsonDecode(res.body);
+
   setState(() {
-    _isLoadingChart = true;
-    _sectorError = false;
+    sectorData = data;
+    _isLoadingCompanies = false;
   });
-
-  try {
-    final res = await http
-        .post(
-          Uri.parse("$baseUrl/api/index/sectors"),
-          headers: {"Content-Type": "application/json"},
-        )
-        .timeout(const Duration(seconds: 30));
-
-    if (!mounted) return;
-
-    if (res.statusCode != 200) {
-      setState(() {
-        _isLoadingChart = false;
-        _sectorError = true;
-      });
-      return;
-    }
-
-    final data = jsonDecode(res.body);
-    print("✅ Sector Data Received: ${data.length} sectors");
-    if (!mounted) return;
-    setState(() {
-      sectorData = data;
-      _isLoadingChart = false;
-    });
-  } catch (e) {
-    print("fetchSectorData error: $e");
-    if (!mounted) return;
-    setState(() {
-      _isLoadingChart = false;
-      _sectorError = true;
-    });
-  }
 }
 
 Future<void> fetchSectorNews() async {
@@ -874,8 +793,6 @@ Future<void> _openTradingView(String fullSymbol) async {
 
 
 List<FlSpot> getMiniSpots(List chart) {
-  if (chart.isEmpty) return [];
-  
   List<FlSpot> spots = [];
 
   for (int i = 0; i < chart.length; i++) {
@@ -883,7 +800,7 @@ List<FlSpot> getMiniSpots(List chart) {
     if (close == null) continue;
 
     spots.add(
-      FlSpot(i.toDouble(), close.toDouble()),
+      FlSpot(spots.length.toDouble(), close.toDouble()),
     );
   }
 
@@ -891,8 +808,6 @@ List<FlSpot> getMiniSpots(List chart) {
 }
 
 List<FlSpot> getSpots() {
-  if (chartData.isEmpty) return [];
-  
   List<FlSpot> spots = [];
 
   for (int i = 0; i < chartData.length; i++) {
@@ -902,7 +817,7 @@ List<FlSpot> getSpots() {
 
     spots.add(
       FlSpot(
-        i.toDouble(),
+        spots.length.toDouble(),
         double.tryParse(close.toString()) ?? 0,
       ),
     );
@@ -929,18 +844,32 @@ double _textWidth(String text, TextStyle style) {
         _tabIndex = index;
 
         if (index == 4) {
+          // Companies tab - clear index data
           isGlobal = false;
           isSector = false;
+          chartData = [];
+          gainers = [];
+          losers = [];
+          news = [];
           _filteredCompanies = List.from(_companies);
         } else {
+          // Clear old data immediately before fetching new data
+          chartData = [];
+          gainers = [];
+          losers = [];
+          news = [];
+          price = 0;
+          
           selectedIndex = symbol;
           isGlobal = (symbol == "^DJI");
           isSector = (index == 2);
 
           if (isGlobal) {
+            globalData = [];
             fetchGlobalData();
             fetchGlobalNews();
           } else if (isSector) {
+            sectorData = [];
             fetchSectorData();
             fetchSectorNews();
           } else {
@@ -1254,22 +1183,9 @@ final symbol = company["Symbol"]?.toString() ?? "";
           ),
           child: Padding(
             padding: const EdgeInsets.only(right: 10),
-            child: _isLoadingChart
+            child: chartSpots.isEmpty
                 ? const Center(child: CircularProgressIndicator())
-                : (isGlobal ? _globalError : _sectorError)
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.wifi_off, size: 36, color: Colors.grey),
-                            const SizedBox(height: 8),
-                            const Text("Failed to load chart", style: TextStyle(color: Colors.grey)),
-                          ],
-                        ),
-                      )
-                    : chartSpots.isEmpty
-                        ? const Center(child: Text("No data", style: TextStyle(color: Colors.grey)))
-                        : LineChart(
+                : LineChart(
                     LineChartData(
                       gridData: FlGridData(show: false),
                       borderData: FlBorderData(show: false),
@@ -1384,8 +1300,8 @@ if (rawDate is int) {
     );
   },
 ),
-          /// NORMAL INDEX UI
-          if (!isGlobal && !isSector) ...[
+          /// NORMAL INDEX UI (ONLY FOR NIFTY AND BANK NIFTY)
+          if (!isGlobal && !isSector && _tabIndex != 4) ...[
 
   Padding(
     padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -1409,27 +1325,9 @@ if (rawDate is int) {
     ),
     child: Padding(
       padding: const EdgeInsets.only(right: 10),
-      child: _isLoadingChart
+      child: chartData.isEmpty
           ? const Center(child: CircularProgressIndicator())
-          : _indexError
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.wifi_off, size: 36, color: Colors.grey),
-                      const SizedBox(height: 8),
-                      const Text("Failed to load chart", style: TextStyle(color: Colors.grey)),
-                      const SizedBox(height: 8),
-                      TextButton(
-                        onPressed: fetchIndexData,
-                        child: const Text("Retry", style: TextStyle(color: Color(0xFFEA6B6B))),
-                      ),
-                    ],
-                  ),
-                )
-              : chartData.isEmpty
-                  ? const Center(child: Text("No chart data", style: TextStyle(color: Colors.grey)))
-                  : LineChart(
+          : LineChart(
               LineChartData(
                 
 
@@ -1517,15 +1415,15 @@ if (rawDate is int) {
     ),
 
     /// IMPORTANT for proper scaling
-    minY: getSpots().isEmpty ? 0 : getSpots().map((e) => e.y).reduce((a,b)=>a<b?a:b) - 20,
-    maxY: getSpots().isEmpty ? 100 : getSpots().map((e) => e.y).reduce((a,b)=>a>b?a:b) + 20,
+    minY: getSpots().map((e) => e.y).reduce((a,b)=>a<b?a:b) - 20,
+    maxY: getSpots().map((e) => e.y).reduce((a,b)=>a>b?a:b) + 20,
 
     lineBarsData: [
       LineChartBarData(
         spots: getSpots(),
 
         /// smooth curve
-        isCurved: true,
+        isCurved: false,
 
         /// line thickness
         barWidth: 3,
@@ -1700,27 +1598,29 @@ if (_tabIndex == 0) ...[
            
           ],
 
-          /// NEWS (ALWAYS)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Text(
-              "NEWS",
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: Colors.grey.shade700,
+          /// NEWS (ONLY FOR INDEX TABS, NOT COMPANIES)
+          if (_tabIndex != 4) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Text(
+                "NEWS",
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey.shade700,
+                ),
               ),
             ),
-          ),
 
-          ListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: news.length,
-            itemBuilder: (_, i) {
-              final article = _convertToArticle(news[i]);
-              return _buildArticleCard(article);
-            },
-          ),
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: news.length,
+              itemBuilder: (_, i) {
+                final article = _convertToArticle(news[i]);
+                return _buildArticleCard(article);
+              },
+            ),
+          ],
 
           const SizedBox(height: 20),
         ],

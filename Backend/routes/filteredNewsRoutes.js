@@ -15,13 +15,13 @@ function extractMainCompanyName(fullName) {
 // ✔ Fetch all filtered news sorted by PublishedAt
 router.get("/", async (req, res) => {
   try {
-    console.log("📰 Fetching all filtered news...");
-    const items = await FilteredNews.find().sort({ PublishedAt: -1 });
-    console.log(`✅ Found ${items.length} filtered news items`);
+    console.log("📰 [FILTERED-NEWS] Fetching all filtered news...");
+    const items = await FilteredNews.find().sort({ ingested_at: -1 }).limit(100);
+    console.log(`✅ [FILTERED-NEWS] Found ${items.length} filtered news items`);
     res.json(items);
   } catch (err) {
-    console.error("🔥 Error fetching filtered news:", err);
-    console.error("🔥 Error details:", err.message);
+    console.error("🔥 [FILTERED-NEWS] Error fetching filtered news:", err);
+    console.error("🔥 [FILTERED-NEWS] Error details:", err.message);
     res.status(500).json({ error: "Server error while fetching filtered news" });
   }
 });
@@ -30,21 +30,21 @@ router.get("/", async (req, res) => {
 router.get("/company/:companyName", async (req, res) => {
   try {
     const companyName = decodeURIComponent(req.params.companyName);
-    console.log(`📰 Fetching filtered news for company: "${companyName}"`);
+    console.log(`📰 [FILTERED-NEWS] Fetching filtered news for company: "${companyName}"`);
     
     // Find news where sector is "Company Specific" 
     const allItems = await FilteredNews.find({
       sector: "Company Specific"
-    }).sort({ PublishedAt: -1 });
+    }).sort({ ingested_at: -1 });
     
-    console.log(`📊 Total Company Specific news items: ${allItems.length}`);
+    console.log(`📊 [FILTERED-NEWS] Total Company Specific news items: ${allItems.length}`);
     
     // Extract main company name from search term (remove "Limited", "Ltd", etc.)
     const mainSearchName = extractMainCompanyName(companyName);
     const normalizedSearchName = mainSearchName.toLowerCase();
     const fullNormalizedSearchName = companyName.trim().toLowerCase();
     
-    console.log(`🔍 Searching with main name: "${mainSearchName}" (normalized: "${normalizedSearchName}")`);
+    console.log(`🔍 [FILTERED-NEWS] Searching with main name: "${mainSearchName}" (normalized: "${normalizedSearchName}")`);
     
     // Filter to match company name case-insensitively in companies array
     const items = allItems.filter(item => {
@@ -74,16 +74,16 @@ router.get("/company/:companyName", async (req, res) => {
       });
     });
     
-    console.log(`✅ Found ${items.length} news items for "${companyName}"`);
+    console.log(`✅ [FILTERED-NEWS] Found ${items.length} news items for "${companyName}"`);
     if (items.length === 0 && allItems.length > 0) {
-      console.log(`⚠️ Sample companies in first item:`, allItems[0].companies);
+      console.log(`⚠️ [FILTERED-NEWS] Sample companies in first item:`, allItems[0].companies);
       // Show first few company names for debugging
       const sampleCompanies = allItems.slice(0, 5).map(item => item.companies).flat();
-      console.log(`📋 Sample company names in DB:`, [...new Set(sampleCompanies)]);
+      console.log(`📋 [FILTERED-NEWS] Sample company names in DB:`, [...new Set(sampleCompanies)]);
     }
     res.json(items);
   } catch (err) {
-    console.error("🔥 Error fetching company filtered news:", err);
+    console.error("🔥 [FILTERED-NEWS] Error fetching company filtered news:", err);
     res.status(500).json({ error: "Server error while fetching company filtered news" });
   }
 });

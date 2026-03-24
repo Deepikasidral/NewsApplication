@@ -4,7 +4,7 @@ const savedNewsSchema = new mongoose.Schema(
   {
     newsId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "FilteredNews",
+      ref: "filtered_news",
       required: true,
     },
     savedAt: {
