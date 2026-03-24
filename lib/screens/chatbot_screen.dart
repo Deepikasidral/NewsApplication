@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_markdown/flutter_markdown.dart';
@@ -142,7 +143,12 @@ void dispose() {
         "question": question,
         "history": history
       }),
-    ).timeout(const Duration(seconds: 30));
+    ).timeout(
+      const Duration(seconds: 60),
+      onTimeout: () {
+        throw Exception('⏱️ Request timeout - AI is taking too long to respond');
+      },
+    );
 
     debugPrint('✅ Response status: ${response.statusCode}');
     debugPrint('✅ Response body: ${response.body}');
@@ -171,11 +177,29 @@ void dispose() {
     return "⚠️ Server error (${response.statusCode})\n\n"
            "Response: ${response.body.length > 200 ? response.body.substring(0, 200) + '...' : response.body}";
 
+  } on http.ClientException catch (e) {
+    debugPrint('❌ Network Error: $e');
+    return "❌ **Network Error**\n\n"
+           "Cannot connect to AI server.\n\n"
+           "**Possible causes:**\n"
+           "• Server is down\n"
+           "• No internet connection\n"
+           "• Firewall blocking port 8000\n\n"
+           "**Check server status:**\n"
+           "`sudo systemctl status mcp-server`";
+  } on TimeoutException catch (e) {
+    debugPrint('❌ Timeout Error: $e');
+    return "⏱️ **Request Timeout**\n\n"
+           "The AI is taking too long to respond.\n\n"
+           "**Try:**\n"
+           "• Ask a simpler question\n"
+           "• Check if server is overloaded\n"
+           "• Wait a moment and try again";
   } catch (e) {
-    debugPrint('❌ Error: $e');
-    return "❌ Connection failed: $e\n\n"
-           "Check if backend is running:\n"
-           "sudo systemctl status mcp-server";
+    debugPrint('❌ Unexpected Error: $e');
+    return "❌ **Unexpected Error**\n\n"
+           "$e\n\n"
+           "Please try again or contact support.";
   }
 }
 

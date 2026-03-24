@@ -59,7 +59,6 @@ late String currentUserId;
     super.initState();
     _searchController.addListener(_applyCompanySearch);
     _init();
-    _fetchCompanies();
   }
   
   @override
@@ -105,10 +104,33 @@ late String currentUserId;
     setState(() => _isLoadingCompanies = true);
     try {
       final resp = await http.get(Uri.parse("$baseUrl/api/companies"));
+      debugPrint("Companies API Status: ${resp.statusCode}");
       if (resp.statusCode == 200) {
         final data = json.decode(resp.body);
+        debugPrint("Response type: ${data.runtimeType}");
+        debugPrint("Response data: $data");
+        
+        // Handle both array and object responses
+        List<Map<String, dynamic>> companiesList;
+        if (data is List) {
+          companiesList = (data as List).cast<Map<String, dynamic>>();
+        } else if (data is Map) {
+          // If it's a map, check for common keys like 'data', 'companies', etc.
+          if (data.containsKey('data')) {
+            companiesList = (data['data'] as List).cast<Map<String, dynamic>>();
+          } else if (data.containsKey('companies')) {
+            companiesList = (data['companies'] as List).cast<Map<String, dynamic>>();
+          } else {
+            debugPrint("Unknown response structure: ${data.keys}");
+            companiesList = [];
+          }
+        } else {
+          companiesList = [];
+        }
+        
+        debugPrint("Companies fetched: ${companiesList.length}");
         setState(() {
-          _companies = (data as List).cast<Map<String, dynamic>>();
+          _companies = companiesList;
           _filteredCompanies = List.from(_companies);
         });
       }
@@ -851,7 +873,10 @@ double _textWidth(String text, TextStyle style) {
           gainers = [];
           losers = [];
           news = [];
-          _filteredCompanies = List.from(_companies);
+          // Don't reset filtered companies, keep existing data
+          if (_companies.isEmpty) {
+            _fetchCompanies();
+          }
         } else {
           // Clear old data immediately before fetching new data
           chartData = [];
@@ -1105,7 +1130,7 @@ Widget build(BuildContext context) {
         ),
 
         /// COMPANY LIST
-        if (_isLoadingCompanies)
+        if (_companies.isEmpty && _isLoadingCompanies)
           const Center(child: CircularProgressIndicator())
         else if (_filteredCompanies.isEmpty)
           const Center(child: Text("No companies found"))
@@ -1119,10 +1144,9 @@ Widget build(BuildContext context) {
               final companyName = company["Company Name"]?.toString() ?? "Unknown";
 final symbol = company["Symbol"]?.toString() ?? "";
 
-              return OptimizedCompanyListItem(
+              return CompanyListItem(
                 companyName: companyName,
                 symbol: symbol,
-                stockData: _stockPriceCache[symbol.toString()],
               );
             },
           ),
