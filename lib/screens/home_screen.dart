@@ -46,12 +46,13 @@ List<Map<String, dynamic>> _filteredCompanies = [];
 late String currentUserId;
 bool _hasLoadedOnce = false;
 late final PageController _pageController;
-
+bool _isShowingAd = false;
 Set<String> _viewedArticles = {};
-
+List<NativeAd> _nativeAds = [];
 BannerAd? _bannerAd;
-bool _isAdLoaded = false;
+InterstitialAd? _interstitialAd;
 
+int _viewCount = 0;
 
 DateTime _lastTrackedDate = DateTime.now();
 
@@ -67,30 +68,66 @@ void initState() {
   _pageController = PageController(viewportFraction: 0.72);
 
   _init();
-  _initBannerAd(); 
+  _loadInterstitialAd();
+  _loadNativeAd();
 }
-void _initBannerAd() {
-  _bannerAd = BannerAd(
-    adUnitId: 'ca-app-pub-6088749573646337/2444903035', // 🔥 USE TEST FIRST
-    size: AdSize.banner,
+void _loadInterstitialAd() {
+  InterstitialAd.load(
+    adUnitId: 'ca-app-pub-6088749573646337/6577319196',
     request: const AdRequest(),
-    listener: BannerAdListener(
+    adLoadCallback: InterstitialAdLoadCallback(
       onAdLoaded: (ad) {
-        setState(() {
-          _isAdLoaded = true;
-        });
+        _interstitialAd = ad;
       },
-      onAdFailedToLoad: (ad, error) {
-        ad.dispose();
-        print("Ad failed to load: $error");
+      onAdFailedToLoad: (error) {
+        debugPrint("Interstitial ad load failed: $error");
       },
     ),
   );
-
-  _bannerAd!.load();
 }
+void _showInterstitialAd() {
+  if (_isShowingAd) return;
 
+  if (_interstitialAd != null) {
+    _isShowingAd = true;
 
+    _interstitialAd!.fullScreenContentCallback = FullScreenContentCallback(
+      onAdDismissedFullScreenContent: (ad) {
+        ad.dispose();
+        _isShowingAd = false;
+        _loadInterstitialAd();
+      },
+      onAdFailedToShowFullScreenContent: (ad, error) {
+        ad.dispose();
+        _isShowingAd = false;
+        _loadInterstitialAd();
+      },
+    );
+
+    _interstitialAd!.show();
+  }
+}
+void _loadNativeAd() {
+  for (int i = 0; i < 3; i++) {
+    final ad = NativeAd(
+      adUnitId: 'ca-app-pub-6088749573646337/3774928437', // test id
+      factoryId: 'listTile',
+      request: const AdRequest(),
+      listener: NativeAdListener(
+        onAdLoaded: (ad) {
+          setState(() {
+            _nativeAds.add(ad as NativeAd);
+          });
+        },
+        onAdFailedToLoad: (ad, error) {
+          ad.dispose();
+        },
+      ),
+    );
+
+    ad.load();
+  }
+}
 Future<void> _init() async {
   await _loadUserId();
   await _fetchLatestNews();
@@ -106,7 +143,10 @@ void dispose() {
   _searchController.removeListener(_applySearch);
   _searchController.dispose();
   _pageController.dispose();
-  _bannerAd?.dispose();
+  _interstitialAd?.dispose();
+  for (var ad in _nativeAds) {
+  ad.dispose();
+}
   super.dispose();
 }
 
@@ -1033,33 +1073,74 @@ double _textWidth(String text, TextStyle style) {
 
     /// 🔥 NORMAL MODE (KEEP PAGEVIEW)
     ? PageView.builder(
-        scrollDirection: Axis.vertical,
-        controller: _pageController,
-        padEnds: false,
-        physics: const BouncingScrollPhysics(),
-        itemCount: _filtered.length,
-        itemBuilder: (context, index) {
-          final article = _filtered[index];
+  scrollDirection: Axis.vertical,
+  controller: _pageController,
+  padEnds: false,
+  physics: const BouncingScrollPhysics(),
+  itemCount: _filtered.length + (_filtered.length ~/ 5),
+  itemBuilder: (context, index) {
 
-          return Padding(
-            padding:
-                const EdgeInsets.symmetric(vertical: 8),
-            child: VisibilityDetector(
-              key: Key(article.id),
-              onVisibilityChanged: (info) {
-                if (info.visibleFraction > 0.6 &&
-                    !_viewedArticles.contains(article.id)) {
+    // 🔥 Native Ad
+   if (index != 0 && index % 5 == 0 && _nativeAds.isNotEmpty) {
 
-                  _viewedArticles.add(article.id);
-                  _trackNewsView();
-                }
-              },
-              child: _buildArticleCard(article),
+  // 🔥 ADD THIS LINE HERE
+  final adIndex = (index ~/ 5) % _nativeAds.length;
+
+  return SizedBox(
+    height: MediaQuery.of(context).size.height * 0.75,
+    child: Container(
+      margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            "Sponsored",
+            style: TextStyle(fontSize: 12, color: Colors.grey),
+          ),
+          const SizedBox(height: 8),
+
+          Expanded(
+            child: AdWidget(
+              ad: _nativeAds[adIndex], // ✅ USE HERE
             ),
-          );
-        },
-      )
+          ),
+        ],
+      ),
+    ),
+  );
+}
 
+    int articleIndex = index - (index ~/ 5);
+    final article = _filtered[articleIndex];
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: VisibilityDetector(
+        key: Key(article.id),
+        onVisibilityChanged: (info) {
+          if (info.visibleFraction > 0.6 &&
+              !_viewedArticles.contains(article.id)) {
+            _viewedArticles.add(article.id);
+            _trackNewsView();
+          }
+        },
+        child: _buildArticleCard(article),
+      ),
+    );
+  },
+)
     /// 🔎 SEARCH MODE (SHOW LISTVIEW)
     : ListView(
         children: [
@@ -1596,20 +1677,7 @@ BottomNavigationBarItem _navItem({
           ],
         ),
       ),
-     bottomNavigationBar: Column(
-  mainAxisSize: MainAxisSize.min,
-  children: [
-
-    // ✅ SHOW AD
-    if (_isAdLoaded)
-      SizedBox(
-        height: _bannerAd!.size.height.toDouble(),
-        width: double.infinity,
-        child: AdWidget(ad: _bannerAd!),
-      ),
-
-    // ✅ YOUR EXISTING NAV BAR
-    Container(
+     bottomNavigationBar: Container(
       decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(
@@ -1635,39 +1703,64 @@ BottomNavigationBarItem _navItem({
           height: 1.2,
         ),
         onTap: (index) {
-  setState(() {
-    _bottomIndex = index;
-  });
+  if (index == _bottomIndex) return;
 
-  if (index == 0) return;
+  Widget? destination;
 
-          Widget? destination;
+  switch (index) {
+    case 0:
+      destination = const NewsFeedScreen();
+      break;
+    case 1:
+      destination = const IndexScreen();
+      break;
+    case 2:
+      destination = const ChatbotScreen();
+      break;
+    case 3:
+      destination = const EventsScreen();
+      break;
+    case 4:
+      destination = const SavedNewsFeedScreen();
+      break;
+    default:
+      return;
+  }
 
-        switch (index) {
-            case 0:
-              destination = const NewsFeedScreen();
-              break;
-            case 1:
-              destination = const IndexScreen();
-              break;
-            case 2:
-              destination = const ChatbotScreen();
-              break;
-            case 3:
-              destination = const EventsScreen();
-              break;
-            case 4:
-              destination = const SavedNewsFeedScreen();
-              break;
-            default:
-              return;
-          }
-
+  if (_interstitialAd != null && !_isShowingAd) {
+    _isShowingAd = true;
+    _interstitialAd!.fullScreenContentCallback = FullScreenContentCallback(
+      onAdDismissedFullScreenContent: (ad) {
+        ad.dispose();
+        _isShowingAd = false;
+        _loadInterstitialAd();
+        if (mounted) {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (_) => destination!),
           );
-        },
+        }
+      },
+      onAdFailedToShowFullScreenContent: (ad, error) {
+        ad.dispose();
+        _isShowingAd = false;
+        _loadInterstitialAd();
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => destination!),
+          );
+        }
+      },
+    );
+    _interstitialAd!.show();
+  } else {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => destination!),
+    );
+  }
+},
         items: [
           _navItem(label: "NEWS", active: 'assets/icons/News Red.svg', inactive: 'assets/icons/News.svg', index: 0),
           _navItem(label: "INDEX", active: 'assets/icons/Index red.svg', inactive: 'assets/icons/Index.svg', index: 1),
@@ -1677,8 +1770,6 @@ BottomNavigationBarItem _navItem({
         ],
       ),
     ),
-  ],
-),
 
     );
   }

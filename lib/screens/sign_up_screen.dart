@@ -8,6 +8,7 @@ import 'sign_in_screen.dart';
 import 'home_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 
 class SignUpScreen extends StatefulWidget {
@@ -22,11 +23,67 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmController = TextEditingController();
-  
+  InterstitialAd? _interstitialAd;
+bool _isAdLoaded = false;
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     scopes: ['email', 'profile'],
   );
-  
+  @override
+void initState() {
+  super.initState();
+  _loadInterstitialAd();
+}
+@override
+void dispose() {
+  _interstitialAd?.dispose();
+  super.dispose();
+}
+void _loadInterstitialAd() {
+  InterstitialAd.load(
+    adUnitId: 'ca-app-pub-6088749573646337/6577319196', 
+    request: const AdRequest(),
+    adLoadCallback: InterstitialAdLoadCallback(
+      onAdLoaded: (ad) {
+        _interstitialAd = ad;
+        _isAdLoaded = true;
+      },
+      onAdFailedToLoad: (error) {
+        print("Ad failed to load: $error");
+        _isAdLoaded = false;
+      },
+    ),
+  );
+}
+void _showAdThenNavigate() {
+  if (_interstitialAd != null && _isAdLoaded) {
+    _interstitialAd!.fullScreenContentCallback =
+        FullScreenContentCallback(
+      onAdDismissedFullScreenContent: (ad) {
+        ad.dispose();
+        _loadInterstitialAd(); // reload
+        _navigateToHome();
+      },
+      onAdFailedToShowFullScreenContent: (ad, error) {
+        ad.dispose();
+        _navigateToHome();
+      },
+    );
+
+    _interstitialAd!.show();
+  } else {
+    _navigateToHome();
+  }
+}
+
+void _navigateToHome() {
+  if (!mounted) return;
+
+  Navigator.pushReplacement(
+    context,
+    MaterialPageRoute(builder: (_) => const NewsFeedScreen()),
+  );
+}
+
   Future<void> _saveUserSession(Map<String, dynamic> user, String token) async {
   final prefs = await SharedPreferences.getInstance();
 
@@ -91,10 +148,7 @@ Future<void> saveFcmTokenToBackend(String userId) async {
     const SnackBar(content: Text("Account Created successfully")),
   );
 
-  Navigator.pushReplacement(
-    context,
-    MaterialPageRoute(builder: (_) => const NewsFeedScreen()),
-  );
+  _showAdThenNavigate();
 }
  else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -212,10 +266,7 @@ Future<void> saveFcmTokenToBackend(String userId) async {
       print("🚀 Navigating to home screen...");
       if (!mounted) return;
       
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const NewsFeedScreen()),
-      );
+     _showAdThenNavigate();
       
       print("✅ Navigation complete");
 

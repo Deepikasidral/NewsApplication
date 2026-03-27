@@ -13,6 +13,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'home_screen.dart';
 import 'index_screen.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 
 class ChatbotScreen extends StatefulWidget {
@@ -33,6 +34,8 @@ class _ChatbotScreenState extends State<ChatbotScreen> with AutomaticKeepAliveCl
   int _bottomIndex = 2;
   bool _rateLimited = false;
   String _userName = "there";
+  InterstitialAd? _interstitialAd;
+  bool _isShowingAd = false;
 
   static const String _sessionKey = "current_session_id";
   static const String _chatCacheKey = "session_chat_messages";
@@ -95,6 +98,22 @@ void initState() {
   super.initState();
   _loadUserName();
   _initSession();
+  _loadInterstitialAd();
+}
+
+void _loadInterstitialAd() {
+  InterstitialAd.load(
+    adUnitId: 'ca-app-pub-6088749573646337/6577319196',
+    request: const AdRequest(),
+    adLoadCallback: InterstitialAdLoadCallback(
+      onAdLoaded: (ad) {
+        _interstitialAd = ad;
+      },
+      onAdFailedToLoad: (error) {
+        debugPrint("Interstitial ad load failed: $error");
+      },
+    ),
+  );
 }
 
 
@@ -105,6 +124,7 @@ void initState() {
 void dispose() {
   _controller.dispose();
   _scrollController.dispose();
+  _interstitialAd?.dispose();
   super.dispose();
 }
 
@@ -562,11 +582,40 @@ Widget build(BuildContext context) {
               return;
           }
 
+  if (_interstitialAd != null && !_isShowingAd) {
+    _isShowingAd = true;
+    _interstitialAd!.fullScreenContentCallback = FullScreenContentCallback(
+      onAdDismissedFullScreenContent: (ad) {
+        ad.dispose();
+        _isShowingAd = false;
+        _loadInterstitialAd();
+        if (mounted) {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (_) => destination!),
           );
-        },
+        }
+      },
+      onAdFailedToShowFullScreenContent: (ad, error) {
+        ad.dispose();
+        _isShowingAd = false;
+        _loadInterstitialAd();
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => destination!),
+          );
+        }
+      },
+    );
+    _interstitialAd!.show();
+  } else {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => destination!),
+    );
+  }
+},
         items: [
           _navItem(label: "NEWS", active: 'assets/icons/News Red.svg', inactive: 'assets/icons/News.svg', index: 0),
           _navItem(label: "INDEX", active: 'assets/icons/Index red.svg', inactive: 'assets/icons/Index.svg', index: 1),

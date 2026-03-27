@@ -14,6 +14,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'index_screen.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 
 class SavedNewsFeedScreen extends StatefulWidget {
@@ -40,6 +41,8 @@ class _SavedNewsFeedScreenState extends State<SavedNewsFeedScreen> {
   int _tabIndex = 0;
   late String currentUserId;
   Set<String> _viewedArticles = {};
+  InterstitialAd? _interstitialAd;
+  bool _isShowingAd = false;
 
   Future<List<Map<String, dynamic>>> _fetchCompanyDetails(
     List<String> companyNames) async {
@@ -99,6 +102,7 @@ void _showCompanySelector(List<Map<String, dynamic>> companies) {
 void initState() {
   super.initState();
   _searchController.addListener(_applySearch);
+  _loadInterstitialAd();
 
   _loadUserId().then((_) {
     if (currentUserId.isNotEmpty) {
@@ -107,12 +111,28 @@ void initState() {
   });
 }
 
+void _loadInterstitialAd() {
+  InterstitialAd.load(
+    adUnitId: 'ca-app-pub-6088749573646337/6577319196',
+    request: const AdRequest(),
+    adLoadCallback: InterstitialAdLoadCallback(
+      onAdLoaded: (ad) {
+        _interstitialAd = ad;
+      },
+      onAdFailedToLoad: (error) {
+        debugPrint("Interstitial ad load failed: $error");
+      },
+    ),
+  );
+}
+
 
 
   @override
   void dispose() {
     _searchController.removeListener(_applySearch);
     _searchController.dispose();
+    _interstitialAd?.dispose();
     super.dispose();
   }
 
@@ -1031,11 +1051,40 @@ Widget _buildArticleCard(Article a) {
               return;
           }
 
+  if (_interstitialAd != null && !_isShowingAd) {
+    _isShowingAd = true;
+    _interstitialAd!.fullScreenContentCallback = FullScreenContentCallback(
+      onAdDismissedFullScreenContent: (ad) {
+        ad.dispose();
+        _isShowingAd = false;
+        _loadInterstitialAd();
+        if (mounted) {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (_) => destination!),
           );
-        },
+        }
+      },
+      onAdFailedToShowFullScreenContent: (ad, error) {
+        ad.dispose();
+        _isShowingAd = false;
+        _loadInterstitialAd();
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => destination!),
+          );
+        }
+      },
+    );
+    _interstitialAd!.show();
+  } else {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => destination!),
+    );
+  }
+},
         items: [
           _navItem(label: "NEWS", active: 'assets/icons/News Red.svg', inactive: 'assets/icons/News.svg', index: 0),
           _navItem(label: "INDEX", active: 'assets/icons/Index red.svg', inactive: 'assets/icons/Index.svg', index: 1),
