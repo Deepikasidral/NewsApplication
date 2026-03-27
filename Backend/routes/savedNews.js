@@ -8,22 +8,33 @@ const User = require("../models/user");
 // =======================
 router.post("/save-news", async (req, res) => {
   try {
-    const { userId, newsId } = req.body;
+    const {
+      userId,
+      newsId,
+      headline,
+      summary,
+      story,
+      companys,
+      commodities_market,
+      sector_market,
+      sentiment,        // ✅ ADD
+  impact            // ✅ ADD
+    } = req.body;
 
     if (!userId || !newsId) {
       return res.status(400).json({ message: "userId and newsId required" });
     }
 
-    // ✅ Validate ObjectIds
-    if (!mongoose.Types.ObjectId.isValid(userId) ||
-        !mongoose.Types.ObjectId.isValid(newsId)) {
+    if (
+      !mongoose.Types.ObjectId.isValid(userId) ||
+      !mongoose.Types.ObjectId.isValid(newsId)
+    ) {
       return res.status(400).json({ message: "Invalid ObjectId" });
     }
 
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    // ✅ Ensure array exists (for old users)
     if (!Array.isArray(user.saved_news)) {
       user.saved_news = [];
     }
@@ -36,9 +47,17 @@ router.post("/save-news", async (req, res) => {
       // ❌ UNSAVE
       user.saved_news.splice(index, 1);
     } else {
-      // ✅ SAVE
+      // ✅ SAVE WITH SNAPSHOT
       user.saved_news.push({
         newsId: new mongoose.Types.ObjectId(newsId),
+        headline,
+        summary,
+        story,
+        companys,
+        commodities_market,
+        sector_market,
+        sentiment,        // ✅ ADD
+        impact ,          // ✅ ADD
         savedAt: new Date()
       });
     }
@@ -54,7 +73,6 @@ router.post("/save-news", async (req, res) => {
     res.status(500).json({ message: "Internal server error" });
   }
 });
-
 // =======================
 // FETCH SAVED NEWS
 // =======================
@@ -66,15 +84,14 @@ router.get("/:userId/saved-news", async (req, res) => {
       return res.status(400).json({ message: "Invalid userId" });
     }
 
-    const user = await User.findById(userId)
-      .populate("saved_news.newsId");
+    const user = await User.findById(userId);
 
     if (!user) return res.status(404).json({ message: "User not found" });
 
     res.json({
       success: true,
       count: user.saved_news.length,
-      data: user.saved_news.map((n) => n.newsId)
+      data: user.saved_news // ✅ DIRECT RETURN
     });
   } catch (err) {
     console.error("Fetch saved news error:", err);

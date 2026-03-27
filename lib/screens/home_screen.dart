@@ -522,8 +522,15 @@ Future<void> _loadSavedNewsIds() async {
       final List saved = body["data"];
 
       setState(() {
-        _locallySavedIds =
-            saved.map((e) => e["_id"].toString()).toSet();
+        _locallySavedIds = saved.map((e) {
+  final id = e["newsId"];
+
+  if (id is Map && id["_id"] != null) {
+    return id["_id"].toString();
+  }
+
+  return id.toString();
+}).toSet();
       });
     }
   } catch (e) {
@@ -531,27 +538,33 @@ Future<void> _loadSavedNewsIds() async {
   }
 }
 
+Future<void> _toggleSaveNews(Article a) async {
+  final bool wasSaved = _locallySavedIds.contains(a.id);
 
-Future<void> _toggleSaveNews(String newsId) async {
-  final bool wasSaved = _locallySavedIds.contains(newsId);
-
-  // 1️⃣ Optimistic UI update
+  // 1️⃣ Optimistic UI
   setState(() {
     if (wasSaved) {
-      _locallySavedIds.remove(newsId);
+      _locallySavedIds.remove(a.id.toString());
     } else {
-      _locallySavedIds.add(newsId);
+      _locallySavedIds.add(a.id.toString());
     }
   });
 
-  // 2️⃣ Call backend
   try {
     final resp = await http.post(
       Uri.parse("$baseUrl/api/users/save-news"),
       headers: {"Content-Type": "application/json"},
       body: jsonEncode({
         "userId": currentUserId,
-        "newsId": newsId,
+        "newsId": a.id,
+        "headline": a.title,
+        "summary": a.summary,
+        "story": a.story,
+        "companys": a.companies,
+        "commodities_market": a.commodities_market,
+        "sector_market": a.sector_market,
+        "sentiment": a.sentiment,
+        "impact": a.impact,
       }),
     );
 
@@ -559,21 +572,18 @@ Future<void> _toggleSaveNews(String newsId) async {
       throw Exception("API failed");
     }
   } catch (e) {
-    // 🔁 ROLLBACK UI if backend fails
+    // rollback
     setState(() {
       if (wasSaved) {
-        _locallySavedIds.add(newsId);
+        _locallySavedIds.add(a.id);
       } else {
-        _locallySavedIds.remove(newsId);
+        _locallySavedIds.remove(a.id);
       }
     });
 
     debugPrint("Save toggle failed: $e");
   }
 }
-
-
-
 
   // ------------------------- TAB HANDLER -------------------------
   void _onTabChange(int idx) {
@@ -781,7 +791,7 @@ else if (a.sector_market.isNotEmpty) ...[
   Chip(
     backgroundColor: const Color(0xFFEA6B6B),
     label: Text(
-      a.sector_market,
+  a.sector_market,
       style: GoogleFonts.poppins(
         fontSize: 12,
         fontWeight: FontWeight.w600,
@@ -1366,8 +1376,8 @@ Widget _buildArticleCard(Article a) {
                 ),
               )
             else if (a.sector_market.isNotEmpty)
-              Text(
-                "Sector: ${a.sector_market}",
+  Text(
+    "Sector: ${a.sector_market}",
                 style: GoogleFonts.poppins(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
@@ -1485,7 +1495,7 @@ Widget _buildArticleCard(Article a) {
 
                             if (a.sector_market.isNotEmpty) {
                               final sector =
-                                  await _fetchSectorDetails(a.sector_market);
+    await _fetchSectorDetails(a.sector_market);
 
                               if (sector != null) {
                                 _openTradingView(
@@ -1536,7 +1546,7 @@ Widget _buildArticleCard(Article a) {
                             ? Colors.red
                             : Colors.grey,
                       ),
-                      onPressed: () => _toggleSaveNews(a.id),
+                      onPressed: () => _toggleSaveNews(a),
                     ),
                   ],
                 ),

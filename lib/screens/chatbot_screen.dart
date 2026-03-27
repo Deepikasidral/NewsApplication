@@ -5,7 +5,6 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_markdown/flutter_markdown.dart';
 import '../models/chat_message.dart';
 import 'home_screen.dart';
-import 'company_screen.dart';
 import 'saved_screen.dart';
 import 'events_screen.dart';
 import 'profile_screen.dart';

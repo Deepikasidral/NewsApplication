@@ -6,7 +6,6 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:news_application/screens/saved_screen.dart';
 import 'chatbot_screen.dart';
-import 'company_screen.dart';
 import 'company_news_screen.dart';
 import 'events_screen.dart';
 import 'home_screen.dart';
@@ -475,7 +474,7 @@ Widget _buildArticleCard(Article a) {
             ? Colors.red
             : Colors.grey,
       ),
-      onPressed: () => _toggleSaveNews(a.id),
+      onPressed: () => _toggleSaveNews(a),
     ),
   ],
 )
@@ -668,7 +667,7 @@ else if (a.sector_market.isNotEmpty) ...[
   Chip(
     backgroundColor: const Color(0xFFEA6B6B),
     label: Text(
-      a.sector_market,
+  a.sector_market,
       style: GoogleFonts.poppins(
         fontSize: 12,
         fontWeight: FontWeight.w600,
@@ -757,7 +756,13 @@ Future<void> _loadSavedNewsIds() async {
 
       setState(() {
         _locallySavedIds =
-            saved.map((e) => e["_id"].toString()).toSet();
+           saved.map((e) {
+  final id = e["newsId"];
+  if (id is Map && id["_id"] != null) {
+    return id["_id"].toString();
+  }
+  return id.toString();
+}).toSet();
       });
     }
   } catch (e) {
@@ -765,14 +770,15 @@ Future<void> _loadSavedNewsIds() async {
   }
 }
 
-Future<void> _toggleSaveNews(String newsId) async {
-  final bool wasSaved = _locallySavedIds.contains(newsId);
+Future<void> _toggleSaveNews(Article a) async {
+  final bool wasSaved = _locallySavedIds.contains(a.id);
 
+  // 1️⃣ Optimistic UI
   setState(() {
     if (wasSaved) {
-      _locallySavedIds.remove(newsId);
+      _locallySavedIds.remove(a.id.toString());
     } else {
-      _locallySavedIds.add(newsId);
+      _locallySavedIds.add(a.id.toString());
     }
   });
 
@@ -782,7 +788,15 @@ Future<void> _toggleSaveNews(String newsId) async {
       headers: {"Content-Type": "application/json"},
       body: jsonEncode({
         "userId": currentUserId,
-        "newsId": newsId,
+        "newsId": a.id,
+        "headline": a.title,
+        "summary": a.summary,
+        "story": a.story,
+        "companys": a.companies,
+        "commodities_market": a.commodities_market,
+        "sector_market": a.sector_market,
+        "sentiment": a.sentiment,
+        "impact": a.impact,
       }),
     );
 
@@ -790,18 +804,18 @@ Future<void> _toggleSaveNews(String newsId) async {
       throw Exception("API failed");
     }
   } catch (e) {
+    // rollback
     setState(() {
       if (wasSaved) {
-        _locallySavedIds.add(newsId);
+        _locallySavedIds.add(a.id);
       } else {
-        _locallySavedIds.remove(newsId);
+        _locallySavedIds.remove(a.id);
       }
     });
 
     debugPrint("Save toggle failed: $e");
   }
 }
-
 Future<void> _openTradingView(String fullSymbol) async {
   final url =
       "https://www.tradingview.com/chart/?symbol=$fullSymbol";

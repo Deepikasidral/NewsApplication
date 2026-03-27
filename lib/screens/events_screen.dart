@@ -311,26 +311,33 @@ Future<void> _toggleSaveEvent(CorporateEvent event) async {
   );
 }
 
-Future<void> _toggleSaveNews(String newsId) async {
-  final bool wasSaved = _locallySavedIds.contains(newsId);
+Future<void> _toggleSaveNews(Article a) async {
+  final bool wasSaved = _locallySavedIds.contains(a.id.toString());
 
-  // 1️⃣ Optimistic UI update
+  // 1️⃣ Optimistic UI
   setState(() {
     if (wasSaved) {
-      _locallySavedIds.remove(newsId);
+      _locallySavedIds.remove(a.id.toString());
     } else {
-      _locallySavedIds.add(newsId);
+      _locallySavedIds.add(a.id.toString());
     }
   });
 
-  // 2️⃣ Call backend
   try {
     final resp = await http.post(
       Uri.parse("$baseUrl/api/users/save-news"),
       headers: {"Content-Type": "application/json"},
       body: jsonEncode({
         "userId": currentUserId,
-        "newsId": newsId,
+        "newsId": a.id,
+        "headline": a.title,
+        "summary": a.summary,
+        "story": a.story,
+        "companys": a.companies,
+        "commodities_market": a.commodities_market,
+        "sector_market": a.sector_market,
+        "sentiment": a.sentiment,
+        "impact": a.impact,
       }),
     );
 
@@ -338,12 +345,12 @@ Future<void> _toggleSaveNews(String newsId) async {
       throw Exception("API failed");
     }
   } catch (e) {
-    // 🔁 ROLLBACK UI if backend fails
+    // rollback
     setState(() {
       if (wasSaved) {
-        _locallySavedIds.add(newsId);
+        _locallySavedIds.add(a.id);
       } else {
-        _locallySavedIds.remove(newsId);
+        _locallySavedIds.remove(a.id);
       }
     });
 
@@ -662,7 +669,7 @@ else if (a.sector_market.isNotEmpty) ...[
   Chip(
     backgroundColor: const Color(0xFFEA6B6B),
     label: Text(
-      a.sector_market,
+  a.sector_market,
       style: GoogleFonts.poppins(
         fontSize: 12,
         fontWeight: FontWeight.w600,
@@ -744,10 +751,17 @@ Future<void> _loadSavedNewsIds() async {
       final body = jsonDecode(resp.body);
       final List saved = body["data"];
 
-      setState(() {
-        _locallySavedIds =
-            saved.map((e) => e["_id"].toString()).toSet();
-      });
+     setState(() {
+  _locallySavedIds = saved.map((e) {
+    final id = e["newsId"];
+
+    if (id is Map && id["_id"] != null) {
+      return id["_id"].toString();
+    }
+
+    return id.toString();
+  }).toSet();
+});
     }
   } catch (e) {
     debugPrint("Failed to load saved ids: $e");
@@ -796,7 +810,10 @@ Widget _buildIpoTab() {
           child: ArticleCard(
             article: article,
             savedIds: _locallySavedIds,
-            onToggleSave: _toggleSaveNews,
+            onToggleSave: (id) {
+  final article = _ipoNews.firstWhere((a) => a.id == id);
+  _toggleSaveNews(article);
+},
             onFetchCompanies: (companies) async {
               if (companies.isEmpty) return;
 

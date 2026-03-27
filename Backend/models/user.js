@@ -7,6 +7,17 @@ const savedNewsSchema = new mongoose.Schema(
       ref: "filtered_news",
       required: true,
     },
+
+    // ✅ ADD THESE FIELDS
+    headline: String,
+    summary: String,
+    story: String,
+    companys: [String],
+    commodities_market: [String],
+    sector_market: String,
+    sentiment: String,
+    impact: String,
+
     savedAt: {
       type: Date,
       default: Date.now,

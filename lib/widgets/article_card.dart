@@ -6,7 +6,7 @@ import '../models/article.dart';
 class ArticleCard extends StatelessWidget {
   final Article article;
   final Set<String> savedIds;
-  final Function(String) onToggleSave;
+  final Function(Article) onToggleSave;
   final Function(String) onOpenTradingView;
   final Function(List<String>) onFetchCompanies;
   final Function(String) onFetchSector;
@@ -214,7 +214,7 @@ class ArticleCard extends StatelessWidget {
                                   : Colors.grey,
                         ),
                         onPressed: () =>
-                            onToggleSave(article.id),
+                            onToggleSave(article),
                       ),
                     ],
                   ),
