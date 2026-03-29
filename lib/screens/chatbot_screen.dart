@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../models/chat_message.dart';
 import 'home_screen.dart';
 import 'saved_screen.dart';
@@ -129,98 +130,135 @@ void dispose() {
 }
 
 
-  // 🔹 Chatbot API URL
-  static const String _baseUrl = "http://51.20.72.236:8000/chat";
+  // 🔹 ChatGPT API Configuration
+  static final String _openAiApiKey = dotenv.env['OPENAI_API_KEY'] ?? '';
+  static const String _openAiApiUrl = "https://api.openai.com/v1/chat/completions";
 
-  // 🔹 SAME LOGIC as ChatbotService.askQuestion()
- Future<String> _askQuestion(String question) async {
-  try {
-    final prefs = await SharedPreferences.getInstance();
-    final userId = prefs.getString("userId");
+  // 🔹 ChatGPT API Implementation
+  Future<String> _askQuestion(String question) async {
+    try {
+      // Build conversation history in OpenAI format
+      List<Map<String, String>> messages = [
+        {
+          "role": "system",
+          "content": "You are a specialized financial AI assistant for a stock market news application. Your ONLY purpose is to help users with:\n\n"
+                     "1. Stock market analysis and trends\n"
+                     "2. Company financial information and performance\n"
+                     "3. Investment strategies and portfolio advice\n"
+                     "4. Market indices (NIFTY, BANK NIFTY, Sensex, etc.)\n"
+                     "5. Sector analysis and commodity markets\n"
+                     "6. Financial news interpretation\n"
+                     "7. Trading concepts and terminology\n"
+                     "8. Mutual funds, SIPs, and investment products\n"
+                     "9. Risk management and diversification\n"
+                     "10. Economic indicators and their impact on markets\n\n"
+                     "STRICT RULES:\n"
+                     "- ONLY answer questions related to finance, stocks, investments, and markets\n"
+                     "- If asked about anything else (sports, entertainment, general knowledge, coding, etc.), politely decline and redirect to financial topics\n"
+                     "- Do NOT provide personal financial advice - always add disclaimers\n"
+                     "- Focus on Indian stock market (NSE, BSE) but can discuss global markets when relevant\n"
+                     "- Keep responses clear, concise, and actionable\n"
+                     "- Use bullet points for better readability\n\n"
+                     "If a question is outside your scope, respond with: \"I'm a financial assistant specialized in stock markets and investments. I can only help with finance-related questions. Please ask me about stocks, markets, investments, or financial news.\""
+        }
+      ];
 
-    // Build conversation history in OpenAI format
-    List<Map<String, String>> history = [];
-    for (var msg in _messages) {
-      history.add({
-        "role": msg.isUser ? "user" : "assistant",
-        "content": msg.text
-      });
-    }
+      // Add conversation history
+      for (var msg in _messages) {
+        messages.add({
+          "role": msg.isUser ? "user" : "assistant",
+          "content": msg.text
+        });
+      }
 
-    debugPrint('🔍 Sending request to: $_baseUrl');
-    debugPrint('🔍 User ID: $userId');
-    debugPrint('🔍 Question: $question');
-    debugPrint('🔍 History length: ${history.length}');
-
-    final response = await http.post(
-      Uri.parse(_baseUrl),
-      headers: {
-        "Content-Type": "application/json",
-        "X-User-Id": userId ?? "",
-      },
-      body: jsonEncode({
-        "question": question,
-        "history": history
-      }),
-    ).timeout(
-      const Duration(seconds: 60),
-      onTimeout: () {
-        throw Exception('⏱️ Request timeout - AI is taking too long to respond');
-      },
-    );
-
-    debugPrint('✅ Response status: ${response.statusCode}');
-    debugPrint('✅ Response body: ${response.body}');
-
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return data["answer"] ?? "No response";
-    }
-
-    // 🔒 RATE LIMIT HIT
-    if (response.statusCode == 429) {
-      setState(() {
-        _rateLimited = true;
+      // Add current question
+      messages.add({
+        "role": "user",
+        "content": question
       });
 
-      return "🚫 **Daily limit reached**\n\n"
-             "You've used all **5 questions for today**.\n"
-             "Please try again **tomorrow** ⏳";
+      debugPrint('🔍 Sending request to ChatGPT API');
+      debugPrint('🔍 Question: $question');
+      debugPrint('🔍 History length: ${messages.length}');
+
+      final response = await http.post(
+        Uri.parse(_openAiApiUrl),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer $_openAiApiKey",
+        },
+        body: jsonEncode({
+          "model": "gpt-3.5-turbo",
+          "messages": messages,
+          "max_tokens": 1000,
+          "temperature": 0.7,
+        }),
+      ).timeout(
+        const Duration(seconds: 60),
+        onTimeout: () {
+          throw Exception('⏱️ Request timeout - ChatGPT is taking too long to respond');
+        },
+      );
+
+      debugPrint('✅ Response status: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final answer = data['choices']?[0]?['message']?['content'];
+        
+        if (answer != null && answer.isNotEmpty) {
+          debugPrint('✅ Got response from ChatGPT');
+          return answer.trim();
+        } else {
+          return "❌ No response from ChatGPT. Please try again.";
+        }
+      }
+
+      // Handle rate limiting
+      if (response.statusCode == 429) {
+        setState(() {
+          _rateLimited = true;
+        });
+        return "🚫 **Rate limit reached**\n\n"
+               "Too many requests. Please wait a moment and try again.";
+      }
+
+      // Handle authentication errors
+      if (response.statusCode == 401) {
+        return "❌ **Authentication Error**\n\n"
+               "Invalid API key. Please contact support.";
+      }
+
+      // Handle other errors
+      final errorData = jsonDecode(response.body);
+      final errorMessage = errorData['error']?['message'] ?? 'Unknown error';
+      
+      return "⚠️ **ChatGPT Error (${response.statusCode})**\n\n"
+             "$errorMessage";
+
+    } on http.ClientException catch (e) {
+      debugPrint('❌ Network Error: $e');
+      return "❌ **Network Error**\n\n"
+             "Cannot connect to ChatGPT API.\n\n"
+             "**Possible causes:**\n"
+             "• No internet connection\n"
+             "• Network firewall blocking OpenAI\n"
+             "• DNS resolution issues";
+    } on TimeoutException catch (e) {
+      debugPrint('❌ Timeout Error: $e');
+      return "⏱️ **Request Timeout**\n\n"
+             "ChatGPT is taking too long to respond.\n\n"
+             "**Try:**\n"
+             "• Ask a simpler question\n"
+             "• Check your internet connection\n"
+             "• Wait a moment and try again";
+    } catch (e) {
+      debugPrint('❌ Unexpected Error: $e');
+      return "❌ **Unexpected Error**\n\n"
+             "$e\n\n"
+             "Please try again or contact support.";
     }
-
-    if (response.statusCode == 401) {
-      return "❌ Session expired. Please login again.";
-    }
-
-    // 🔴 Better error message with full response
-    return "⚠️ Server error (${response.statusCode})\n\n"
-           "Response: ${response.body.length > 200 ? response.body.substring(0, 200) + '...' : response.body}";
-
-  } on http.ClientException catch (e) {
-    debugPrint('❌ Network Error: $e');
-    return "❌ **Network Error**\n\n"
-           "Cannot connect to AI server.\n\n"
-           "**Possible causes:**\n"
-           "• Server is down\n"
-           "• No internet connection\n"
-           "• Firewall blocking port 8000\n\n"
-           "**Check server status:**\n"
-           "`sudo systemctl status mcp-server`";
-  } on TimeoutException catch (e) {
-    debugPrint('❌ Timeout Error: $e');
-    return "⏱️ **Request Timeout**\n\n"
-           "The AI is taking too long to respond.\n\n"
-           "**Try:**\n"
-           "• Ask a simpler question\n"
-           "• Check if server is overloaded\n"
-           "• Wait a moment and try again";
-  } catch (e) {
-    debugPrint('❌ Unexpected Error: $e');
-    return "❌ **Unexpected Error**\n\n"
-           "$e\n\n"
-           "Please try again or contact support.";
   }
-}
 
 
   void _scrollToBottom() {

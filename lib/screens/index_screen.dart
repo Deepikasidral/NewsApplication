@@ -122,39 +122,70 @@ late String currentUserId;
   Future<void> _fetchCompanies() async {
     setState(() => _isLoadingCompanies = true);
     try {
-      final resp = await http.get(Uri.parse("$baseUrl/api/companies"));
-      debugPrint("Companies API Status: ${resp.statusCode}");
-      if (resp.statusCode == 200) {
-        final data = json.decode(resp.body);
-        debugPrint("Response type: ${data.runtimeType}");
-        debugPrint("Response data: $data");
+      List<Map<String, dynamic>> allCompanies = [];
+      int page = 1;
+      bool hasMore = true;
+      
+      debugPrint("🔍 Fetching all companies...");
+      
+      // Fetch companies with pagination
+      while (hasMore && page <= 20) {
+        final url = page == 1 
+            ? "$baseUrl/api/companies"
+            : "$baseUrl/api/companies?page=$page&limit=100";
         
-        // Handle both array and object responses
-        List<Map<String, dynamic>> companiesList;
-        if (data is List) {
-          companiesList = (data as List).cast<Map<String, dynamic>>();
-        } else if (data is Map) {
-          // If it's a map, check for common keys like 'data', 'companies', etc.
-          if (data.containsKey('data')) {
-            companiesList = (data['data'] as List).cast<Map<String, dynamic>>();
-          } else if (data.containsKey('companies')) {
-            companiesList = (data['companies'] as List).cast<Map<String, dynamic>>();
+        final resp = await http.get(Uri.parse(url));
+        debugPrint("📄 Page $page - Status: ${resp.statusCode}");
+        
+        if (resp.statusCode == 200) {
+          final data = json.decode(resp.body);
+          
+          List<Map<String, dynamic>> pageCompanies;
+          if (data is List) {
+            pageCompanies = (data as List).cast<Map<String, dynamic>>();
+          } else if (data is Map) {
+            if (data.containsKey('data')) {
+              pageCompanies = (data['data'] as List).cast<Map<String, dynamic>>();
+            } else if (data.containsKey('companies')) {
+              pageCompanies = (data['companies'] as List).cast<Map<String, dynamic>>();
+            } else {
+              pageCompanies = [];
+            }
           } else {
-            debugPrint("Unknown response structure: ${data.keys}");
-            companiesList = [];
+            pageCompanies = [];
+          }
+          
+          if (pageCompanies.isEmpty) {
+            hasMore = false;
+            debugPrint("✅ No more companies at page $page");
+          } else {
+            allCompanies.addAll(pageCompanies);
+            debugPrint("📊 Page $page: ${pageCompanies.length} companies. Total: ${allCompanies.length}");
+            
+            // If we got less than 50, probably no more pages
+            if (pageCompanies.length < 50) {
+              hasMore = false;
+            }
+            page++;
           }
         } else {
-          companiesList = [];
+          hasMore = false;
+          debugPrint("⚠️ Failed at page $page");
         }
-        
-        debugPrint("Companies fetched: ${companiesList.length}");
-        setState(() {
-          _companies = companiesList;
-          _filteredCompanies = List.from(_companies);
-        });
       }
+      
+      debugPrint("🎉 TOTAL COMPANIES LOADED: ${allCompanies.length}");
+      if (allCompanies.isNotEmpty) {
+        debugPrint("First: ${allCompanies.first['Company Name']}");
+        debugPrint("Last: ${allCompanies.last['Company Name']}");
+      }
+      
+      setState(() {
+        _companies = allCompanies;
+        _filteredCompanies = List.from(_companies);
+      });
     } catch (e) {
-      debugPrint("Company fetch failed: $e");
+      debugPrint("❌ Company fetch failed: $e");
     }
     setState(() => _isLoadingCompanies = false);
   }
@@ -1195,24 +1226,20 @@ Widget build(BuildContext context) {
         /// COMPANY LIST
         if (_companies.isEmpty && _isLoadingCompanies)
           const Center(child: CircularProgressIndicator())
-        else if (_filteredCompanies.isEmpty)
+        else if (_searchController.text.isEmpty && _companies.isEmpty)
           const Center(child: Text("No companies found"))
+        else if (_searchController.text.isNotEmpty && _filteredCompanies.isEmpty)
+          const Center(child: Text("No companies match your search"))
         else
-          ListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: _filteredCompanies.length,
-            itemBuilder: (context, index) {
-              final company = _filteredCompanies[index];
-              final companyName = company["Company Name"]?.toString() ?? "Unknown";
-final symbol = company["Symbol"]?.toString() ?? "";
+          ...(_searchController.text.isEmpty ? _companies : _filteredCompanies).map((company) {
+            final companyName = company["Company Name"]?.toString() ?? "Unknown";
+            final symbol = company["Symbol"]?.toString() ?? "";
 
-              return CompanyListItem(
-                companyName: companyName,
-                symbol: symbol,
-              );
-            },
-          ),
+            return CompanyListItem(
+              companyName: companyName,
+              symbol: symbol,
+            );
+          }).toList(),
       ],
     ),
   )
