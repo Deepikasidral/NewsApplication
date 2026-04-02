@@ -1341,9 +1341,9 @@ Widget build(BuildContext context) {
                         bottomTitles: AxisTitles(
   sideTitles: SideTitles(
     showTitles: true,
-    interval: chartSpots.length <= 1
+    interval: chartSpots.length <= 5
         ? 1
-        : (chartSpots.length / 3).floor().clamp(1, chartSpots.length).toDouble(),
+        : (chartSpots.length / 5).floor().clamp(1, chartSpots.length).toDouble(),
     getTitlesWidget: (value, meta) {
 
       int index = value.toInt();
@@ -1495,7 +1495,9 @@ if (rawDate is int) {
      bottomTitles: AxisTitles(
   sideTitles: SideTitles(
     showTitles: true,
-    interval: (chartData.length / 3).floor().clamp(1, chartData.length).toDouble(),
+    interval: chartData.length <= 5
+        ? 1
+        : (chartData.length / 5).floor().clamp(1, chartData.length).toDouble(),
     getTitlesWidget: (value, meta) {
       int index = value.toInt();
 
@@ -1873,7 +1875,7 @@ class _CompanyListItemState extends State<CompanyListItem> {
   Widget build(BuildContext context) {
     
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6),
       child: InkWell(
         onTap: () {
           Navigator.push(
@@ -1887,54 +1889,88 @@ class _CompanyListItemState extends State<CompanyListItem> {
           );
         },
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: Colors.white,
-            border: Border(
-              bottom: BorderSide(color: Colors.grey.shade200, width: 1),
-            ),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.shade200),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
           child: Row(
             children: [
               Expanded(
-                child: Text(
-                  widget.companyName,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                  ),
+                flex: 3,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.companyName,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      widget.symbol,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                 ),
               ),
+              const SizedBox(width: 12),
               if (loading)
                 const SizedBox(
-                  width: 16,
-                  height: 16,
+                  width: 20,
+                  height: 20,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
               else if (stockData != null) ...[
-                const SizedBox(
-                  height: 30,
-                  child: VerticalDivider(color: Colors.grey, thickness: 1),
-                ),
-                const SizedBox(width: 8),
-                Text(
-  stockData!['price'].toString(),
-
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Text(
-  '${stockData!['changePercent'].toString()}%',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: double.parse(stockData!['changePercent'].toString()) >= 0
-    ? Colors.green
-    : Colors.red,
-                  ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '₹${stockData!['price'].toString()}',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: double.parse(stockData!['changePercent'].toString()) >= 0
+                            ? Colors.green.shade50
+                            : Colors.red.shade50,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        '${double.parse(stockData!['changePercent'].toString()) >= 0 ? '+' : ''}${stockData!['changePercent'].toString()}%',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: double.parse(stockData!['changePercent'].toString()) >= 0
+                              ? Colors.green.shade700
+                              : Colors.red.shade700,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ],

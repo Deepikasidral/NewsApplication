@@ -66,7 +66,7 @@ router.post("/data", async (req, res) => {
 
     const endDate = new Date();
     const startDate = new Date();
-    startDate.setDate(endDate.getDate() - 7);
+    startDate.setDate(endDate.getDate() - 14);
 
     let newsQuery;
     if (symbol === "^NSEI") {
@@ -260,7 +260,7 @@ router.post("/global", async (req, res) => {
 
           const endDate = new Date();
           const startDate = new Date();
-          startDate.setDate(endDate.getDate() - 7);
+          startDate.setDate(endDate.getDate() - 14);
 
           const chart = await yahooFinance.chart(symbol, {
             period1: startDate,
@@ -324,7 +324,7 @@ router.post("/sectors", async (req, res) => {
 
           const endDate = new Date();
           const startDate = new Date();
-          startDate.setDate(endDate.getDate() - 7);
+          startDate.setDate(endDate.getDate() - 14);
 
           const chart = await yahooFinance.chart(symbol, {
             period1: startDate,
