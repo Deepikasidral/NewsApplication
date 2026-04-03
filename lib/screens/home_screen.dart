@@ -15,7 +15,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 import 'company_news_screen.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
+// import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'index_screen.dart';
 
 
@@ -48,9 +48,9 @@ bool _hasLoadedOnce = false;
 late final PageController _pageController;
 bool _isShowingAd = false;
 Set<String> _viewedArticles = {};
-List<NativeAd> _nativeAds = [];
-BannerAd? _bannerAd;
-InterstitialAd? _interstitialAd;
+// List<NativeAd> _nativeAds = [];
+// BannerAd? _bannerAd;
+// InterstitialAd? _interstitialAd;
 
 int _viewCount = 0;
 
@@ -68,66 +68,66 @@ void initState() {
   _pageController = PageController(viewportFraction: 0.72);
 
   _init();
-  _loadInterstitialAd();
-  _loadNativeAd();
+  // _loadInterstitialAd();
+  // _loadNativeAd();
 }
-void _loadInterstitialAd() {
-  InterstitialAd.load(
-    adUnitId: 'ca-app-pub-6088749573646337/6577319196',
-    request: const AdRequest(),
-    adLoadCallback: InterstitialAdLoadCallback(
-      onAdLoaded: (ad) {
-        _interstitialAd = ad;
-      },
-      onAdFailedToLoad: (error) {
-        debugPrint("Interstitial ad load failed: $error");
-      },
-    ),
-  );
-}
-void _showInterstitialAd() {
-  if (_isShowingAd) return;
+// void _loadInterstitialAd() {
+//   InterstitialAd.load(
+//     adUnitId: 'ca-app-pub-6088749573646337/6577319196',
+//     request: const AdRequest(),
+//     adLoadCallback: InterstitialAdLoadCallback(
+//       onAdLoaded: (ad) {
+//         _interstitialAd = ad;
+//       },
+//       onAdFailedToLoad: (error) {
+//         debugPrint("Interstitial ad load failed: $error");
+//       },
+//     ),
+//   );
+// }
+// void _showInterstitialAd() {
+//   if (_isShowingAd) return;
 
-  if (_interstitialAd != null) {
-    _isShowingAd = true;
+//   if (_interstitialAd != null) {
+//     _isShowingAd = true;
 
-    _interstitialAd!.fullScreenContentCallback = FullScreenContentCallback(
-      onAdDismissedFullScreenContent: (ad) {
-        ad.dispose();
-        _isShowingAd = false;
-        _loadInterstitialAd();
-      },
-      onAdFailedToShowFullScreenContent: (ad, error) {
-        ad.dispose();
-        _isShowingAd = false;
-        _loadInterstitialAd();
-      },
-    );
+//     _interstitialAd!.fullScreenContentCallback = FullScreenContentCallback(
+//       onAdDismissedFullScreenContent: (ad) {
+//         ad.dispose();
+//         _isShowingAd = false;
+//         _loadInterstitialAd();
+//       },
+//       onAdFailedToShowFullScreenContent: (ad, error) {
+//         ad.dispose();
+//         _isShowingAd = false;
+//         _loadInterstitialAd();
+//       },
+//     );
 
-    _interstitialAd!.show();
-  }
-}
-void _loadNativeAd() {
-  for (int i = 0; i < 3; i++) {
-    final ad = NativeAd(
-      adUnitId: 'ca-app-pub-6088749573646337/3774928437', // test id
-      factoryId: 'listTile',
-      request: const AdRequest(),
-      listener: NativeAdListener(
-        onAdLoaded: (ad) {
-          setState(() {
-            _nativeAds.add(ad as NativeAd);
-          });
-        },
-        onAdFailedToLoad: (ad, error) {
-          ad.dispose();
-        },
-      ),
-    );
+//     _interstitialAd!.show();
+//   }
+// }
+// void _loadNativeAd() {
+//   for (int i = 0; i < 3; i++) {
+//     final ad = NativeAd(
+//       adUnitId: 'ca-app-pub-6088749573646337/3774928437', // test id
+//       factoryId: 'listTile',
+//       request: const AdRequest(),
+//       listener: NativeAdListener(
+//         onAdLoaded: (ad) {
+//           setState(() {
+//             _nativeAds.add(ad as NativeAd);
+//           });
+//         },
+//         onAdFailedToLoad: (ad, error) {
+//           ad.dispose();
+//         },
+//       ),
+//     );
 
-    ad.load();
-  }
-}
+//     ad.load();
+//   }
+// }
 Future<void> _init() async {
   await _loadUserId();
   await _fetchLatestNews();
@@ -143,10 +143,10 @@ void dispose() {
   _searchController.removeListener(_applySearch);
   _searchController.dispose();
   _pageController.dispose();
-  _interstitialAd?.dispose();
-  for (var ad in _nativeAds) {
-  ad.dispose();
-}
+  // _interstitialAd?.dispose();
+  // for (var ad in _nativeAds) {
+  //   ad.dispose();
+  // }
   super.dispose();
 }
 
@@ -1077,53 +1077,53 @@ double _textWidth(String text, TextStyle style) {
   controller: _pageController,
   padEnds: false,
   physics: const BouncingScrollPhysics(),
-  itemCount: _filtered.length + (_filtered.length ~/ 5),
+  itemCount: _filtered.length, // + (_filtered.length ~/ 5),
   itemBuilder: (context, index) {
 
     // 🔥 Native Ad
-   if (index != 0 && index % 5 == 0 && _nativeAds.isNotEmpty) {
+   // if (index != 0 && index % 5 == 0 && _nativeAds.isNotEmpty) {
 
   // 🔥 ADD THIS LINE HERE
-  final adIndex = (index ~/ 5) % _nativeAds.length;
+  // final adIndex = (index ~/ 5) % _nativeAds.length;
 
-  return SizedBox(
-    height: MediaQuery.of(context).size.height * 0.75,
-    child: Container(
-      margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            "Sponsored",
-            style: TextStyle(fontSize: 12, color: Colors.grey),
-          ),
-          const SizedBox(height: 8),
+  // return SizedBox(
+  //   height: MediaQuery.of(context).size.height * 0.75,
+  //   child: Container(
+  //     margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+  //     padding: const EdgeInsets.all(16),
+  //     decoration: BoxDecoration(
+  //       color: Colors.white,
+  //       borderRadius: BorderRadius.circular(14),
+  //       boxShadow: [
+  //         BoxShadow(
+  //           color: Colors.black.withOpacity(0.04),
+  //           blurRadius: 8,
+  //           offset: const Offset(0, 3),
+  //         ),
+  //       ],
+  //     ),
+  //     child: Column(
+  //       crossAxisAlignment: CrossAxisAlignment.start,
+  //       children: [
+  //         const Text(
+  //           "Sponsored",
+  //           style: TextStyle(fontSize: 12, color: Colors.grey),
+  //         ),
+  //         const SizedBox(height: 8),
 
-          Expanded(
-            child: AdWidget(
-              ad: _nativeAds[adIndex], // ✅ USE HERE
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
-}
+  //         Expanded(
+  //           child: AdWidget(
+  //             ad: _nativeAds[adIndex], // ✅ USE HERE
+  //           ),
+  //         ),
+  //       ],
+  //     ),
+  //   ),
+  // );
+// }
 
-    int articleIndex = index - (index ~/ 5);
-    final article = _filtered[articleIndex];
+    // int articleIndex = index - (index ~/ 5);
+    final article = _filtered[index];
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -1727,39 +1727,39 @@ BottomNavigationBarItem _navItem({
       return;
   }
 
-  if (_interstitialAd != null && !_isShowingAd) {
-    _isShowingAd = true;
-    _interstitialAd!.fullScreenContentCallback = FullScreenContentCallback(
-      onAdDismissedFullScreenContent: (ad) {
-        ad.dispose();
-        _isShowingAd = false;
-        _loadInterstitialAd();
-        if (mounted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => destination!),
-          );
-        }
-      },
-      onAdFailedToShowFullScreenContent: (ad, error) {
-        ad.dispose();
-        _isShowingAd = false;
-        _loadInterstitialAd();
-        if (mounted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => destination!),
-          );
-        }
-      },
-    );
-    _interstitialAd!.show();
-  } else {
+  // if (_interstitialAd != null && !_isShowingAd) {
+  //   _isShowingAd = true;
+  //   _interstitialAd!.fullScreenContentCallback = FullScreenContentCallback(
+  //     onAdDismissedFullScreenContent: (ad) {
+  //       ad.dispose();
+  //       _isShowingAd = false;
+  //       _loadInterstitialAd();
+  //       if (mounted) {
+  //         Navigator.pushReplacement(
+  //           context,
+  //           MaterialPageRoute(builder: (_) => destination!),
+  //         );
+  //       }
+  //     },
+  //     onAdFailedToShowFullScreenContent: (ad, error) {
+  //       ad.dispose();
+  //       _isShowingAd = false;
+  //       _loadInterstitialAd();
+  //       if (mounted) {
+  //         Navigator.pushReplacement(
+  //           context,
+  //           MaterialPageRoute(builder: (_) => destination!),
+  //         );
+  //       }
+  //     },
+  //   );
+  //   _interstitialAd!.show();
+  // } else {
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(builder: (_) => destination!),
     );
-  }
+  // }
 },
         items: [
           _navItem(label: "NEWS", active: 'assets/icons/News Red.svg', inactive: 'assets/icons/News.svg', index: 0),

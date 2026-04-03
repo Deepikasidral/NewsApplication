@@ -17,7 +17,7 @@ import '../models/article.dart';
 import 'package:flutter_html/flutter_html.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 import 'index_screen.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
+// import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 
 
@@ -46,15 +46,15 @@ class _EventsScreenState extends State<EventsScreen> {
   late final PageController _pageController;
   Set<String> _viewedArticles = {};
   DateTime _lastTrackedDate = DateTime.now();
-  InterstitialAd? _interstitialAd;
-  bool _isShowingAd = false;
+  // InterstitialAd? _interstitialAd;
+  // bool _isShowingAd = false;
 
 
 @override
 void initState() {
   super.initState();
   _pageController = PageController(viewportFraction: 0.72);
-  _loadInterstitialAd();
+  // _loadInterstitialAd();
 
   _loadUserId().then((_) {
     _loadSavedEventIds();
@@ -64,24 +64,24 @@ void initState() {
   });
 }
 
-void _loadInterstitialAd() {
-  InterstitialAd.load(
-    adUnitId: 'ca-app-pub-6088749573646337/6577319196',
-    request: const AdRequest(),
-    adLoadCallback: InterstitialAdLoadCallback(
-      onAdLoaded: (ad) {
-        _interstitialAd = ad;
-      },
-      onAdFailedToLoad: (error) {
-        debugPrint("Interstitial ad load failed: $error");
-      },
-    ),
-  );
-}
+// void _loadInterstitialAd() {
+//   InterstitialAd.load(
+//     adUnitId: 'ca-app-pub-6088749573646337/6577319196',
+//     request: const AdRequest(),
+//     adLoadCallback: InterstitialAdLoadCallback(
+//       onAdLoaded: (ad) {
+//         _interstitialAd = ad;
+//       },
+//       onAdFailedToLoad: (error) {
+//         debugPrint("Interstitial ad load failed: $error");
+//       },
+//     ),
+//   );
+// }
 @override
 void dispose() {
   _pageController.dispose();
-  _interstitialAd?.dispose();
+  // _interstitialAd?.dispose();
   super.dispose();
 }
 
@@ -1061,39 +1061,39 @@ Widget _buildIpoTab() {
               return;
           }
 
-  if (_interstitialAd != null && !_isShowingAd) {
-    _isShowingAd = true;
-    _interstitialAd!.fullScreenContentCallback = FullScreenContentCallback(
-      onAdDismissedFullScreenContent: (ad) {
-        ad.dispose();
-        _isShowingAd = false;
-        _loadInterstitialAd();
-        if (mounted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => destination!),
-          );
-        }
-      },
-      onAdFailedToShowFullScreenContent: (ad, error) {
-        ad.dispose();
-        _isShowingAd = false;
-        _loadInterstitialAd();
-        if (mounted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => destination!),
-          );
-        }
-      },
-    );
-    _interstitialAd!.show();
-  } else {
+  // if (_interstitialAd != null && !_isShowingAd) {
+  //   _isShowingAd = true;
+  //   _interstitialAd!.fullScreenContentCallback = FullScreenContentCallback(
+  //     onAdDismissedFullScreenContent: (ad) {
+  //       ad.dispose();
+  //       _isShowingAd = false;
+  //       _loadInterstitialAd();
+  //       if (mounted) {
+  //         Navigator.pushReplacement(
+  //           context,
+  //           MaterialPageRoute(builder: (_) => destination!),
+  //         );
+  //       }
+  //     },
+  //     onAdFailedToShowFullScreenContent: (ad, error) {
+  //       ad.dispose();
+  //       _isShowingAd = false;
+  //       _loadInterstitialAd();
+  //       if (mounted) {
+  //         Navigator.pushReplacement(
+  //           context,
+  //           MaterialPageRoute(builder: (_) => destination!),
+  //         );
+  //       }
+  //     },
+  //   );
+  //   _interstitialAd!.show();
+  // } else {
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(builder: (_) => destination!),
     );
-  }
+  // }
 },
         items: [
           _navItem(label: "NEWS", active: 'assets/icons/News Red.svg', inactive: 'assets/icons/News.svg', index: 0),

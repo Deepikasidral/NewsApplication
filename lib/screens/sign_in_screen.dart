@@ -8,7 +8,7 @@ import 'sign_up_screen.dart';
 import 'home_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
+// import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 
 
@@ -22,59 +22,59 @@ class SignInScreen extends StatefulWidget {
 class _SignInScreenState extends State<SignInScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  InterstitialAd? _interstitialAd;
-bool _isAdLoaded = false;
+  // InterstitialAd? _interstitialAd;
+  // bool _isAdLoaded = false;
   bool _isGoogleSignInLoading = false;
+  
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     scopes: ['email', 'profile'],
-    // Removed explicit clientId - will use from google-services.json
   );
   @override
 void initState() {
   super.initState();
-  _loadInterstitialAd();
+  // _loadInterstitialAd();
 }
 @override
 void dispose() {
-  _interstitialAd?.dispose();
+  // _interstitialAd?.dispose();
   super.dispose();
 }
-void _loadInterstitialAd() {
-  InterstitialAd.load(
-    adUnitId: 'ca-app-pub-6088749573646337/6577319196', 
-    request: const AdRequest(),
-    adLoadCallback: InterstitialAdLoadCallback(
-      onAdLoaded: (ad) {
-        _interstitialAd = ad;
-        _isAdLoaded = true;
-      },
-      onAdFailedToLoad: (error) {
-        print("Ad failed to load: $error");
-        _isAdLoaded = false;
-      },
-    ),
-  );
-}
-void _showAdThenNavigate() {
-  if (_interstitialAd != null && _isAdLoaded) {
-    _interstitialAd!.fullScreenContentCallback =
-        FullScreenContentCallback(
-      onAdDismissedFullScreenContent: (ad) {
-        ad.dispose();
-         _loadInterstitialAd(); 
-        _navigateToHome();
-      },
-      onAdFailedToShowFullScreenContent: (ad, error) {
-        ad.dispose();
-        _navigateToHome();
-      },
-    );
+// void _loadInterstitialAd() {
+//   InterstitialAd.load(
+//     adUnitId: 'ca-app-pub-6088749573646337/6577319196', 
+//     request: const AdRequest(),
+//     adLoadCallback: InterstitialAdLoadCallback(
+//       onAdLoaded: (ad) {
+//         _interstitialAd = ad;
+//         _isAdLoaded = true;
+//       },
+//       onAdFailedToLoad: (error) {
+//         print("Ad failed to load: $error");
+//         _isAdLoaded = false;
+//       },
+//     ),
+//   );
+// }
+// void _showAdThenNavigate() {
+//   if (_interstitialAd != null && _isAdLoaded) {
+//     _interstitialAd!.fullScreenContentCallback =
+//         FullScreenContentCallback(
+//       onAdDismissedFullScreenContent: (ad) {
+//         ad.dispose();
+//          _loadInterstitialAd(); 
+//         _navigateToHome();
+//       },
+//       onAdFailedToShowFullScreenContent: (ad, error) {
+//         ad.dispose();
+//         _navigateToHome();
+//       },
+//     );
 
-    _interstitialAd!.show();
-  } else {
-    _navigateToHome();
-  }
-}
+//     _interstitialAd!.show();
+//   } else {
+//     _navigateToHome();
+//   }
+// }
 
 void _navigateToHome() {
    if (!mounted) return;
@@ -142,7 +142,8 @@ Future<void> saveFcmTokenToBackend(String userId) async {
     const SnackBar(content: Text("Signed in successfully")),
   );
 
-  _showAdThenNavigate();
+  // _showAdThenNavigate();
+  _navigateToHome();
 }
  else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -269,7 +270,8 @@ Future<void> saveFcmTokenToBackend(String userId) async {
       print("🚀 Navigating to home screen...");
       if (!mounted) return;
       
-      _showAdThenNavigate();
+      // _showAdThenNavigate();
+      _navigateToHome();
       
       print("✅ Navigation complete");
 

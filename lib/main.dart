@@ -5,7 +5,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:news_application/screens/splash_screen.dart';
 import 'package:news_application/screens/home_screen.dart';
 import 'package:news_application/services/analytics_service.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
+// import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 
 final GlobalKey<NavigatorState> navigatorKey =
@@ -19,7 +19,7 @@ void main() async {
   FirebaseMessaging messaging = FirebaseMessaging.instance;
 
     // ✅ Initialize AdMob
-  await MobileAds.instance.initialize();
+  // await MobileAds.instance.initialize();
 
   // 🔔 REQUEST PERMISSION
   NotificationSettings settings =

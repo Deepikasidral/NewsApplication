@@ -8,7 +8,7 @@ import 'sign_in_screen.dart';
 import 'home_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
+// import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 
 class SignUpScreen extends StatefulWidget {
@@ -23,57 +23,114 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmController = TextEditingController();
-  InterstitialAd? _interstitialAd;
-bool _isAdLoaded = false;
+  // InterstitialAd? _interstitialAd;
+  // bool _isAdLoaded = false;
+  bool _acceptedPrivacyPolicy = false;
+  
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     scopes: ['email', 'profile'],
   );
+
+  final String privacyPolicyText = '''
+RupeeLetter respects your privacy and is committed to protecting your personal information.
+
+1. Information We Collect
+• Name
+• Email address or mobile number
+• User preferences (notifications, followed stocks)
+
+2. Automatically Collected Information
+• App usage activity
+• Device information
+• Crash logs and performance data
+
+3. Information We Do Not Collect
+• Bank details
+• Trading or brokerage data
+• PAN, Aadhaar, or KYC information
+
+4. How We Use Your Information
+• Deliver relevant financial news
+• Personalize content
+• Improve app performance
+• Respond to support requests
+
+We do not sell your personal data.
+
+5. Notifications
+You can enable or disable notifications at any time from the App.
+
+6. Your Rights
+You may update preferences, opt out of notifications, or request account deletion.
+
+7. Contact Us
+Email: contact@rupeeletter.com
+Website: https://rupeeletter.com
+''';
+
+  final String termsText = '''
+By using the RupeeLetter app, you agree to the following:
+
+• RupeeLetter provides financial news and information for informational purposes only.
+
+• Content is sourced from third parties and public information; accuracy or completeness is not guaranteed.
+
+• RupeeLetter does not provide investment, legal, or financial advice.
+
+• Users are responsible for how they use the information provided.
+
+• We may update, modify, or discontinue features without prior notice.
+
+• Misuse of the app or attempts to disrupt services may result in account suspension.
+
+• Continued use of the app constitutes acceptance of these Terms.
+''';
   @override
 void initState() {
   super.initState();
-  _loadInterstitialAd();
+  // _loadInterstitialAd();
 }
 @override
 void dispose() {
-  _interstitialAd?.dispose();
+  // _interstitialAd?.dispose();
   super.dispose();
 }
-void _loadInterstitialAd() {
-  InterstitialAd.load(
-    adUnitId: 'ca-app-pub-6088749573646337/6577319196', 
-    request: const AdRequest(),
-    adLoadCallback: InterstitialAdLoadCallback(
-      onAdLoaded: (ad) {
-        _interstitialAd = ad;
-        _isAdLoaded = true;
-      },
-      onAdFailedToLoad: (error) {
-        print("Ad failed to load: $error");
-        _isAdLoaded = false;
-      },
-    ),
-  );
-}
-void _showAdThenNavigate() {
-  if (_interstitialAd != null && _isAdLoaded) {
-    _interstitialAd!.fullScreenContentCallback =
-        FullScreenContentCallback(
-      onAdDismissedFullScreenContent: (ad) {
-        ad.dispose();
-        _loadInterstitialAd(); // reload
-        _navigateToHome();
-      },
-      onAdFailedToShowFullScreenContent: (ad, error) {
-        ad.dispose();
-        _navigateToHome();
-      },
-    );
+// void _loadInterstitialAd() {
+//   InterstitialAd.load(
+//     adUnitId: 'ca-app-pub-6088749573646337/6577319196', 
+//     request: const AdRequest(),
+//     adLoadCallback: InterstitialAdLoadCallback(
+//       onAdLoaded: (ad) {
+//         _interstitialAd = ad;
+//         _isAdLoaded = true;
+//       },
+//       onAdFailedToLoad: (error) {
+//         print("Ad failed to load: $error");
+//         _isAdLoaded = false;
+//       },
+//     ),
+//   );
+// }
+// void _showAdThenNavigate() {
+//   if (_interstitialAd != null && _isAdLoaded) {
+//     _interstitialAd!.fullScreenContentCallback =
+//         FullScreenContentCallback(
+//       onAdDismissedFullScreenContent: (ad) {
+//         ad.dispose();
+//         _loadInterstitialAd(); // reload
+//         _navigateToHome();
+//       },
+//       onAdFailedToShowFullScreenContent: (ad, error) {
+//         ad.dispose();
+//         _navigateToHome();
+//       },
+//     );
 
-    _interstitialAd!.show();
-  } else {
-    _navigateToHome();
-  }
-}
+//     _interstitialAd!.show();
+//   } else {
+//     _navigateToHome();
+//   }
+// }
 
 void _navigateToHome() {
   if (!mounted) return;
@@ -115,6 +172,33 @@ Future<void> saveFcmTokenToBackend(String userId) async {
     final password = _passwordController.text.trim();
     final confirmPassword = _confirmController.text.trim();
 
+    if (!_acceptedPrivacyPolicy) {
+      showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          title: const Text(
+            "Privacy Policy Required",
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          content: const Text(
+            "Please accept the Privacy Policy and Terms & Conditions to continue.",
+            style: TextStyle(fontSize: 15),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(
+                "OK",
+                style: TextStyle(color: Colors.red.shade700, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
     if (password != confirmPassword) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Passwords do not match")),
@@ -148,7 +232,8 @@ Future<void> saveFcmTokenToBackend(String userId) async {
     const SnackBar(content: Text("Account Created successfully")),
   );
 
-  _showAdThenNavigate();
+  // _showAdThenNavigate();
+  _navigateToHome();
 }
  else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -165,6 +250,33 @@ Future<void> saveFcmTokenToBackend(String userId) async {
   }
 
   Future<void> _handleGoogleSignIn() async {
+    if (!_acceptedPrivacyPolicy) {
+      showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          title: const Text(
+            "Privacy Policy Required",
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          content: const Text(
+            "Please accept the Privacy Policy and Terms & Conditions to continue.",
+            style: TextStyle(fontSize: 15),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(
+                "OK",
+                style: TextStyle(color: Colors.red.shade700, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
     print("🚀 Starting Google Sign-In...");
     try {
       await _googleSignIn.signOut();
@@ -266,7 +378,8 @@ Future<void> saveFcmTokenToBackend(String userId) async {
       print("🚀 Navigating to home screen...");
       if (!mounted) return;
       
-     _showAdThenNavigate();
+     // _showAdThenNavigate();
+     _navigateToHome();
       
       print("✅ Navigation complete");
 
@@ -505,6 +618,59 @@ Future<void> saveFcmTokenToBackend(String userId) async {
 
                 const SizedBox(height: 20),
 
+                // Privacy Policy Checkbox
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                  child: Row(
+                    children: [
+                      Checkbox(
+                        value: _acceptedPrivacyPolicy,
+                        onChanged: (value) {
+                          setState(() {
+                            _acceptedPrivacyPolicy = value ?? false;
+                          });
+                        },
+                        activeColor: Colors.red.shade700,
+                      ),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () {
+                            showDialog(
+                              context: context,
+                              builder: (_) => _buildPrivacyDialog(),
+                            );
+                          },
+                          child: RichText(
+                            text: TextSpan(
+                              style: const TextStyle(fontSize: 15, color: Colors.black87),
+                              children: [
+                                const TextSpan(text: 'I accept the '),
+                                TextSpan(
+                                  text: 'Privacy Policy',
+                                  style: TextStyle(
+                                    color: Colors.red.shade700,
+                                    decoration: TextDecoration.underline,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const TextSpan(text: ' and '),
+                                TextSpan(
+                                  text: 'Terms & Conditions',
+                                  style: TextStyle(
+                                    color: Colors.red.shade700,
+                                    decoration: TextDecoration.underline,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
                 // Add Divider
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24.0),
@@ -582,6 +748,90 @@ Future<void> saveFcmTokenToBackend(String userId) async {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPrivacyDialog() {
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      child: DefaultTabController(
+        length: 2,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFFEA6B6B),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+              ),
+              child: const TabBar(
+                indicatorColor: Colors.white,
+                labelColor: Colors.white,
+                unselectedLabelColor: Colors.white70,
+                labelStyle: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                tabs: [
+                  Tab(text: "Privacy Policy"),
+                  Tab(text: "Terms & Conditions"),
+                ],
+              ),
+            ),
+            SizedBox(
+              height: 450,
+              child: TabBarView(
+                children: [
+                  SingleChildScrollView(
+                    padding: const EdgeInsets.all(20),
+                    child: Text(
+                      privacyPolicyText,
+                      style: const TextStyle(fontSize: 15, height: 1.6, color: Colors.black87),
+                    ),
+                  ),
+                  SingleChildScrollView(
+                    padding: const EdgeInsets.all(20),
+                    child: Text(
+                      termsText,
+                      style: const TextStyle(fontSize: 15, height: 1.6, color: Colors.black87),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text(
+                      "Close",
+                      style: TextStyle(color: Colors.black54, fontSize: 15),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: () {
+                      setState(() {
+                        _acceptedPrivacyPolicy = true;
+                      });
+                      Navigator.pop(context);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFEA6B6B),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    ),
+                    child: const Text(
+                      "Accept",
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
