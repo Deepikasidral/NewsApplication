@@ -46,7 +46,7 @@ POST /api/index/data
 router.post("/data", async (req, res) => {
 
   const { symbol } = req.body;
-  
+
   console.log("🔥 /data API HIT - Symbol:", symbol);
 
   try {
@@ -66,21 +66,21 @@ router.post("/data", async (req, res) => {
 
     const endDate = new Date();
     const startDate = new Date();
-    startDate.setDate(endDate.getDate() - 14);
+    startDate.setDate(endDate.getDate() - 22);
 
     let newsQuery;
     if (symbol === "^NSEI") {
       // For NSEI, get all Indian market news (not global, not commodities)
-      newsQuery = { 
-        global: false, 
+      newsQuery = {
+        global: false,
         commodities: false
       };
     } else if (symbol === "^NSEBANK") {
-      newsQuery = { 
+      newsQuery = {
         sector_market: "Nifty Bank"
       };
     } else if (symbol === "^CNXIT") {
-      newsQuery = { 
+      newsQuery = {
         sector_market: "Nifty IT"
       };
     }
@@ -104,9 +104,9 @@ router.post("/data", async (req, res) => {
         console.log("❌ Quote error:", err.message);
         return null;
       }),
-      yahooFinance.chart(symbol, { 
-        period1: startDate, 
-        period2: endDate, 
+      yahooFinance.chart(symbol, {
+        period1: startDate,
+        period2: endDate,
         interval: "1d"
       }).then(result => {
         console.log("📈 Chart data received:", {
@@ -124,11 +124,11 @@ router.post("/data", async (req, res) => {
         try {
           const constituents = constituentMap[symbol] || constituentMap["^NSEI"];
           console.log(`📈 Fetching movers for ${constituents.length} stocks...`);
-          
+
           const quotes = await Promise.allSettled(
             constituents.map(s => yahooFinance.quote(s).catch(() => null))
           );
-          
+
           const stocks = quotes
             .filter(r => r.status === 'fulfilled' && r.value)
             .map(r => r.value)
@@ -138,17 +138,17 @@ router.post("/data", async (req, res) => {
               lastPrice: q.regularMarketPrice || 0,
               pChange: q.regularMarketChangePercent || 0
             }));
-          
+
           const gainers = stocks
             .filter(s => s.pChange > 0)
             .sort((a, b) => b.pChange - a.pChange)
             .slice(0, 5);
-          
+
           const losers = stocks
             .filter(s => s.pChange < 0)
             .sort((a, b) => a.pChange - b.pChange)
             .slice(0, 5);
-          
+
           console.log("✅ Movers fetched:", gainers.length, "gainers,", losers.length, "losers");
           return { gainers, losers };
         } catch (err) {
@@ -197,7 +197,7 @@ router.post("/data", async (req, res) => {
         // Use timestamp from quote object or from timestamps array
         const timestamp = q.date || (chartData.timestamps && chartData.timestamps[i]);
         if (!timestamp) return null;
-        
+
         return {
           close: q.close,
           date: typeof timestamp === 'number' ? new Date(timestamp * 1000).toISOString() : new Date(timestamp).toISOString()
@@ -260,7 +260,7 @@ router.post("/global", async (req, res) => {
 
           const endDate = new Date();
           const startDate = new Date();
-          startDate.setDate(endDate.getDate() - 14);
+          startDate.setDate(endDate.getDate() - 22);
 
           const chart = await yahooFinance.chart(symbol, {
             period1: startDate,
@@ -324,7 +324,7 @@ router.post("/sectors", async (req, res) => {
 
           const endDate = new Date();
           const startDate = new Date();
-          startDate.setDate(endDate.getDate() - 14);
+          startDate.setDate(endDate.getDate() - 22);
 
           const chart = await yahooFinance.chart(symbol, {
             period1: startDate,
@@ -337,7 +337,7 @@ router.post("/sectors", async (req, res) => {
             if (!q || !q.close) return null;
             const timestamp = q.date || (chart.timestamps && chart.timestamps[i]);
             if (!timestamp) return null;
-            
+
             return {
               close: q.close,
               date: typeof timestamp === 'number' ? timestamp : new Date(timestamp).getTime() / 1000

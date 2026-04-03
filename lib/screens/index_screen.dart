@@ -1289,7 +1289,7 @@ Widget build(BuildContext context) {
         Container(
           margin: const EdgeInsets.symmetric(horizontal: 12),
           padding: const EdgeInsets.all(10),
-          height: 250,
+          height: 300,
           decoration: BoxDecoration(
             border: Border.all(color: Colors.grey.shade300),
             borderRadius: BorderRadius.circular(10),
@@ -1339,42 +1339,38 @@ Widget build(BuildContext context) {
                           ),
                         ),
                         bottomTitles: AxisTitles(
-  sideTitles: SideTitles(
-    showTitles: true,
-    interval: chartSpots.length <= 5
-        ? 1
-        : (chartSpots.length / 5).floor().clamp(1, chartSpots.length).toDouble(),
-    getTitlesWidget: (value, meta) {
-
-      int index = value.toInt();
-
-      if (index < 0 || index >= chartSpots.length) {
-        return const SizedBox();
-      }
-
-      final rawDate = g["chart"][index]["date"];
-
-DateTime date;
-
-if (rawDate is int) {
-  date = DateTime.fromMillisecondsSinceEpoch(rawDate * 1000);
-} else {
-  date = DateTime.tryParse(rawDate.toString()) ?? DateTime.now();
-}
-
-      return Padding(
-        padding: const EdgeInsets.only(top: 6),
-        child: Text(
-          DateFormat("d MMM").format(date),
-          style: const TextStyle(
-            fontSize: 10,
-            color: Colors.grey,
-          ),
-        ),
-      );
-    },
-  ),
-),
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 40,
+                            interval: 1,
+                            getTitlesWidget: (value, meta) {
+                              int index = value.toInt();
+                              if (index < 0 || index >= chartSpots.length) {
+                                return const SizedBox();
+                              }
+                              final rawDate = g["chart"][index]["date"];
+                              DateTime date;
+                              if (rawDate is int) {
+                                date = DateTime.fromMillisecondsSinceEpoch(rawDate * 1000);
+                              } else {
+                                date = DateTime.tryParse(rawDate.toString()) ?? DateTime.now();
+                              }
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 6),
+                                child: Transform.rotate(
+                                  angle: -0.75,
+                                  child: Text(
+                                    DateFormat("d MMM").format(date),
+                                    style: const TextStyle(
+                                      fontSize: 8,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
                         topTitles: AxisTitles(
                           sideTitles: SideTitles(showTitles: false),
                         ),
@@ -1390,7 +1386,17 @@ if (rawDate is int) {
                           isCurved: false,
                           barWidth: 3,
                           color: Colors.green,
-                          dotData: FlDotData(show: false),
+                          dotData: FlDotData(
+                            show: true,
+                            getDotPainter: (spot, percent, barData, index) {
+                              return FlDotCirclePainter(
+                                radius: 3,
+                                color: Colors.green,
+                                strokeWidth: 1.5,
+                                strokeColor: Colors.white,
+                              );
+                            },
+                          ),
                           belowBarData: BarAreaData(
                             show: true,
                             gradient: LinearGradient(
@@ -1431,7 +1437,7 @@ if (rawDate is int) {
   Container(
     margin: const EdgeInsets.symmetric(horizontal: 12),
     padding: const EdgeInsets.all(10),
-    height: 250,
+    height: 300,
     decoration: BoxDecoration(
       border: Border.all(color: Colors.grey.shade300),
       borderRadius: BorderRadius.circular(10),
@@ -1443,7 +1449,6 @@ if (rawDate is int) {
           ? const Center(child: CircularProgressIndicator())
           : LineChart(
               LineChartData(
-                
 
     /// remove grid
     gridData: FlGridData(show: false),
@@ -1458,68 +1463,66 @@ if (rawDate is int) {
       ),
     ),
     extraLinesData: ExtraLinesData(
-  horizontalLines: [
-    HorizontalLine(
-      y: price,
-      color: Colors.green.withOpacity(0.4),
-      strokeWidth: 1,
-      dashArray: [5,5],
-    )
-  ],
-  
-),
+      horizontalLines: [
+        HorizontalLine(
+          y: price,
+          color: Colors.green.withOpacity(0.4),
+          strokeWidth: 1,
+          dashArray: [5,5],
+        )
+      ],
+    ),
 
     /// axis titles
     titlesData: FlTitlesData(
 
       leftTitles: AxisTitles(
-  sideTitles: SideTitles(
-    showTitles: true,
-    reservedSize: 50,
-    interval: 500, // adjust depending on index
-    getTitlesWidget: (value, meta) {
-      return Padding(
-        padding: const EdgeInsets.only(right: 4),
-        child: Text(
-          value.toStringAsFixed(0),
-          style: const TextStyle(
-            fontSize: 11,
-            color: Colors.grey,
-          ),
+        sideTitles: SideTitles(
+          showTitles: true,
+          reservedSize: 50,
+          interval: 500,
+          getTitlesWidget: (value, meta) {
+            return Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: Text(
+                value.toStringAsFixed(0),
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: Colors.grey,
+                ),
+              ),
+            );
+          },
         ),
-      );
-    },
-  ),
-),
+      ),
 
-     bottomTitles: AxisTitles(
-  sideTitles: SideTitles(
-    showTitles: true,
-    interval: chartData.length <= 5
-        ? 1
-        : (chartData.length / 5).floor().clamp(1, chartData.length).toDouble(),
-    getTitlesWidget: (value, meta) {
-      int index = value.toInt();
-
-      if (index < 0 || index >= chartData.length) {
-        return const SizedBox();
-      }
-
-      final date = DateTime.parse(chartData[index]["date"]);
-
-      return Padding(
-        padding: const EdgeInsets.only(top: 6),
-        child: Text(
-          DateFormat("d MMM").format(date),
-          style: const TextStyle(
-            fontSize: 10,
-            color: Colors.grey,
-          ),
+      bottomTitles: AxisTitles(
+        sideTitles: SideTitles(
+          showTitles: true,
+          reservedSize: 40,
+          interval: 1,
+          getTitlesWidget: (value, meta) {
+            int index = value.toInt();
+            if (index < 0 || index >= chartData.length) {
+              return const SizedBox();
+            }
+            final date = DateTime.parse(chartData[index]["date"]);
+            return Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Transform.rotate(
+                angle: -0.75,
+                child: Text(
+                  DateFormat("d MMM").format(date),
+                  style: const TextStyle(
+                    fontSize: 8,
+                    color: Colors.grey,
+                  ),
+                ),
+              ),
+            );
+          },
         ),
-      );
-    },
-  ),
-),
+      ),
 
       topTitles: AxisTitles(
         sideTitles: SideTitles(showTitles: false),
@@ -1547,8 +1550,18 @@ if (rawDate is int) {
         /// green color
         color: Colors.green,
 
-        /// remove dots
-        dotData: FlDotData(show: false),
+        /// show dot data points at every date
+        dotData: FlDotData(
+          show: true,
+          getDotPainter: (spot, percent, barData, index) {
+            return FlDotCirclePainter(
+              radius: 3,
+              color: Colors.green,
+              strokeWidth: 1.5,
+              strokeColor: Colors.white,
+            );
+          },
+        ),
 
         /// gradient area under chart
         belowBarData: BarAreaData(
