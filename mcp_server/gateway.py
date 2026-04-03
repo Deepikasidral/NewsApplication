@@ -12,12 +12,11 @@
 #     answer = ask_llm(req.question)
 #     return {"answer": answer}
 
-
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, Request
 from pydantic import BaseModel
-from llm import ask_llm
-from rate_limiter import check_rate_limit
+from mcp_server.llm import ask_llm
+from mcp_server.rate_limiter import check_rate_limit
 
 app = FastAPI(title="RupeeLetter Chat API")
 app.add_middleware(
