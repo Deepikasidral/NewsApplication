@@ -830,10 +830,7 @@ Widget _buildIpoTab() {
           child: ArticleCard(
             article: article,
             savedIds: _locallySavedIds,
-            onToggleSave: (id) {
-  final article = _ipoNews.firstWhere((a) => a.id == id);
-  _toggleSaveNews(article);
-},
+            onToggleSave: (article) => _toggleSaveNews(article),
             onFetchCompanies: (companies) async {
               if (companies.isEmpty) return;
 
@@ -850,6 +847,9 @@ Widget _buildIpoTab() {
                 _showCompanySelector(companyData);
               }
             },
+            shouldShowTradingView: article.companies.isNotEmpty || 
+                                   article.sector_market.isNotEmpty || 
+                                   article.commodities_market.isNotEmpty,
             onOpenTradingView: _openTradingView,
             onFetchSector: (sector) async {
               final sectorData =

@@ -12,6 +12,7 @@ class ArticleCard extends StatelessWidget {
   final Function(String) onFetchSector;
   final Function(List<String>) onFetchCommodities;
   final Function(Article) onOpenFullStory;
+  final bool shouldShowTradingView;
 
   const ArticleCard({
     super.key,
@@ -23,6 +24,7 @@ class ArticleCard extends StatelessWidget {
     required this.onFetchSector,
     required this.onFetchCommodities,
     required this.onOpenFullStory,
+    this.shouldShowTradingView = true,
   });
 
   @override
@@ -186,18 +188,19 @@ class ArticleCard extends StatelessWidget {
                   Row(
                     children: [
 
-                      IconButton(
-                        padding: EdgeInsets.zero,
-                        constraints:
-                            const BoxConstraints(),
-                        icon: Image.asset(
-                          "assets/tradingview.png",
-                          height: 32,
-                          width: 32,
+                      if (shouldShowTradingView)
+                        IconButton(
+                          padding: EdgeInsets.zero,
+                          constraints:
+                              const BoxConstraints(),
+                          icon: Image.asset(
+                            "assets/tradingview.png",
+                            height: 32,
+                            width: 32,
+                          ),
+                          onPressed: () =>
+                              onFetchCompanies(article.companies),
                         ),
-                        onPressed: () =>
-                            onFetchCompanies(article.companies),
-                      ),
 
                       IconButton(
                         padding: EdgeInsets.zero,

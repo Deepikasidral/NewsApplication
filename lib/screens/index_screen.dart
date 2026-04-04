@@ -510,6 +510,35 @@ Widget _buildArticleCard(Article a) {
         onPressed: () {
           _openTradingView("NSE:${a.companies.first}");
         },
+      )
+    else if (a.sector_market.isNotEmpty)
+      IconButton(
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(),
+        icon: Image.asset(
+          "assets/tradingview.png",
+          height: 32,
+          width: 32,
+        ),
+        onPressed: () async {
+          final sectorData = await _fetchSectorDetails(a.sector_market);
+          if (sectorData != null) {
+            _openTradingView("NSE:${sectorData["symbol"]}");
+          }
+        },
+      )
+    else if (a.commodities_market.isNotEmpty)
+      IconButton(
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(),
+        icon: Image.asset(
+          "assets/tradingview.png",
+          height: 32,
+          width: 32,
+        ),
+        onPressed: () {
+          _openTradingView("MCX:${a.commodities_market.first}");
+        },
       ),
 
     /// SAVE
@@ -867,6 +896,21 @@ Future<void> _toggleSaveNews(Article a) async {
     debugPrint("Save toggle failed: $e");
   }
 }
+Future<Map<String, dynamic>?> _fetchSectorDetails(String sector) async {
+  final url =
+      "$baseUrl/api/sector-lookup/by-name?name=$sector";
+
+  final resp = await http.get(Uri.parse(url));
+
+  if (resp.statusCode != 200) return null;
+
+  final body = jsonDecode(resp.body);
+
+  if (!body["success"]) return null;
+
+  return body["data"];
+}
+
 Future<void> _openTradingView(String fullSymbol) async {
   final url =
       "https://www.tradingview.com/chart/?symbol=$fullSymbol";
@@ -1727,8 +1771,36 @@ if (_tabIndex == 0) ...[
            
           ],
 
-          /// NEWS (ONLY FOR INDEX TABS, NOT COMPANIES)
-          if (_tabIndex != 4) ...[
+          /// NEWS (ONLY FOR INDEX TABS, NOT COMPANIES, GLOBAL, OR SECTORS)
+          if (_tabIndex != 4 && !isGlobal && !isSector) ...[
+            const SizedBox(height: 10),
+            
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Text(
+                "NEWS",
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey.shade700,
+                ),
+              ),
+            ),
+
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: news.length,
+              itemBuilder: (_, i) {
+                final article = _convertToArticle(news[i]);
+                return _buildArticleCard(article);
+              },
+            ),
+          ],
+          
+          /// NEWS FOR GLOBAL AND SECTORS
+          if ((isGlobal || isSector) && news.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Text(

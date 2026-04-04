@@ -548,10 +548,11 @@ TOOLS = [
         "type": "function",
         "function":  {
             "name": "finedge_company_tool",
+            "description": "Get real-time stock price, company quote data, and related news for a specific company. Use this when user asks about current price, stock value, or company performance.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                "company": { "type": "string" },
+                "company": { "type": "string", "description": "Company name or stock symbol" },
                 "limit": { "type": "integer", "default": 5 }
                 },
                 "required": ["company"]
