@@ -1,17 +1,16 @@
-  import 'dart:convert';
+import 'dart:convert';
   import 'package:flutter/material.dart';
   import 'package:http/http.dart' as http;
   import 'package:flutter_markdown/flutter_markdown.dart';
   import '../models/chat_message.dart';
   import 'home_screen.dart';
-  import 'company_screen.dart';
+  import 'index_screen.dart';
   import 'saved_screen.dart';
   import 'events_screen.dart';
   import 'profile_screen.dart';
   import 'package:shared_preferences/shared_preferences.dart';
   import 'package:flutter_svg/flutter_svg.dart';
   import 'package:google_fonts/google_fonts.dart';
-  import 'home_screen.dart';
 
 
   class ChatbotScreen extends StatefulWidget {
@@ -26,7 +25,7 @@
     final TextEditingController _controller = TextEditingController();
     final List<ChatMessage> _messages = [];
     bool _loading = false;
-    int _bottomIndex = 1;
+    int _bottomIndex = 2;
     bool _rateLimited = false;
     String _userName = "there";
 
@@ -436,25 +435,20 @@
 
     switch (index) {
       case 0:
-        destination=const NewsFeedScreen();
+        destination = const NewsFeedScreen();
         break;
-
       case 1:
+        destination = const IndexScreen();
+        break;
+      case 2:
         destination = const ChatbotScreen();
         break;
-
-      case 2:
-        destination = const CompanyScreen();
-        break;
-
       case 3:
         destination = const EventsScreen();
         break;
-
       case 4:
         destination = const SavedNewsFeedScreen();
         break;
-
       default:
         return;
     }
@@ -466,42 +460,15 @@
   },
 
 
-    items: [
-      _navItem(
-        label: "NEWS",
-        active: 'assets/icons/News Red.svg',
-        inactive: 'assets/icons/News.svg',
-        index: 0,
-      ),
-      _navItem(
-        label: "ASK AI",
-        active: 'assets/icons/Ask AI Red.svg',
-        inactive: 'assets/icons/Ask AI.svg',
-        index: 1,
-      ),
-      _navItem(
-        label: "COMPANIES",
-        active: 'assets/icons/Graph Red.svg',
-        inactive: 'assets/icons/Graph.svg',
-        index: 2,
-      ),
-      _navItem(
-        label: "EVENTS",
-        active: 'assets/icons/Calender Red.svg',
-        inactive: 'assets/icons/Calender.svg',
-        index: 3,
-      ),
-      _navItem(
-        label: "SAVED",
-        active: 'assets/icons/Save red.svg',
-        inactive: 'assets/icons/Save.svg',
-        index: 4,
-      ),
-    ],
+     items: [
+       _navItem(label: "NEWS", active: 'assets/icons/News Red.svg', inactive: 'assets/icons/News.svg', index: 0),
+       _navItem(label: "INDEX", active: 'assets/icons/Index red.svg', inactive: 'assets/icons/Index.svg', index: 1),
+       _navItem(label: "ASK AI", active: 'assets/icons/Ask AI Red.svg', inactive: 'assets/icons/Ask AI.svg', index: 2),
+       _navItem(label: "EVENTS", active: 'assets/icons/Calender Red.svg', inactive: 'assets/icons/Calender.svg', index: 3),
+       _navItem(label: "SAVED", active: 'assets/icons/Save red.svg', inactive: 'assets/icons/Save.svg', index: 4),
+     ],
+   ),
   ),
-
-  ),
-
     );
   }
   }
