@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:news_application/screens/splash_screen.dart';
 import 'package:news_application/screens/home_screen.dart';
 import 'package:news_application/services/analytics_service.dart';
@@ -27,9 +28,17 @@ void main() async {
 
   print("🔔 Permission: ${settings.authorizationStatus}");
 
-  // 🔔 SUBSCRIBE TO TOPIC
-  await messaging.subscribeToTopic("market_alerts");
-  print("✅ Subscribed to market_alerts");
+  // 🔔 SUBSCRIBE TO TOPIC (only if notifications are enabled)
+  final prefs = await SharedPreferences.getInstance();
+  final notificationsEnabled = prefs.getBool('notificationsEnabled') ?? true;
+
+  if (notificationsEnabled) {
+    await messaging.subscribeToTopic("market_alerts");
+    print("✅ Subscribed to market_alerts");
+  } else {
+    await messaging.unsubscribeFromTopic("market_alerts");
+    print("🔕 Notifications disabled — skipped subscription");
+  }
 
   // 🔔 APP TERMINATED STATE
   RemoteMessage? initialMessage =

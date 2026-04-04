@@ -218,7 +218,8 @@ Future<void> _loadUserId() async {
     sentiment: e["sentiment"] ?? "",
     impact: e["impact"] ?? "",
   );
-}).toList();
+}).where((a) => a.title.trim().isNotEmpty || a.summary.trim().isNotEmpty)
+  .toList();
 
       _filtered = List.from(_articles);
     } else {

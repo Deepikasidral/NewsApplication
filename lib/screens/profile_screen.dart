@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:news_application/screens/sign_in_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -14,6 +15,7 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   bool loading = true;
+  bool notificationsEnabled = true;
 
   String name = "";
   String email = "";
@@ -130,6 +132,34 @@ RupeeLetter is a financial news and insights platform focused on simplifying mar
   void initState() {
     super.initState();
     fetchProfile();
+    _loadNotificationPreference();
+  }
+
+  /// Load notification preference from SharedPreferences
+  Future<void> _loadNotificationPreference() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      notificationsEnabled = prefs.getBool('notificationsEnabled') ?? true;
+    });
+  }
+
+  /// Toggle notification preference, persist it, and subscribe/unsubscribe from FCM topic
+  Future<void> _toggleNotifications(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('notificationsEnabled', value);
+
+    final messaging = FirebaseMessaging.instance;
+    if (value) {
+      await messaging.subscribeToTopic('market_alerts');
+      debugPrint('✅ Subscribed to market_alerts');
+    } else {
+      await messaging.unsubscribeFromTopic('market_alerts');
+      debugPrint('🔕 Unsubscribed from market_alerts');
+    }
+
+    setState(() {
+      notificationsEnabled = value;
+    });
   }
 
   /// 🔹 FETCH PROFILE
@@ -440,10 +470,57 @@ Widget build(BuildContext context) {
             const SizedBox(height: 30),
 
             /// ================= SETTINGS =================
-            
-           
+            Text(
+              "Settings",
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 12),
 
-            
+            /// ---------------- NOTIFICATIONS TOGGLE ----------------
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        notificationsEnabled
+                            ? Icons.notifications_active
+                            : Icons.notifications_off_outlined,
+                        size: 22,
+                        color: notificationsEnabled
+                            ? Colors.black
+                            : Colors.grey,
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        "App Notifications",
+                        style: GoogleFonts.poppins(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                  Switch(
+                    value: notificationsEnabled,
+                    onChanged: _toggleNotifications,
+                    activeColor: Colors.green,
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 30),
+
             /// ---------------- LOGOUT ----------------
             TextButton(
               onPressed: logout,
