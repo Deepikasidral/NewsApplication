@@ -5,7 +5,7 @@ import os
 import requests
 from datetime import datetime, timedelta
 from pytz import timezone
-
+from mcp_server.company_mapper import get_best_symbol
 FINEDGE_API_TOKEN = os.getenv("FINEDGE_API_TOKEN")
 FINEDGE_BASE = "https://data.finedgeapi.com/api/v1"
 IST = timezone("Asia/Kolkata")
@@ -153,40 +153,54 @@ def get_news_by_impact(impact: str, limit: int = 5):
 # Company + Finedge quote
 # --------------------------------
 def finedge_company_tool(company: str, limit: int = 5):
-    symbol = company.upper()
-
-    
-
     if not company:
         return {"error": "Company name not detected"}
 
-    symbol = company.upper()
+    # 🔥 Clean input
+    company_clean = company.lower().strip()
 
-    news = get_news_by_company(company, limit)
+    # 🔥 Use intelligent mapper
+    symbol = get_best_symbol(company_clean)
+
+    print("🔍 INPUT COMPANY:", company)
+    print("🔍 MAPPED SYMBOL:", symbol)
+
+    news = get_news_by_company(company_clean, limit)
 
     finedge = {}
     try:
         resp = requests.get(
             f"{FINEDGE_BASE}/quote",
             params={"symbol": symbol, "token": FINEDGE_API_TOKEN},
-            timeout=10
+            timeout=5
         )
+
         data = resp.json()
+        print("🔥 API RESPONSE:", data)
+
+        symbol_data = data.get(symbol, {})
+
+        price = symbol_data.get("current_price")
+        change = symbol_data.get("change")
+
+        trend = "upward" if change and "+" in str(change) else "downward"
+
         finedge = {
-            "price": data.get(symbol, {}).get("current_price"),
-            "change": data.get(symbol, {}).get("change"),
-            "change_percent": data.get(symbol, {}).get("percent_change"),
+            "price": price,
+            "change": change,
+            "trend": trend   # 🔥 ADD THIS
         }
+
     except Exception as e:
+        print("❌ API ERROR:", str(e))
         finedge["error"] = str(e)
 
     return {
-        "company": company,
+        "company": company_clean,
         "symbol": symbol,
         "quote": finedge,
         "news": news
     }
-
 
 # --------------------------------
 # Market news by date (today / yesterday / any date)
@@ -227,3 +241,31 @@ def get_market_news_by_date(date: str, limit: int = 10):
         "count": len(docs),
         "news": [compress_news(d) for d in docs],
     }
+
+def finedge_full_analysis_tool(company: str):
+    if not company:
+        return {"error": "Company name not provided"}
+
+    symbol = company.upper()
+
+    data = fetch_comprehensive_analysis(symbol)
+
+    news = get_news_by_company(company, 5)
+
+    return {
+        "company": company,
+        "symbol": symbol,
+        "financials": data,
+        "news": news
+    }
+
+def fetch_comprehensive_analysis(symbol: str):
+    try:
+        resp = requests.get(
+            f"{FINEDGE_BASE}/quote",
+            params={"symbol": symbol, "token": FINEDGE_API_TOKEN},
+            timeout=10
+        )
+        return resp.json()
+    except Exception as e:
+        return {"error": str(e)}

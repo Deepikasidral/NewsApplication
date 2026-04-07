@@ -1114,6 +1114,12 @@ Widget _buildIpoTab() {
   }
 
   Widget _buildTodayEventsTab() {
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: Color(0xFFF05151)),
+      );
+    }
+    
     if (_todayEvents.isEmpty) {
       return Center(
         child: Column(
@@ -1172,6 +1178,12 @@ Widget _buildIpoTab() {
   }
 
   Widget _buildUpcomingEventsTab() {
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: Color(0xFFF05151)),
+      );
+    }
+    
     if (_upcomingEvents.isEmpty) {
       return Center(
         child: Column(
@@ -1229,7 +1241,6 @@ Widget _buildIpoTab() {
 
   Widget _buildEventCard(CorporateEvent event, {required bool isToday}) {
     final dateFormatted = DateFormat('MMM dd, yyyy').format(event.date);
-    final timeFormatted = DateFormat('hh:mm a').format(event.date);
     
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -1321,7 +1332,7 @@ Widget _buildIpoTab() {
               color: Colors.grey.shade700,
             ),
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 8),
           Row(
             children: [
               Icon(
@@ -1337,21 +1348,6 @@ Widget _buildIpoTab() {
                   color: Colors.grey.shade600,
                 ),
               ),
-              const SizedBox(width: 16),
-              Icon(
-                Icons.access_time,
-                size: 16,
-                color: Colors.grey.shade600,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                timeFormatted,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Colors.grey.shade600,
-                ),
-              ),
-              
             ],
           ),
         ],

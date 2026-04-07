@@ -1,4 +1,3 @@
-// models/Event.js
 const mongoose = require('mongoose');
 
 const eventSchema = new mongoose.Schema({
@@ -16,8 +15,7 @@ const eventSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    required: true,
-    enum: ['AGM', 'Results', 'Board Meeting', 'Investor Meet', 'Product Launch', 'Inauguration', 'Earnings Call', 'Conference', 'Press Release']
+    required: true
   },
   tags: {
     type: String,

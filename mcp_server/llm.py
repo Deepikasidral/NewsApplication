@@ -1,298 +1,3 @@
-# import json
-# from openai import OpenAI
-# from datetime import datetime
-# from pytz import timezone
-
-
-
-# from mcp_server.config import OPENAI_API_KEY
-
-# from mcp_server.tools import (
-#     search_news,
-#     get_latest_news,
-#     get_news_by_company,
-#     get_news_by_sentiment,
-#     get_news_by_impact,
-#     finedge_company_tool,
-#     get_todays_market_news,
-
-# )
-
-
-# # ============================
-# # TEMP 1-TURN CHAT MEMORY
-# # ============================
-# # ============================
-# # MULTI-TURN CHAT MEMORY
-# # ============================
-
-# IST = timezone("Asia/Kolkata")
-# today = datetime.now(IST).strftime("%B %d, %Y")
-# CHAT_HISTORY = []
-
-
-# # ============================
-# # 🔐 FINAL SYSTEM PROMPT
-# # ============================
-# SYSTEM_FINAL_PROMPT = f"""
-# You are a smart and knowledgeable financial assistant.
-
-# IMPORTANT CONTEXT:
-# - Today's date is {today} (IST).
-# - Always use today's date when mentioning market timelines.
-# - Never assume or invent dates.
-
-# Follow these rules:
-# - Respond like ChatGPT with clear structure, headings, bullet points, and bold text when helpful.
-# - Use emojis naturally to improve readability.
-# - Never mention tools, databases, filters, storage, or sources.
-# - Never say phrases like "based on the data", "according to news records", or "from the database".
-# - If information is available, blend it naturally into your response.
-# - If information is missing, answer confidently using your general financial knowledge.
-# - Keep the tone professional, clear, and easy to understand.
-# - Never say something like "A tool is not required to answer your question".
-
-# IMPORTANT:
-# - After completing the main answer, ALWAYS add a section titled:
-#   "💡 You may also ask:"
-# - Under it, suggest 2–3 short, relevant follow-up questions a user might naturally ask next.
-# - The follow-up questions should be conversational and useful.
-# """
-
-
-
-# def get_openai_client():
-#     return OpenAI(
-#         api_key=OPENAI_API_KEY
-#     )
-
-
-# TOOLS = [
-#     {
-#         "type": "function",
-#         "function": {
-#             "name": "search_news",
-#             "description": "Search news by keyword",
-#             "parameters": {
-#                 "type": "object",
-#                 "properties": {
-#                     "query": {"type": "string"}
-#                 },
-#                 "required": ["query"]
-#             }
-#         }
-#     },
-#     {
-#         "type": "function",
-#         "function": {
-#             "name": "get_latest_news",
-#             "description": "Get latest news",
-#             "parameters": {"type": "object", "properties": {}}
-#         }
-#     },
-#     {
-#         "type": "function",
-#         "function": {
-#             "name": "get_news_by_company",
-#             "description": "Get news related to a specific company",
-#             "parameters": {
-#                 "type": "object",
-#                 "properties": {
-#                     "company": {"type": "string"}
-#                 },
-#                 "required": ["company"]
-#             }
-#         }
-#     },
-#     {
-#         "type": "function",
-#         "function": {
-#             "name": "get_news_by_sentiment",
-#             "description": "Get news filtered by sentiment",
-#             "parameters": {
-#                 "type": "object",
-#                 "properties": {
-#                     "sentiment": {"type": "string"}
-#                 },
-#                 "required": ["sentiment"]
-#             }
-#         }
-#     },
-#     {
-#         "type": "function",
-#         "function": {
-#             "name": "get_news_by_impact",
-#             "description": "Get news filtered by impact",
-#             "parameters": {
-#                 "type": "object",
-#                 "properties": {
-#                     "impact": {"type": "string"}
-#                 },
-#                 "required": ["impact"]
-#             }
-#         }
-#     },
-#     {
-#     "type": "function",
-#     "function": {
-#         "name": "finedge_company_tool",
-#         "description": "Get today's market news with very high impact and extreme sentiment",
-#         "parameters": {
-#             "type": "object",
-#             "properties": {
-#                 "limit": {
-#                     "type": "integer",
-#                     "default": 10
-#                 }
-#             }
-#         }
-#     }
-# },
-# {
-#     "type": "function",
-#     "function": {
-#         "name": "get_todays_market_news",
-#         "description": "Get today's market news with very high impact and extreme sentiment",
-#         "parameters": {
-#             "type": "object",
-#             "properties": {
-#                 "limit": {
-#                     "type": "integer",
-#                     "default": 10
-#                 }
-#             }
-#         }
-#     }
-# }
-
-
-# ]
-
-# TOOL_MAP = {
-#     "search_news": search_news,
-#     "get_latest_news": get_latest_news,
-#     "get_news_by_company": get_news_by_company,
-#     "get_news_by_sentiment": get_news_by_sentiment,
-#     "get_news_by_impact": get_news_by_impact,
-#     "finedge_company_tool":finedge_company_tool,
-#     "get_todays_market_news":get_todays_market_news
-# }
-
-
-# def ask_llm(question: str) -> str:
-#     global CHAT_HISTORY
-
-#     client = get_openai_client()
-
-#     # ============================
-#     # BUILD CONTEXT FROM MEMORY
-#     # ============================
-#     messages_for_tool_decision = []
-
-#     for msg in CHAT_HISTORY:
-#         messages_for_tool_decision.append(msg)
-
-#     messages_for_tool_decision.append(
-#         {"role": "user", "content": question}
-#     )
-#     # ============================
-# # FORCE TOOLS FOR MARKET QUERIES
-# # ============================
-#     force_tool = any(
-#         k in question.lower()
-#         for k in ["today", "market", "trend", "sentiment"]
-#     )
-
-#     tool_choice = "required" if force_tool else "auto"
-
-
-#     # ============================
-#     # STEP 1: TOOL DECISION
-#     # ============================
-#     response = client.chat.completions.create(
-#         model="gpt-4o-mini",
-#         messages=[
-#             {
-#                 "role": "system",
-#                 "content": "Decide whether a tool is required. Do NOT explain your decision."
-#             },
-#             *messages_for_tool_decision
-#         ],
-#         tools=TOOLS,
-#         tool_choice=tool_choice,   # 👈 USE IT HERE
-#         temperature=0,
-#     )
-
-#     msg = response.choices[0].message
-
-#     # ============================
-#     # TOOL PATH (UNCHANGED)
-#     # ============================
-#     if msg.tool_calls:
-#         tool_call = msg.tool_calls[0]
-#         tool_name = tool_call.function.name
-#         args = json.loads(tool_call.function.arguments)
-
-#         tool_result = TOOL_MAP[tool_name](**args)
-
-#         # Tool returned nothing → fallback to LLM
-#         if not tool_result:
-#             final = client.chat.completions.create(
-#                 model="gpt-4o-mini",
-#                 messages=[
-#                     {"role": "system", "content": SYSTEM_FINAL_PROMPT},
-#                     *CHAT_HISTORY,
-#                     {"role": "user", "content": question},
-#                 ],
-#                 temperature=0.6,
-#             )
-
-#             answer = final.choices[0].message.content
-
-#         else:
-#             # Tool has data → reason silently
-#             final = client.chat.completions.create(
-#                 model="gpt-4o-mini",
-#                 messages=[
-#                     {"role": "system", "content": SYSTEM_FINAL_PROMPT},
-#                     *CHAT_HISTORY,
-#                     {
-#                         "role": "user",
-#                         "content": (
-#                             f"{question}\n\n"
-#                             f"Information:\n{json.dumps(tool_result)}"
-#                         ),
-#                     },
-#                 ],
-#                 temperature=0.4,
-#             )
-
-#             answer = final.choices[0].message.content
-
-#     # ============================
-#     # NO TOOL NEEDED (UNCHANGED)
-#     # ============================
-#     else:
-#         final = client.chat.completions.create(
-#             model="gpt-4o-mini",
-#             messages=[
-#                 {"role": "system", "content": SYSTEM_FINAL_PROMPT},
-#                 *CHAT_HISTORY,
-#                 {"role": "user", "content": question},
-#             ],
-#             temperature=0.6,
-#         )
-
-#         answer = final.choices[0].message.content
-
-#     # ============================
-#     # SAVE TO MEMORY (NEW)
-#     # ============================
-#     CHAT_HISTORY.append({"role": "user", "content": question})
-#     CHAT_HISTORY.append({"role": "assistant", "content": answer})
-
-#     return answer
-
 import json
 from openai import OpenAI
 from datetime import datetime
@@ -307,6 +12,7 @@ from mcp_server.tools import (
     get_news_by_impact,
     finedge_company_tool,
     get_market_news_by_date,
+    finedge_full_analysis_tool,
 )
 
 # ============================
@@ -351,6 +57,20 @@ CORE BEHAVIOR:
    - Answer in a general advisory manner.
    - Provide strategy-oriented guidance.
    - Avoid disclaimers about missing data.
+
+3. IF the user asks about investing (e.g., "should I buy", "is it good time"):
+   - You MUST use the provided price and news data.
+   - Start by mentioning:
+       → current price movement (up/down based on change)
+       → recent sentiment (from news)
+   - Then provide a balanced interpretation:
+       → positive signals → mention growth potential
+       → negative signals → mention caution
+   - NEVER give generic advice without using the data.
+   - NEVER ignore the provided data.
+   - Avoid definitive statements like "definitely buy".
+   - Use phrases like:
+       "based on current trend", "shows positive momentum", "may require caution".
 
 STYLE GUIDELINES:
 - Prefer bullets or short paragraphs.
@@ -405,8 +125,18 @@ TOOL SELECTION RULES:
    → Pass the resolved date in YYYY-MM-DD format.
 
 2. If the user asks about:
-   - a specific company
+   - current price
    - stock price
+   - price of [company]
+   - what is the price
+   - how much is [company]
+   - [company] price
+   - trading price
+   - share price
+   - stock value
+   - current value
+   - trading at
+   - a specific company
    - company performance
    - company-related news
 
@@ -417,6 +147,13 @@ TOOL SELECTION RULES:
 
 4. If the user asks for latest general news:
    → YOU MAY call: get_latest_news
+5. If user asks about:
+   - company fundamentals
+   - financials
+   - revenue, profit, balance sheet
+   - analysis of a company
+
+   → YOU MUST call: finedge_full_analysis_tool
 
 IMPORTANT:
 - Always prefer tools when factual market or historical data is requested.
@@ -442,6 +179,12 @@ CORE RULES:
     "check another source",
     "latest price is unavailable".
 - NEVER invent prices, index values, or numeric figures.
+- If financial data is present:
+  → Summarize revenue, profit, or key metrics.
+- If quote data exists:
+  → Mention price and change clearly.
+- If both news and financials exist:
+  → Combine insights into a clear company outlook.
 
 WHEN A QUESTION ASKS FOR A CURRENT / LIVE NUMERIC VALUE
 AND NO VERIFIED NUMBER IS PROVIDED:
@@ -580,6 +323,20 @@ TOOLS = [
             "required": ["date"]
         }
     }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "finedge_full_analysis_tool",
+        "description": "Get full financial analysis including revenue, profit, ratios, and stock data",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "company": {"type": "string"}
+            },
+            "required": ["company"]
+        }
+    }
 }
 
 ]
@@ -594,30 +351,34 @@ TOOL_MAP = {
     "get_news_by_impact": get_news_by_impact,
     "finedge_company_tool": finedge_company_tool,
     "get_market_news_by_date": get_market_news_by_date,
+    "finedge_full_analysis_tool": finedge_full_analysis_tool,
 }
 
 
 def is_tool_result_relevant(question: str, tool_name: str, tool_result: dict) -> bool:
     q = question.lower()
 
-    # -------- PRICE / VALUE QUERIES (INDEX or STOCK) --------
-    if any(word in q for word in ["price", "current", "value", "level"]):
-        if tool_name == "finedge_company_tool":
-            quote = tool_result.get("quote", {})
-            return quote.get("price") is not None
+    # Always trust company tools
+    if tool_name in ["finedge_company_tool", "finedge_full_analysis_tool"]:
+        return True
 
-        # Any other tool is irrelevant for price
-        return False
-
-    # -------- DATE / MARKET PERFORMANCE QUERIES --------
+    # Market date queries
     if any(word in q for word in ["market", "yesterday", "performed", "stocks", "date"]):
-        if tool_name == "get_market_news_by_date":
-            return bool(tool_result.get("news"))
-        return False
+        return bool(tool_result.get("news"))
 
-    # -------- DEFAULT: tool not relevant --------
     return False
 
+def has_valid_price_data(tool_result):
+    try:
+        return tool_result.get("quote", {}).get("price") not in [None, "", "Not Available"]
+    except:
+        return False
+
+def is_investment_query(question: str) -> bool:
+    q = question.lower()
+    return any(word in q for word in [
+        "buy", "invest", "should i", "good time", "worth", "hold", "sell"
+    ])
 # ============================
 # MAIN LLM FUNCTION
 # ============================
@@ -631,6 +392,11 @@ def ask_llm(question: str) -> str:
     client = get_openai_client()
 
     # -------- Tool decision step (LLM ONLY) --------
+    is_price_query = any(word in question.lower() for word in [
+    "price", "current price", "stock price", "share price", "trading price"
+])
+    is_investment = is_investment_query(question),
+    
     response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
@@ -639,7 +405,8 @@ def ask_llm(question: str) -> str:
             {"role": "user", "content": question},
         ],
         tools=TOOLS,
-        tool_choice="auto",
+
+        tool_choice = "required" if (is_price_query or is_investment) else "auto",
         temperature=0,
     )
 
@@ -675,10 +442,26 @@ def ask_llm(question: str) -> str:
             print("⚠️ TOOL RETURNED UNKNOWN FORMAT")
 
 
-        use_tool = is_tool_result_relevant(question, tool_name, tool_result)
+        clean_result = tool_result.copy()
 
-        if use_tool:
-            # Tool is relevant → pass data
+        # 🚀 remove symbol from response
+        if "symbol" in clean_result:
+            del clean_result["symbol"]
+
+        # 🔥 Check if tool result is useful
+        is_investment = is_investment_query(question)
+        has_price = has_valid_price_data(tool_result)
+        has_news = bool(tool_result.get("news"))
+
+        if has_price or (is_investment and has_news):
+            clean_result = tool_result.copy()
+            clean_result.pop("symbol", None)
+            enhanced_info = {
+                                "price_data": clean_result.get("quote"),
+                                "news_signals": clean_result.get("news"),
+                                "analysis_hint": "Use price trend and news sentiment to answer investment questions"
+                            }
+
             final = client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
@@ -686,14 +469,17 @@ def ask_llm(question: str) -> str:
                     *CHAT_HISTORY,
                     {
                         "role": "user",
-                        "content": f"{question}\n\nInformation:\n{json.dumps(tool_result)}",
+                        
+
+                        "content": f"{question}\n\nInformation:\n{json.dumps(enhanced_info)}",
+                        
                     },
                 ],
                 temperature=0.4,
                 max_tokens=300
             )
         else:
-            # Tool is irrelevant → IGNORE it completely
+            # 🚀 FALLBACK DIRECTLY
             final = client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
@@ -703,8 +489,6 @@ def ask_llm(question: str) -> str:
                 ],
                 temperature=0.6,
             )
-
-
 
 
         answer = final.choices[0].message.content
