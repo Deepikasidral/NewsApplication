@@ -16,7 +16,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/stock_price_service.dart';
 import 'profile_screen.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
+// import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 
 
@@ -53,38 +53,38 @@ late String currentUserId;
   Map<String, Map<String, dynamic>> _stockPriceCache = {};
   final TextEditingController _searchController = TextEditingController();
   bool _isLoadingCompanies = false;
-  InterstitialAd? _interstitialAd;
-  bool _isShowingAd = false;
+  // InterstitialAd? _interstitialAd;
+  // bool _isShowingAd = false;
 
   @override
   void initState() {
     super.initState();
     _searchController.addListener(_applyCompanySearch);
-    _loadInterstitialAd();
+    // _loadInterstitialAd();
     _init();
   }
   
   @override
   void dispose() {
     _searchController.dispose();
-    _interstitialAd?.dispose();
+    // _interstitialAd?.dispose();
     super.dispose();
   }
 
-  void _loadInterstitialAd() {
-    InterstitialAd.load(
-      adUnitId: 'ca-app-pub-6088749573646337/6577319196',
-      request: const AdRequest(),
-      adLoadCallback: InterstitialAdLoadCallback(
-        onAdLoaded: (ad) {
-          _interstitialAd = ad;
-        },
-        onAdFailedToLoad: (error) {
-          debugPrint("Interstitial ad load failed: $error");
-        },
-      ),
-    );
-  }
+  // void _loadInterstitialAd() {
+  //   InterstitialAd.load(
+  //     adUnitId: 'ca-app-pub-6088749573646337/6577319196',
+  //     request: const AdRequest(),
+  //     adLoadCallback: InterstitialAdLoadCallback(
+  //       onAdLoaded: (ad) {
+  //         _interstitialAd = ad;
+  //       },
+  //       onAdFailedToLoad: (error) {
+  //         debugPrint("Interstitial ad load failed: $error");
+  //       },
+  //     ),
+  //   );
+  // }
   
   Future<void> _init() async {
     // Run in parallel instead of sequential
@@ -1172,39 +1172,39 @@ Widget build(BuildContext context) {
               return;
           }
 
-  if (_interstitialAd != null && !_isShowingAd) {
-    _isShowingAd = true;
-    _interstitialAd!.fullScreenContentCallback = FullScreenContentCallback(
-      onAdDismissedFullScreenContent: (ad) {
-        ad.dispose();
-        _isShowingAd = false;
-        _loadInterstitialAd();
-        if (mounted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => destination!),
-          );
-        }
-      },
-      onAdFailedToShowFullScreenContent: (ad, error) {
-        ad.dispose();
-        _isShowingAd = false;
-        _loadInterstitialAd();
-        if (mounted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => destination!),
-          );
-        }
-      },
-    );
-    _interstitialAd!.show();
-  } else {
+  // if (_interstitialAd != null && !_isShowingAd) {
+  //   _isShowingAd = true;
+  //   _interstitialAd!.fullScreenContentCallback = FullScreenContentCallback(
+  //     onAdDismissedFullScreenContent: (ad) {
+  //       ad.dispose();
+  //       _isShowingAd = false;
+  //       _loadInterstitialAd();
+  //       if (mounted) {
+  //         Navigator.pushReplacement(
+  //           context,
+  //           MaterialPageRoute(builder: (_) => destination!),
+  //         );
+  //       }
+  //     },
+  //     onAdFailedToShowFullScreenContent: (ad, error) {
+  //       ad.dispose();
+  //       _isShowingAd = false;
+  //       _loadInterstitialAd();
+  //       if (mounted) {
+  //         Navigator.pushReplacement(
+  //           context,
+  //           MaterialPageRoute(builder: (_) => destination!),
+  //         );
+  //       }
+  //     },
+  //   );
+  //   _interstitialAd!.show();
+  // } else {
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(builder: (_) => destination!),
     );
-  }
+  // }
 },
         items: [
           _navItem(label: "NEWS", active: 'assets/icons/News Red.svg', inactive: 'assets/icons/News.svg', index: 0),
@@ -1694,19 +1694,62 @@ if (_tabIndex == 0) ...[
 
         Divider(height: 1),
         
+        /// TOP GAINERS LABEL
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          color: Colors.green.shade50,
+          child: Row(
+            children: [
+              Icon(Icons.trending_up, color: Colors.green.shade700, size: 18),
+              const SizedBox(width: 8),
+              Text(
+                "Top Gainers",
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.green.shade700,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+        ),
+        
 
         /// ROWS
         ListView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          itemCount: displayGainers.length + displayLosers.length,
+          itemCount: displayGainers.length + displayLosers.length + 1, // +1 for Top Losers label
           itemBuilder: (_, i) {
+            
+            // Show Top Losers label after gainers
+            if (i == displayGainers.length) {
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                color: Colors.red.shade50,
+                child: Row(
+                  children: [
+                    Icon(Icons.trending_down, color: Colors.red.shade700, size: 18),
+                    const SizedBox(width: 8),
+                    Text(
+                      "Top Losers",
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.red.shade700,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
 
             final isGainer = i < displayGainers.length;
+            final adjustedIndex = i > displayGainers.length ? i - 1 : i;
 
             final m = isGainer
-                ? displayGainers[i]
-                : displayLosers[i - displayGainers.length];
+                ? displayGainers[adjustedIndex]
+                : displayLosers[adjustedIndex - displayGainers.length];
 
             final change = (m["pChange"] ?? 0).toDouble();
 

@@ -441,26 +441,42 @@ def ask_llm(question: str) -> str:
         else:
             print("⚠️ TOOL RETURNED UNKNOWN FORMAT")
 
-
-        clean_result = tool_result.copy()
-
-        # 🚀 remove symbol from response
-        if "symbol" in clean_result:
-            del clean_result["symbol"]
+        # 🔥 Handle both dict and list results
+        if isinstance(tool_result, list):
+            # If tool returns a list, wrap it in a dict
+            clean_result = {"news": tool_result}
+        else:
+            clean_result = tool_result.copy()
+            # 🚀 remove symbol from response
+            if "symbol" in clean_result:
+                del clean_result["symbol"]
 
         # 🔥 Check if tool result is useful
         is_investment = is_investment_query(question)
-        has_price = has_valid_price_data(tool_result)
-        has_news = bool(tool_result.get("news"))
+        
+        # Safe access for both dict and list
+        if isinstance(tool_result, dict):
+            has_price = has_valid_price_data(tool_result)
+            has_news = bool(tool_result.get("news"))
+        else:
+            has_price = False
+            has_news = bool(tool_result)  # List is truthy if not empty
 
         if has_price or (is_investment and has_news):
-            clean_result = tool_result.copy()
-            clean_result.pop("symbol", None)
-            enhanced_info = {
-                                "price_data": clean_result.get("quote"),
-                                "news_signals": clean_result.get("news"),
-                                "analysis_hint": "Use price trend and news sentiment to answer investment questions"
-                            }
+            if isinstance(tool_result, dict):
+                clean_result = tool_result.copy()
+                clean_result.pop("symbol", None)
+                enhanced_info = {
+                    "price_data": clean_result.get("quote"),
+                    "news_signals": clean_result.get("news"),
+                    "analysis_hint": "Use price trend and news sentiment to answer investment questions"
+                }
+            else:
+                # For list results
+                enhanced_info = {
+                    "news_signals": tool_result,
+                    "analysis_hint": "Use news sentiment to answer the question"
+                }
 
             final = client.chat.completions.create(
                 model="gpt-4o-mini",
@@ -469,10 +485,7 @@ def ask_llm(question: str) -> str:
                     *CHAT_HISTORY,
                     {
                         "role": "user",
-                        
-
                         "content": f"{question}\n\nInformation:\n{json.dumps(enhanced_info)}",
-                        
                     },
                 ],
                 temperature=0.4,

@@ -180,7 +180,7 @@ import 'dart:convert';
           const SizedBox(height: 32),
 
           _buildSuggestion("Help me understand today's market trend"),
-          _buildSuggestion("Ask about 5 top volatile stocks today"),
+          _buildSuggestion("Ask about the current price of Bank Nifty"),
           _buildSuggestion("Ask about best funds to start sip in"),
 
           const Spacer(flex: 3),
@@ -281,17 +281,6 @@ import 'dart:convert';
       ),
       child: Row(
         children: [
-
-          /// 📷 CAMERA ICON
-          IconButton(
-            icon: const Icon(
-              Icons.camera_alt_outlined,
-              color: Colors.grey,
-            ),
-            onPressed: () {
-              // TODO: open camera / image picker later
-            },
-          ),
 
           /// TEXT FIELD
           Expanded(

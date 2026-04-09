@@ -31,34 +31,48 @@ router.post("/save-event", async (req, res) => {
 
     res.json({ success: true, saved: index === -1 });
   } catch (err) {
+    console.error("Save event error:", err);
     res.status(500).json({ message: "Server error" });
   }
 });
 
 // FETCH SAVED EVENTS
 router.get("/:userId/saved-events", async (req, res) => {
-  const { userId } = req.params;
+  try {
+    const { userId } = req.params;
 
-  const user = await User.findById(userId)
-    .populate("saved_events.eventId");
+    const user = await User.findById(userId)
+      .populate("saved_events.eventId");
 
-  if (!user) return res.status(404).json({ message: "User not found" });
+    if (!user) return res.status(404).json({ message: "User not found" });
 
-  res.json({
-    success: true,
-    data: user.saved_events.map((e) => e.eventId),
-  });
+    // Filter out null/deleted events
+    const validEvents = user.saved_events
+      .filter((e) => e.eventId != null)
+      .map((e) => e.eventId);
+
+    res.json({
+      success: true,
+      data: validEvents,
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
+  }
 });
 
 // DELETE ALL SAVED EVENTS
 router.delete("/:userId/saved-events", async (req, res) => {
-  const user = await User.findById(req.params.userId);
-  if (!user) return res.status(404).json({ message: "User not found" });
+  try {
+    const user = await User.findById(req.params.userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
 
-  user.saved_events = [];
-  await user.save();
+    user.saved_events = [];
+    await user.save();
 
-  res.json({ success: true });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
+  }
 });
 
 
