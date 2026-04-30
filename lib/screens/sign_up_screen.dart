@@ -8,6 +8,7 @@ import 'sign_in_screen.dart';
 import 'home_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:url_launcher/url_launcher.dart';
 // import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 
@@ -31,60 +32,14 @@ class _SignUpScreenState extends State<SignUpScreen> {
     scopes: ['email', 'profile'],
   );
 
-  final String privacyPolicyText = '''
-RupeeLetter respects your privacy and is committed to protecting your personal information.
+  Future<void> _openUrl(String url) async {
+    final uri = Uri.parse(url);
+    
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      await launchUrl(uri, mode: LaunchMode.inAppWebView);
+    }
+  }
 
-1. Information We Collect
-• Name
-• Email address or mobile number
-• User preferences (notifications, followed stocks)
-
-2. Automatically Collected Information
-• App usage activity
-• Device information
-• Crash logs and performance data
-
-3. Information We Do Not Collect
-• Bank details
-• Trading or brokerage data
-• PAN, Aadhaar, or KYC information
-
-4. How We Use Your Information
-• Deliver relevant financial news
-• Personalize content
-• Improve app performance
-• Respond to support requests
-
-We do not sell your personal data.
-
-5. Notifications
-You can enable or disable notifications at any time from the App.
-
-6. Your Rights
-You may update preferences, opt out of notifications, or request account deletion.
-
-7. Contact Us
-Email: contact@rupeeletter.com
-Website: https://rupeeletter.com
-''';
-
-  final String termsText = '''
-By using the RupeeLetter app, you agree to the following:
-
-• RupeeLetter provides financial news and information for informational purposes only.
-
-• Content is sourced from third parties and public information; accuracy or completeness is not guaranteed.
-
-• RupeeLetter does not provide investment, legal, or financial advice.
-
-• Users are responsible for how they use the information provided.
-
-• We may update, modify, or discontinue features without prior notice.
-
-• Misuse of the app or attempts to disrupt services may result in account suspension.
-
-• Continued use of the app constitutes acceptance of these Terms.
-''';
   @override
 void initState() {
   super.initState();
@@ -156,7 +111,7 @@ Future<void> saveFcmTokenToBackend(String userId) async {
   if (token == null) return;
 
   await http.post(
-    Uri.parse("http://51.20.72.236:5000/api/users/save-fcm"),
+    Uri.parse("http://51.20.136.45:5000/api/users/save-fcm"),
     headers: {"Content-Type": "application/json"},
     body: jsonEncode({
       "userId": userId,
@@ -210,7 +165,7 @@ Future<void> saveFcmTokenToBackend(String userId) async {
     
     try {
       final response = await http.post(
-        Uri.parse("http://51.20.72.236:5000/api/auth/signup"), // backend unchanged
+        Uri.parse("http://51.20.136.45:5000/api/auth/signup"), // backend unchanged
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({
           "name": name,
@@ -326,7 +281,7 @@ Future<void> saveFcmTokenToBackend(String userId) async {
       print("💾 Saving to MongoDB...");
       try {
         final response = await http.post(
-          Uri.parse("http://51.20.72.236:5000/api/auth/google-login"),
+          Uri.parse("http://51.20.136.45:5000/api/auth/google-login"),
           headers: {"Content-Type": "application/json"},
           body: jsonEncode(userData),
         ).timeout(const Duration(seconds: 10));
@@ -444,18 +399,6 @@ Future<void> saveFcmTokenToBackend(String userId) async {
                         fontSize: 30,
                         fontWeight: FontWeight.bold,
                         color: Colors.black,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 36.0),
-                      child: Text(
-                        'By continuing, you agree to our Terms of Services and Private Policy.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade600,
-                        ),
                       ),
                     ),
                   ],
@@ -633,38 +576,42 @@ Future<void> saveFcmTokenToBackend(String userId) async {
                         activeColor: Colors.red.shade700,
                       ),
                       Expanded(
-                        child: GestureDetector(
-                          onTap: () {
-                            showDialog(
-                              context: context,
-                              builder: (_) => _buildPrivacyDialog(),
-                            );
-                          },
-                          child: RichText(
-                            text: TextSpan(
-                              style: const TextStyle(fontSize: 15, color: Colors.black87),
-                              children: [
-                                const TextSpan(text: 'I accept the '),
-                                TextSpan(
-                                  text: 'Privacy Policy',
-                                  style: TextStyle(
-                                    color: Colors.red.shade700,
-                                    decoration: TextDecoration.underline,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                const TextSpan(text: ' and '),
-                                TextSpan(
-                                  text: 'Terms & Conditions',
-                                  style: TextStyle(
-                                    color: Colors.red.shade700,
-                                    decoration: TextDecoration.underline,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
+                        child: Wrap(
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            const Text(
+                              'I accept the ',
+                              style: TextStyle(fontSize: 15, color: Colors.black87),
                             ),
-                          ),
+                            GestureDetector(
+                              onTap: () => _openUrl("https://news.rupeeletter.com/privacy-policy"),
+                              child: const Text(
+                                'Privacy Policy',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  color: Colors.blue,
+                                  decoration: TextDecoration.underline,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            const Text(
+                              ' and ',
+                              style: TextStyle(fontSize: 15, color: Colors.black87),
+                            ),
+                            GestureDetector(
+                              onTap: () => _openUrl("https://news.rupeeletter.com/terms-and-conditions"),
+                              child: const Text(
+                                'Terms & Conditions',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  color: Colors.blue,
+                                  decoration: TextDecoration.underline,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -748,90 +695,6 @@ Future<void> saveFcmTokenToBackend(String userId) async {
               ],
             ),
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPrivacyDialog() {
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      child: DefaultTabController(
-        length: 2,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFFEA6B6B),
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
-              ),
-              child: const TabBar(
-                indicatorColor: Colors.white,
-                labelColor: Colors.white,
-                unselectedLabelColor: Colors.white70,
-                labelStyle: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-                tabs: [
-                  Tab(text: "Privacy Policy"),
-                  Tab(text: "Terms & Conditions"),
-                ],
-              ),
-            ),
-            SizedBox(
-              height: 450,
-              child: TabBarView(
-                children: [
-                  SingleChildScrollView(
-                    padding: const EdgeInsets.all(20),
-                    child: Text(
-                      privacyPolicyText,
-                      style: const TextStyle(fontSize: 15, height: 1.6, color: Colors.black87),
-                    ),
-                  ),
-                  SingleChildScrollView(
-                    padding: const EdgeInsets.all(20),
-                    child: Text(
-                      termsText,
-                      style: const TextStyle(fontSize: 15, height: 1.6, color: Colors.black87),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text(
-                      "Close",
-                      style: TextStyle(color: Colors.black54, fontSize: 15),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  ElevatedButton(
-                    onPressed: () {
-                      setState(() {
-                        _acceptedPrivacyPolicy = true;
-                      });
-                      Navigator.pop(context);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFEA6B6B),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                    ),
-                    child: const Text(
-                      "Accept",
-                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
         ),
       ),
     );

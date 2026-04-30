@@ -46,7 +46,7 @@ List losers = [];
 Set<String> _locallySavedIds = {};
 late String currentUserId;
 
-  final String baseUrl = "http://51.20.72.236:5000";
+  final String baseUrl = "http://51.20.136.45:5000";
   
   List<Map<String, dynamic>> _companies = [];
   List<Map<String, dynamic>> _filteredCompanies = [];

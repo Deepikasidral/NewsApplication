@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:news_application/screens/sign_in_screen.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -126,7 +127,7 @@ RupeeLetter is a financial news and insights platform focused on simplifying mar
   
 
 
-  static const String baseUrl = "http://51.20.72.236:5000";
+  static const String baseUrl = "http://51.20.136.45:5000";
 
   @override
   void initState() {
@@ -289,56 +290,12 @@ void showDeleteDialog() {
   );
 }
 
-void _showInfoDialog(String title, String content) {
-  showDialog(
-    context: context,
-    builder: (context) => Dialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: GoogleFonts.poppins(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Expanded(
-              child: SingleChildScrollView(
-                child: Text(
-                  content,
-                  style: GoogleFonts.poppins(
-                    fontSize: 14,
-                    height: 1.5,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: Text(
-                  "Close",
-                  style: GoogleFonts.poppins(
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
+Future<void> _openUrl(String url) async {
+  final uri = Uri.parse(url);
+  
+  if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+    await launchUrl(uri, mode: LaunchMode.inAppWebView);
+  }
 }
 
 
@@ -436,17 +393,17 @@ Widget build(BuildContext context) {
 
             buildLink(
               "Disclaimer",
-              () => _showInfoDialog("Disclaimer", disclaimerText),
+              () => _openUrl("https://news.rupeeletter.com/disclaimer"),
             ),
 
             buildLink(
               "Terms & Conditions",
-              () => _showInfoDialog("Terms & Conditions", termsText),
+              () => _openUrl("https://news.rupeeletter.com/terms-and-conditions"),
             ),
 
             buildLink(
               "Privacy Policy",
-              () => _showInfoDialog("Privacy Policy", privacyPolicyText),
+              () => _openUrl("https://news.rupeeletter.com/privacy-policy"),
             ),
 
             const SizedBox(height: 30),
@@ -462,9 +419,9 @@ Widget build(BuildContext context) {
             const SizedBox(height: 12),
 
             buildLink(
-  "Send Feedback",
-  () => _showInfoDialog("Send Feedback", feedbackText),
-),
+              "Contact Us",
+              () => _openUrl("https://news.rupeeletter.com/contact-us"),
+            ),
 
 
             const SizedBox(height: 30),

@@ -99,7 +99,7 @@ Future<void> saveFcmTokenToBackend(String userId) async {
   if (token == null) return;
 
   await http.post(
-    Uri.parse("http://51.20.72.236:5000/api/users/save-fcm"),
+    Uri.parse("http://51.20.136.45:5000/api/users/save-fcm"),
     headers: {"Content-Type": "application/json"},
     body: jsonEncode({
       "userId": userId,
@@ -125,7 +125,7 @@ Future<void> saveFcmTokenToBackend(String userId) async {
     
     try {
       final response = await http.post(
-        Uri.parse("http://51.20.72.236:5000/api/auth/signin"),
+        Uri.parse("http://51.20.136.45:5000/api/auth/signin"),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({"email": email, "password": password, "loginType": "email"}),
       );
@@ -217,7 +217,7 @@ Future<void> saveFcmTokenToBackend(String userId) async {
       print("💾 Saving to MongoDB...");
       try {
         final response = await http.post(
-          Uri.parse("http://51.20.72.236:5000/api/auth/google-login"),
+          Uri.parse("http://51.20.136.45:5000/api/auth/google-login"),
           headers: {"Content-Type": "application/json"},
           body: jsonEncode(userData),
         ).timeout(const Duration(seconds: 10));
@@ -360,7 +360,7 @@ Future<void> saveFcmTokenToBackend(String userId) async {
                             ),
                           ),
                           const TextSpan(
-                            text: 'upee Letter',
+                            text: 'Rupee Letter',
                             style: TextStyle(
                               color: Colors.black,
                               fontSize: 28,

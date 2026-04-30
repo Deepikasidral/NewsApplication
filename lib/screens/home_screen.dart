@@ -57,7 +57,7 @@ int _viewCount = 0;
 DateTime _lastTrackedDate = DateTime.now();
 
 
-final String baseUrl = "http://51.20.72.236:5000";
+final String baseUrl = "http://51.20.136.45:5000";
 
  @override
 void initState() {
@@ -190,10 +190,39 @@ Future<void> _fetchCompanies() async {
 
 List<Article> _removeDuplicates(List<Article> list) {
   final map = <String, Article>{};
+  final seen = <String>{};
+  
   for (var a in list) {
-    map[a.id] = a; // _id should be unique
+    // Remove by ID first
+    if (map.containsKey(a.id)) continue;
+    
+    // Check for similar content
+    final contentKey = _generateContentKey(a);
+    if (seen.contains(contentKey)) continue;
+    
+    map[a.id] = a;
+    seen.add(contentKey);
   }
   return map.values.toList();
+}
+
+String _generateContentKey(Article a) {
+  // Normalize title: lowercase, remove special chars, trim
+  final normalizedTitle = a.title
+      .toLowerCase()
+      .replaceAll(RegExp(r'[^a-z0-9\s]'), '')
+      .trim()
+      .split(RegExp(r'\s+'))
+      .where((word) => word.length > 3) // Keep only meaningful words
+      .take(10) // First 10 words
+      .join(' ');
+  
+  // Use first 100 chars of summary for additional matching
+  final summarySnippet = a.summary.length > 100 
+      ? a.summary.substring(0, 100).toLowerCase() 
+      : a.summary.toLowerCase();
+  
+  return '$normalizedTitle|$summarySnippet';
 }
 
 void _scrollToArticle(String fileName) {

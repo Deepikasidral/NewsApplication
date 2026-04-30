@@ -1,4 +1,3 @@
-
 import os
 import sys
 import json
@@ -31,7 +30,7 @@ COMPANY_LOOKUP_CACHE = None
 # ================================
 # 🔧 CONFIGURATION
 # ================================
-load_dotenv(dotenv_path="../.env")
+load_dotenv()
 
 mongo_uri = os.getenv("MONGO_URI")
 db_name = os.getenv("DB_NAME")
@@ -383,6 +382,11 @@ The company is:
 - Primary subject of event
 - Official participant in transaction
 
+⚠️ SPECIAL RULE FOR BANKS:
+- Always extract individual bank names (HDFC Bank, ICICI Bank, SBI, etc.)
+- Do NOT use "Nifty Bank" sector unless more than 6 banks are mentioned
+- Banks are companies, not sectors
+
 ---
 
 ### DO NOT INCLUDE companies that are:
@@ -397,9 +401,9 @@ The company is:
 ###  PRIORITY RULE
 If article focuses on ONE company → return only that company
 
-If SAME event involves multiple companies → return all
+If SAME event involves multiple companies → return all (up to 6 companies)
 
-If MORE THAN 4 relevant companies → return:
+If MORE THAN 6 relevant companies → return:
 - sector from allowed list
 - companies MUST be empty
 
@@ -531,6 +535,7 @@ Return JSON only. No commentary.
 """
 
 
+
 def normalize_llm_name(name):
     name = name.lower()
     name = re.sub(r"[^\w\s]", "", name)  # remove dots, commas
@@ -624,7 +629,7 @@ def process_agent2(article):
     elif news_type == "stock":
         final_commodities = []
 
-        if len(validated_companies) >= 4:
+        if len(validated_companies) >= 6:
             final_sector = llm_sector if llm_sector else ""
             final_companies = []
 
@@ -755,16 +760,17 @@ def remove_pti_references(text):
     return text
 
 
+
 # ================================
 # 🚀 PIPELINE RUNNER
 # ================================
 def run_pipeline():
     articles = fetch_pti_news()
-    
+
     fetched_count = len(articles)
     stored_count = 0
     filtered_count = 0
-    
+
     print(f"📊 Fetched: {fetched_count} articles")
 
     for article in articles:
@@ -772,7 +778,7 @@ def run_pipeline():
         if not file_name:
             continue
 
-        
+
 
         print(f"\n📰 Processing: {article.get('Headline','')[:80]}")
 
@@ -795,8 +801,8 @@ def run_pipeline():
             agent3["sentiment"] in ["Very Bullish", "Very Bearish"]
         )
 
-        
-        
+
+
         content_hash = compute_news_hash(article)
         clean_headline = remove_pti_references(article.get("Headline", ""))
         clean_story = remove_pti_references(article.get("story", ""))
@@ -837,6 +843,18 @@ def run_pipeline():
 
 
         try:
+            # Check if already exists by FileName or content_hash
+            existing = filtered_news.find_one({
+                "$or": [
+                    {"FileName": file_name},
+                    {"content_hash": content_hash}
+                ]
+            })
+            
+            if existing:
+                print("⏩ Duplicate detected - skipping")
+                continue
+
             result = filtered_news.update_one(
                 {"content_hash": content_hash},
                 {"$setOnInsert": final_doc},
@@ -848,6 +866,7 @@ def run_pipeline():
                 print("✅ Stored new article")
 
                 if notify:
+                    print(f"🔔 Sending notification for: {article.get('Headline','')[:60]}")
                     send_push_notification(article, agent2, agent3)
             else:
                 print("⏩ Duplicate skipped (same content)")
@@ -856,7 +875,7 @@ def run_pipeline():
 
 
     print(f"\n🎯 Pipeline complete: Fetched={fetched_count}, Filtered={filtered_count}, Stored={stored_count}")
-    
+
     if stored_count == 0 and fetched_count > 0:
         save_last_run_time(datetime.now(IST))
 

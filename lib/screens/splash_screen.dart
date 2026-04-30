@@ -35,7 +35,7 @@ class _SplashScreenState extends State<SplashScreen> {
     // Verify token with backend
     try {
       final response = await http.post(
-        Uri.parse("http://51.20.72.236:5000/api/auth/verify-token"),
+        Uri.parse("http://51.20.136.45:5000/api/auth/verify-token"),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({"token": token}),
       ).timeout(const Duration(seconds: 5));
